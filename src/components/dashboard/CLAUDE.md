@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9109 | 3:21 PM | 🟣 | Thumbnail upload added to portfolio item editor | ~296 |
+| #9100 | 3:20 PM | 🟣 | Portfolio items now support custom thumbnail uploads | ~378 |
 | #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |
 | #9027 | 2:40 PM | 🟣 | Profile and Portfolio API Database Integration | ~524 |
 | #9004 | 2:27 PM | 🟣 | Role-based dashboard navigation and overview pages | ~525 |

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import Button from "../Button";
 import { useToast } from "../Toast";
 
@@ -10,21 +11,19 @@ type MessageType = "text" | "file" | "system" | "ai";
 
 interface ChatMessage {
   id: string;
-  sender: string;
-  initial: string;
+  senderId: string | null;
+  senderName: string | null;
   content: string;
-  timestamp: string;
-  /** ISO timestamp for relative time calculation */
-  sentAt: number;
-  type: MessageType;
-  fileName?: string;
-  fileSize?: string;
+  messageType: MessageType;
+  fileUrl: string | null;
+  createdAt: string;
 }
 
 // --- Relative time helper ---
 
-function relativeTime(sentAt: number): string {
+function relativeTime(dateStr: string): string {
   const now = Date.now();
+  const sentAt = new Date(dateStr).getTime();
   const diffMs = now - sentAt;
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
@@ -42,113 +41,27 @@ function relativeTime(sentAt: number): string {
   });
 }
 
-// --- Mock Data ---
+function getInitials(name: string | null): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
-const NOW = Date.now();
+function getFileName(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    return path.split("/").pop() || "file";
+  } catch {
+    return "file";
+  }
+}
 
-const MOCK_MESSAGES: ChatMessage[] = [
-  {
-    id: "m1",
-    sender: "",
-    initial: "",
-    content: "Sara Chen joined the project",
-    timestamp: "10:02 AM",
-    sentAt: NOW - 3 * 60 * 60 * 1000,
-    type: "system",
-  },
-  {
-    id: "m2",
-    sender: "Sara Chen",
-    initial: "SC",
-    content:
-      "Hey team, I just pushed the initial component structure. Let me know if the file organization makes sense.",
-    timestamp: "10:05 AM",
-    sentAt: NOW - 2.9 * 60 * 60 * 1000,
-    type: "text",
-  },
-  {
-    id: "m3",
-    sender: "Client",
-    initial: "CL",
-    content:
-      "Looks great. Can we make sure the nav collapses on mobile? That was a pain point on the last project.",
-    timestamp: "10:08 AM",
-    sentAt: NOW - 2.7 * 60 * 60 * 1000,
-    type: "text",
-  },
-  {
-    id: "m4",
-    sender: "Marcus Johnson",
-    initial: "MJ",
-    content:
-      "Already on it. I'm using a sheet pattern for mobile nav — swipe to dismiss. Should feel native.",
-    timestamp: "10:12 AM",
-    sentAt: NOW - 2.5 * 60 * 60 * 1000,
-    type: "text",
-  },
-  {
-    id: "m5",
-    sender: "Sara Chen",
-    initial: "SC",
-    content: "",
-    timestamp: "10:15 AM",
-    sentAt: NOW - 2.3 * 60 * 60 * 1000,
-    type: "file",
-    fileName: "design-system-tokens.json",
-    fileSize: "4.2 KB",
-  },
-  {
-    id: "m6",
-    sender: "vibechckd AI",
-    initial: "AI",
-    content:
-      "Based on the project scope, here's a suggested task breakdown:\n\n1. Navigation component (mobile + desktop) — Sara\n2. API integration layer + auth flow — Marcus\n3. Dashboard layout with responsive grid — Sara\n4. Data fetching hooks + caching — Marcus\n\nEstimated timeline: 5-7 days for MVP.",
-    timestamp: "10:18 AM",
-    sentAt: NOW - 2.1 * 60 * 60 * 1000,
-    type: "ai",
-  },
-  {
-    id: "m7",
-    sender: "Client",
-    initial: "CL",
-    content: "That breakdown works. Let's aim for end of week for a first review.",
-    timestamp: "10:22 AM",
-    sentAt: NOW - 1.8 * 60 * 60 * 1000,
-    type: "text",
-  },
-  {
-    id: "m8",
-    sender: "Marcus Johnson",
-    initial: "MJ",
-    content:
-      "Quick question — are we using the existing auth provider or rolling our own? That affects the timeline.",
-    timestamp: "10:30 AM",
-    sentAt: NOW - 1.2 * 60 * 60 * 1000,
-    type: "text",
-  },
-  {
-    id: "m9",
-    sender: "",
-    initial: "",
-    content: "Marcus Johnson shared a screen recording",
-    timestamp: "10:45 AM",
-    sentAt: NOW - 30 * 60 * 1000,
-    type: "system",
-  },
-  {
-    id: "m10",
-    sender: "Sara Chen",
-    initial: "SC",
-    content:
-      "Nice work on the transitions, Marcus. The easing feels right. I'd tweak the duration on the card entrance — maybe 200ms instead of 300ms.",
-    timestamp: "10:52 AM",
-    sentAt: NOW - 8 * 60 * 1000,
-    type: "text",
-  },
-];
-
-const MEMBER_COUNT = 3;
 const MAX_CHARS = 500;
+const POLL_INTERVAL = 5000;
 
 // --- Icons ---
 
@@ -205,6 +118,25 @@ function FileIcon() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 function BotIcon() {
   return (
     <svg
@@ -248,17 +180,49 @@ interface ProjectChatProps {
 }
 
 export default function ProjectChat({ projectId }: ProjectChatProps) {
+  const { data: session } = useSession();
   const [aiEnabled, setAiEnabled] = useState(true);
   const [inputValue, setInputValue] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // keep projectId for future use
-  void projectId;
+  const currentUserId = session?.user?.id;
+  const currentUserName = session?.user?.name || "You";
 
+  // Fetch messages
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/messages?projectId=${projectId}`);
+      if (!res.ok) return;
+      const data: ChatMessage[] = await res.json();
+      setMessages(data);
+    } catch {
+      // silently fail on poll
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
+
+  // Initial load
+  useEffect(() => {
+    setMessages([]);
+    setIsLoading(true);
+    fetchMessages();
+  }, [fetchMessages]);
+
+  // Poll for new messages every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchMessages, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchMessages]);
+
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isAiTyping]);
@@ -270,49 +234,114 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
   }
 
   function handleAttach() {
-    toast("File attachment coming soon");
+    fileInputRef.current?.click();
   }
 
-  function handleSend() {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be selected again
+    e.target.value = "";
+
+    try {
+      toast("Uploading file...");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "asset");
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        toast("Failed to upload file");
+        return;
+      }
+
+      const { url } = await uploadRes.json();
+
+      // Send file message
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          content: file.name,
+          messageType: "file",
+          fileUrl: url,
+        }),
+      });
+
+      if (!res.ok) {
+        toast("Failed to send file");
+        return;
+      }
+
+      const created: ChatMessage = await res.json();
+      setMessages((prev) => [...prev, created]);
+      toast("File shared");
+    } catch {
+      toast("Failed to upload file");
+    }
+  }
+
+  async function handleSend() {
     const text = inputValue.trim();
-    if (!text) return;
+    if (!text || isSending) return;
 
-    const newMessage: ChatMessage = {
-      id: `m${Date.now()}`,
-      sender: "Client",
-      initial: "CL",
-      content: text,
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      }),
-      sentAt: Date.now(),
-      type: "text",
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    setIsSending(true);
     setInputValue("");
-    inputRef.current?.focus();
-    toast("Message sent");
 
-    // Simulate AI typing response
+    // Optimistically add the message
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: optimisticId,
+      senderId: currentUserId || null,
+      senderName: currentUserName,
+      content: text,
+      messageType: "text",
+      fileUrl: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+    inputRef.current?.focus();
+
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, content: text }),
+      });
+
+      if (!res.ok) {
+        // Remove optimistic message on failure
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        toast("Failed to send message");
+        setInputValue(text);
+        setIsSending(false);
+        return;
+      }
+
+      const created: ChatMessage = await res.json();
+      // Replace optimistic message with real one
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticId ? created : m))
+      );
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      toast("Failed to send message");
+      setInputValue(text);
+    }
+
+    setIsSending(false);
+
+    // Simulate AI typing (cosmetic for now)
     if (aiEnabled) {
       setIsAiTyping(true);
       setTimeout(() => {
         setIsAiTyping(false);
-        const aiReply: ChatMessage = {
-          id: `m${Date.now()}-ai`,
-          sender: "vibechckd AI",
-          initial: "AI",
-          content: "Got it. I'll factor that into the current sprint plan.",
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          }),
-          sentAt: Date.now(),
-          type: "ai",
-        };
-        setMessages((prev) => [...prev, aiReply]);
       }, 2000);
     }
   }
@@ -326,9 +355,6 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
         <div className="flex items-center gap-2.5">
           <span className="text-[13px] font-medium text-text-primary font-body">
             Chat
-          </span>
-          <span className="inline-flex items-center px-1.5 py-0.5 text-[11px] font-mono text-text-muted bg-surface-muted rounded">
-            {MEMBER_COUNT}
           </span>
         </div>
         <button
@@ -363,16 +389,30 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0">
+        {isLoading && (
+          <div className="flex justify-center py-8">
+            <span className="text-[12px] text-text-muted font-mono">
+              Loading messages...
+            </span>
+          </div>
+        )}
+        {!isLoading && messages.length === 0 && (
+          <div className="flex justify-center py-8">
+            <span className="text-[12px] text-text-muted font-body italic">
+              No messages yet. Start the conversation.
+            </span>
+          </div>
+        )}
         {messages.map((msg, idx) => {
           const prevMsg = idx > 0 ? messages[idx - 1] : null;
           const isSameSenderAsPrev =
             prevMsg &&
-            prevMsg.type !== "system" &&
-            msg.type !== "system" &&
-            prevMsg.sender === msg.sender;
+            prevMsg.messageType !== "system" &&
+            msg.messageType !== "system" &&
+            prevMsg.senderId === msg.senderId;
           const isDifferentSender = prevMsg && !isSameSenderAsPrev;
 
-          if (msg.type === "system") {
+          if (msg.messageType === "system") {
             return (
               <div key={msg.id} className="flex justify-center py-3">
                 <span className="text-[12px] italic text-text-muted font-body">
@@ -382,9 +422,11 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
             );
           }
 
-          const isOwn = msg.sender === "Client";
-          const isAi = msg.type === "ai";
+          const isOwn = msg.senderId === currentUserId;
+          const isAi = msg.messageType === "ai";
           const showHeader = !isSameSenderAsPrev;
+          const displayName = msg.senderName || "Unknown";
+          const initial = isAi ? null : getInitials(displayName);
 
           return (
             <div key={msg.id}>
@@ -398,7 +440,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
                   isSameSenderAsPrev ? "mt-0.5" : "mt-2"
                 }`}
               >
-                {/* Avatar — only show on first message in a group */}
+                {/* Avatar */}
                 {showHeader ? (
                   <div
                     className={`
@@ -411,7 +453,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
                       }
                     `}
                   >
-                    {isAi ? <BotIcon /> : msg.initial}
+                    {isAi ? <BotIcon /> : initial}
                   </div>
                 ) : (
                   <div className="flex-shrink-0 w-6" />
@@ -424,7 +466,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
                     ${isOwn ? "items-end" : "items-start"}
                   `}
                 >
-                  {/* Sender + time — only on first in group */}
+                  {/* Sender + time */}
                   {showHeader && (
                     <div
                       className={`flex items-center gap-2 mb-0.5 ${
@@ -432,37 +474,42 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
                       }`}
                     >
                       <span className="text-[12px] font-medium text-text-primary font-body">
-                        {msg.sender}
+                        {isOwn ? "You" : displayName}
                       </span>
                       <span className="text-[11px] font-mono text-text-muted">
-                        {relativeTime(msg.sentAt)}
+                        {relativeTime(msg.createdAt)}
                       </span>
                     </div>
                   )}
 
                   {/* Message body */}
-                  {msg.type === "file" ? (
-                    <div
-                      className={`
-                        border border-border rounded-md px-3 py-2 flex items-center gap-2.5
-                        ${isOwn ? "bg-surface-muted" : "bg-background"}
-                      `}
+                  {msg.messageType === "file" ? (
+                    <a
+                      href={msg.fileUrl || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block no-underline"
                     >
-                      <span className="text-text-muted">
-                        <FileIcon />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] text-text-primary font-body truncate">
-                          {msg.fileName}
+                      <div
+                        className={`
+                          border border-border rounded-md px-3 py-2 flex items-center gap-2.5
+                          hover:bg-surface-muted/80 transition-colors duration-150
+                          ${isOwn ? "bg-surface-muted" : "bg-background"}
+                        `}
+                      >
+                        <span className="text-text-muted">
+                          <FileIcon />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] text-text-primary font-body truncate">
+                            {msg.content || getFileName(msg.fileUrl || "")}
+                          </div>
                         </div>
-                        <div className="text-[11px] font-mono text-text-muted">
-                          {msg.fileSize}
-                        </div>
+                        <span className="text-text-muted hover:text-text-primary transition-colors duration-150">
+                          <DownloadIcon />
+                        </span>
                       </div>
-                      <span className="text-[12px] text-text-muted hover:text-text-primary transition-colors duration-150 cursor-pointer font-body">
-                        Download
-                      </span>
-                    </div>
+                    </a>
                   ) : (
                     <div
                       className={`
@@ -480,9 +527,21 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
             </div>
           );
         })}
-        {isAiTyping && <div className="mt-2"><TypingIndicator /></div>}
+        {isAiTyping && (
+          <div className="mt-2">
+            <TypingIndicator />
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
       {/* Input area */}
       <div className="border-t border-border px-3 py-2.5 bg-background">
@@ -527,7 +586,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
             variant="primary"
             size="sm"
             onClick={handleSend}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || isSending}
             className="!px-2.5 !py-1.5"
           >
             <SendIcon />

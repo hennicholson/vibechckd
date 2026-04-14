@@ -65,7 +65,7 @@ export async function GET() {
           slug: profile.creatorSlug || "",
           displayName: user.name || "",
           avatarUrl: profile.pfpUrl || `/pfp/${(profile.creatorSlug || "").split("-")[0]}.jpeg`,
-          gifPreviewUrl: "",
+          gifPreviewUrl: profile.gifPreviewUrl || "",
           bio: profile.bio || "",
           tagline: profile.tagline || "",
           location: profile.location || "",

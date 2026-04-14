@@ -1,59 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ProjectChat from "@/components/projects/ProjectChat";
 
 type Conversation = {
-  id: string;
   projectId: string;
   projectName: string;
   lastMessage: string;
-  timestamp: string;
-  unreadCount: number;
+  lastSenderName: string;
+  lastMessageAt: string;
 };
 
-const conversations: Conversation[] = [
-  {
-    id: "conv-1",
-    projectId: "proj-1",
-    projectName: "vibechckd Marketing Site",
-    lastMessage: "Nice work on the transitions, Marcus. The easing feels right.",
-    timestamp: "2h ago",
-    unreadCount: 2,
-  },
-  {
-    id: "conv-2",
-    projectId: "proj-3",
-    projectName: "E-Commerce Redesign",
-    lastMessage: "Can we revisit the checkout flow? Conversion is still below target.",
-    timestamp: "Yesterday",
-    unreadCount: 1,
-  },
-  {
-    id: "conv-3",
-    projectId: "proj-2",
-    projectName: "Personal Portfolio",
-    lastMessage: "Draft looks good. Let me know when you want to go live.",
-    timestamp: "Apr 10",
-    unreadCount: 0,
-  },
-  {
-    id: "conv-4",
-    projectId: "proj-4",
-    projectName: "SaaS Dashboard",
-    lastMessage: "The data visualization components are ready for review.",
-    timestamp: "Apr 8",
-    unreadCount: 0,
-  },
-  {
-    id: "conv-5",
-    projectId: "proj-5",
-    projectName: "Mobile App Landing",
-    lastMessage: "Updated the hero animation per your notes. Take a look?",
-    timestamp: "Apr 5",
-    unreadCount: 0,
-  },
-];
+function relativeTimestamp(dateStr: string): string {
+  const now = Date.now();
+  const ts = new Date(dateStr).getTime();
+  const diffMs = now - ts;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDay === 1) return "Yesterday";
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return new Date(ts).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function SearchIcon() {
   return (
@@ -94,8 +69,33 @@ function ChatBubbleIcon() {
 export default function InboxPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const selectedConv = conversations.find((c) => c.id === selected);
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await fetch("/api/conversations");
+      if (!res.ok) return;
+      const data: Conversation[] = await res.json();
+      setConversations(data);
+    } catch {
+      // silently fail
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  // Refresh conversation list every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchConversations, 10000);
+    return () => clearInterval(interval);
+  }, [fetchConversations]);
+
+  const selectedConv = conversations.find((c) => c.projectId === selected);
 
   const filtered = search.trim()
     ? conversations.filter((c) =>
@@ -132,31 +132,42 @@ export default function InboxPage() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
+          {isLoading && (
+            <div className="px-4 py-6 text-center">
+              <span className="text-[12px] text-text-muted font-mono">
+                Loading...
+              </span>
+            </div>
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="px-4 py-6 text-center">
+              <span className="text-[12px] text-text-muted font-body italic">
+                {search.trim()
+                  ? "No conversations match your search"
+                  : "No conversations yet"}
+              </span>
+            </div>
+          )}
           {filtered.map((conv) => (
             <button
-              key={conv.id}
-              onClick={() => setSelected(conv.id)}
+              key={conv.projectId}
+              onClick={() => setSelected(conv.projectId)}
               className={`w-full text-left px-4 py-3 border-b border-border transition-colors duration-150 cursor-pointer ${
-                selected === conv.id
+                selected === conv.projectId
                   ? "bg-surface-muted"
                   : "bg-background hover:bg-background-alt"
               }`}
             >
               <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  {conv.unreadCount > 0 && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-text-primary flex-shrink-0" />
-                  )}
-                  <span
-                    className={`text-[13px] text-text-primary font-body truncate ${
-                      conv.unreadCount > 0 ? "font-semibold" : "font-medium"
-                    }`}
-                  >
+                  <span className="text-[13px] text-text-primary font-body font-medium truncate">
                     {conv.projectName}
                   </span>
                 </div>
                 <span className="text-[11px] font-mono text-text-muted flex-shrink-0 ml-2">
-                  {conv.timestamp}
+                  {conv.lastMessageAt
+                    ? relativeTimestamp(conv.lastMessageAt)
+                    : ""}
                 </span>
               </div>
               <p className="text-[12px] text-text-muted font-body truncate">

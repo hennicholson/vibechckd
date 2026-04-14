@@ -7,6 +7,7 @@ import Input from "../Input";
 import Textarea from "../Textarea";
 import Button from "../Button";
 import { useToast } from "../Toast";
+import FileUploadButton from "./FileUploadButton";
 import {
   SPECIALTIES,
   SPECIALTY_LABELS,
@@ -36,6 +37,8 @@ type ProfileData = {
   twitterUrl: string;
   linkedinUrl: string;
   websiteUrl: string;
+  avatarUrl: string;
+  gifPreviewUrl: string;
 };
 
 interface ProfileFormProps {
@@ -55,6 +58,8 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
     twitterUrl: initialData?.twitterUrl ?? defaultProfile.twitterUrl ?? "",
     linkedinUrl: initialData?.linkedinUrl ?? defaultProfile.linkedinUrl ?? "",
     websiteUrl: initialData?.websiteUrl ?? defaultProfile.websiteUrl ?? "",
+    avatarUrl: initialData?.avatarUrl ?? defaultProfile.avatarUrl ?? "",
+    gifPreviewUrl: initialData?.gifPreviewUrl ?? defaultProfile.gifPreviewUrl ?? "",
   });
 
   const [saving, setSaving] = useState(false);
@@ -99,7 +104,7 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
     }
   };
 
-  const hasPfp = defaultProfile.avatarUrl.startsWith("/pfp/");
+  const hasPfp = isRealUrl(form.avatarUrl) || form.avatarUrl.startsWith("/pfp/");
 
   const initials = form.displayName
     .split(" ")
@@ -108,41 +113,80 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
     .toUpperCase()
     .slice(0, 2);
 
+  function isRealUrl(url: string): boolean {
+    return url.startsWith("http://") || url.startsWith("https://");
+  }
+
   return (
     <div className="mt-6 pb-24">
-      {/* Photo */}
-      <div className="flex items-center gap-4">
-        {hasPfp ? (
-          <div className="w-[80px] h-[80px] rounded-[10px] overflow-hidden flex-shrink-0 pfp-static">
-            <Image
-              src={defaultProfile.avatarUrl}
-              alt={defaultProfile.displayName}
-              width={80}
-              height={80}
-              className="w-full h-full object-cover"
+      {/* Profile Photo */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          {hasPfp ? (
+            <div className="w-[80px] h-[80px] rounded-[10px] overflow-hidden flex-shrink-0 pfp-static">
+              {isRealUrl(form.avatarUrl) ? (
+                <img
+                  src={form.avatarUrl}
+                  alt={form.displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Image
+                  src={form.avatarUrl}
+                  alt={form.displayName}
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
+          ) : (
+            <div className="w-[80px] h-[80px] rounded-[10px] bg-surface-muted flex items-center justify-center text-[20px] font-semibold text-text-muted select-none">
+              {initials}
+            </div>
+          )}
+          <div className="flex flex-col gap-2 flex-1">
+            <FileUploadButton
+              type="pfp"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              label="Change photo"
+              onUpload={(url) => update("avatarUrl", url)}
             />
+            <Link
+              href={`/coders/${defaultProfile.slug}`}
+              className="inline-flex items-center gap-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Preview profile
+            </Link>
           </div>
-        ) : (
-          <div className="w-[80px] h-[80px] rounded-[10px] bg-surface-muted flex items-center justify-center text-[20px] font-semibold text-text-muted select-none">
-            {initials}
-          </div>
-        )}
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            className="text-[13px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer text-left"
-          >
-            Change photo
-          </button>
-          <Link
-            href={`/coders/${defaultProfile.slug}`}
-            className="inline-flex items-center gap-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            Preview profile
-          </Link>
+        </div>
+
+        {/* GIF Preview Upload */}
+        <div className="space-y-1.5">
+          <label className="block text-[13px] font-medium text-text-primary">
+            GIF Preview
+          </label>
+          <p className="text-[12px] text-text-muted">
+            Animated thumbnail shown in the browse gallery.
+          </p>
+          {form.gifPreviewUrl && isRealUrl(form.gifPreviewUrl) && (
+            <div className="w-[120px] h-[80px] rounded-lg overflow-hidden border border-border">
+              <img
+                src={form.gifPreviewUrl}
+                alt="GIF preview"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+          <FileUploadButton
+            type="preview"
+            accept="image/gif"
+            label="Upload GIF preview"
+            onUpload={(url) => update("gifPreviewUrl", url)}
+          />
         </div>
       </div>
 

@@ -1,11 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import type { PortfolioItem } from "@/lib/mock-data";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { useToast } from "@/components/Toast";
 import PortfolioItemEditor from "./PortfolioItemEditor";
+
+function ThumbnailUploadButton({
+  itemId,
+  onUpload,
+}: {
+  itemId: string;
+  onUpload: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("type", "asset");
+        formData.append("itemId", itemId);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload failed");
+        onUpload(data.url);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Upload failed", "error");
+      } finally {
+        setUploading(false);
+        if (inputRef.current) inputRef.current.value = "";
+      }
+    },
+    [itemId, onUpload, toast]
+  );
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer px-1.5 py-1 disabled:opacity-50"
+      >
+        {uploading ? "..." : "Thumb"}
+      </button>
+    </>
+  );
+}
 
 interface PortfolioManagerProps {
   initialItems: PortfolioItem[];
@@ -72,6 +128,23 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
       if (!res.ok) throw new Error("Failed to save order");
     } catch {
       toast("Failed to save order", "error");
+    }
+  }
+
+  async function handleThumbnailUpload(itemId: string, url: string) {
+    try {
+      const res = await fetch(`/api/portfolio/${itemId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thumbnailUrl: url }),
+      });
+      if (!res.ok) throw new Error("Failed to update thumbnail");
+      setItems((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, thumbnailUrl: url } : i))
+      );
+      toast("Thumbnail updated", "success");
+    } catch {
+      toast("Failed to update thumbnail", "error");
     }
   }
 
@@ -143,7 +216,13 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
             >
               {/* Thumbnail / live preview */}
               <div className="w-[72px] h-[60px] bg-surface-muted flex-shrink-0 flex items-center justify-center overflow-hidden relative">
-                {livePreview ? (
+                {item.thumbnailUrl ? (
+                  <img
+                    src={item.thumbnailUrl}
+                    alt={`${item.title} thumbnail`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : livePreview ? (
                   <iframe
                     src={livePreview.url}
                     title={`${item.title} preview`}
@@ -173,6 +252,10 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
 
               {/* Actions */}
               <div className="flex items-center gap-1 flex-shrink-0">
+                <ThumbnailUploadButton
+                  itemId={item.id}
+                  onUpload={(url) => handleThumbnailUpload(item.id, url)}
+                />
                 <button
                   onClick={() => openEditor(item)}
                   className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer px-1.5 py-1"

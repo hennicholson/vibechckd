@@ -7,6 +7,7 @@ import Textarea from "@/components/Textarea";
 import Button from "@/components/Button";
 import Tag from "@/components/Tag";
 import { useToast } from "@/components/Toast";
+import FileUploadButton from "./FileUploadButton";
 
 const ASSET_TYPES = ["pdf", "image", "video", "live_preview", "figma"] as const;
 
@@ -55,6 +56,7 @@ interface PortfolioItemEditorProps {
 export default function PortfolioItemEditor({ item, onSave, onClose }: PortfolioItemEditorProps) {
   const [title, setTitle] = useState(item?.title ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
+  const [thumbnailUrl, setThumbnailUrl] = useState(item?.thumbnailUrl ?? "");
   const [assets, setAssets] = useState<PortfolioAsset[]>(item?.assets ?? []);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -141,7 +143,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
       const payload: any = {
         title: title.trim(),
         description: description.trim(),
-        thumbnailUrl: item?.thumbnailUrl ?? "",
+        thumbnailUrl,
       };
 
       // For new items, include assets in the payload
@@ -171,7 +173,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
         id: data.item?.id ?? item?.id ?? `pi-${Date.now()}`,
         title: title.trim(),
         description: description.trim(),
-        thumbnailUrl: item?.thumbnailUrl ?? "",
+        thumbnailUrl,
         assets,
       };
 
@@ -200,6 +202,27 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
         maxChars={200}
         currentLength={description.length}
       />
+
+      {/* Thumbnail */}
+      <div className="space-y-1.5">
+        <label className="block text-[13px] font-medium text-text-primary">Thumbnail</label>
+        {thumbnailUrl && (
+          <div className="w-[120px] h-[80px] rounded-lg overflow-hidden border border-border">
+            <img
+              src={thumbnailUrl}
+              alt="Project thumbnail"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+        <FileUploadButton
+          type="asset"
+          itemId={item?.id ?? undefined}
+          accept="image/jpeg,image/png,image/webp"
+          label="Upload thumbnail"
+          onUpload={(url) => setThumbnailUrl(url)}
+        />
+      </div>
 
       {/* Assets list */}
       <div className="space-y-2">
@@ -260,24 +283,66 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
             placeholder="Asset title"
           />
         </div>
-        <div className="flex gap-3 items-end">
-          <div className="flex-1">
-            <Input
-              label="URL"
-              value={newAssetUrl}
-              onChange={(e) => setNewAssetUrl(e.target.value)}
-              placeholder="https://..."
+        {/* Upload or URL input depending on asset type */}
+        {["image", "pdf", "video"].includes(newAssetType) ? (
+          <div className="space-y-2">
+            <FileUploadButton
+              type="asset"
+              itemId={item?.id ?? undefined}
+              accept={
+                newAssetType === "image"
+                  ? "image/jpeg,image/png,image/webp,image/gif"
+                  : newAssetType === "pdf"
+                    ? "application/pdf"
+                    : "video/mp4,video/webm"
+              }
+              label={`Upload ${ASSET_TYPE_LABELS[newAssetType]}`}
+              onUpload={(url) => setNewAssetUrl(url)}
             />
+            {newAssetUrl && (
+              <p className="text-[11px] font-mono text-text-muted truncate">
+                {newAssetUrl}
+              </p>
+            )}
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <Input
+                  label="Or paste URL"
+                  value={newAssetUrl}
+                  onChange={(e) => setNewAssetUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleAddAsset}
+                disabled={!newAssetTitle.trim() || !newAssetUrl.trim()}
+              >
+                Add
+              </Button>
+            </div>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleAddAsset}
-            disabled={!newAssetTitle.trim() || !newAssetUrl.trim()}
-          >
-            Add
-          </Button>
-        </div>
+        ) : (
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <Input
+                label="URL"
+                value={newAssetUrl}
+                onChange={(e) => setNewAssetUrl(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleAddAsset}
+              disabled={!newAssetTitle.trim() || !newAssetUrl.trim()}
+            >
+              Add
+            </Button>
+          </div>
+        )}
 
         {/* Instant live preview when typing a live_preview URL */}
         {newAssetType === "live_preview" && newAssetUrl.trim().startsWith("http") && (

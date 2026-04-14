@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import TeamRoster from "@/components/projects/TeamRoster";
 import TaskList from "@/components/projects/TaskList";
@@ -32,6 +33,8 @@ const STATUS_DISPLAY: Record<ProjectStatus, { label: string; className: string }
 };
 
 export default function ProjectDashboardPage() {
+  const params = useParams();
+  const projectId = params.id as string;
   const [activeTab, setActiveTab] = useState<Tab>("tasks");
 
   const teamMembers = mockProject.teamMemberIds
@@ -114,7 +117,7 @@ export default function ProjectDashboardPage() {
           )}
           {activeTab === "chat" && (
             <div className="border border-border rounded-[10px] overflow-hidden h-[calc(100vh-280px)]">
-              <ProjectChat projectId={mockProject.id} />
+              <ProjectChat projectId={projectId} />
             </div>
           )}
         </div>

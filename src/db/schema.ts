@@ -88,6 +88,7 @@ export const coderProfiles = pgTable("coder_profiles", {
   status: profileStatusEnum("status").default("draft"),
   verifiedAt: timestamp("verified_at", { mode: "date" }),
   pfpUrl: text("pfp_url"),
+  gifPreviewUrl: text("gif_preview_url"),
   githubUrl: text("github_url"),
   twitterUrl: text("twitter_url"),
   linkedinUrl: text("linkedin_url"),

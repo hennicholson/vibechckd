@@ -36,6 +36,8 @@ export async function GET() {
       twitterUrl: "",
       linkedinUrl: "",
       websiteUrl: "",
+      avatarUrl: "",
+      gifPreviewUrl: "",
     });
   }
 
@@ -45,6 +47,8 @@ export async function GET() {
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
+
+  const gifPreviewUrl = profile.gifPreviewUrl ?? "";
 
   return NextResponse.json({
     displayName: user?.name ?? "",
@@ -58,6 +62,8 @@ export async function GET() {
     twitterUrl: profile.twitterUrl ?? "",
     linkedinUrl: profile.linkedinUrl ?? "",
     websiteUrl: profile.websiteUrl ?? "",
+    avatarUrl: profile.pfpUrl ?? "",
+    gifPreviewUrl,
   });
 }
 
