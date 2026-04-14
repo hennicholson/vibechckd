@@ -1,3 +1,5 @@
+import VerifiedSeal from "@/components/VerifiedSeal";
+
 type BadgeVariant = "available" | "selective" | "unavailable" | "pending" | "approved" | "rejected" | "verified";
 
 interface BadgeProps {
@@ -20,14 +22,10 @@ export default function Badge({ variant, className = "", size = "sm" }: BadgePro
   const { dot, text, label } = config[variant];
 
   if (variant === "verified") {
-    const dim = size === "md" ? "w-[18px] h-[18px]" : "w-[14px] h-[14px]";
-    const stroke = size === "md" ? 2 : 2.2;
+    const sealSize = size === "md" ? "sm" as const : "xs" as const;
     return (
       <span className={`inline-flex items-center flex-shrink-0 ${className}`} title="Verified">
-        <svg className={`${dim}`} viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="#0a0a0a" strokeWidth={stroke} />
-          <path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="#0a0a0a" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <VerifiedSeal size={sealSize} />
       </span>
     );
   }

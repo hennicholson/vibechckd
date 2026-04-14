@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9131 | 3:46 PM | 🔄 | DashboardSidebar refactored to use VerifiedSeal component | ~309 |
 | #9109 | 3:21 PM | 🟣 | Thumbnail upload added to portfolio item editor | ~296 |
 | #9100 | 3:20 PM | 🟣 | Portfolio items now support custom thumbnail uploads | ~378 |
 | #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |

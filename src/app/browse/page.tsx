@@ -8,6 +8,7 @@ import Tag from "@/components/Tag";
 import Button from "@/components/Button";
 import { useSession, signOut } from "next-auth/react";
 import { coders as fallbackCoders, SPECIALTIES, SPECIALTY_LABELS, type Coder, type Specialty } from "@/lib/mock-data";
+import VerifiedSeal from "@/components/VerifiedSeal";
 
 function BrowseSidebarUser() {
   const { data: session, status } = useSession();
@@ -76,10 +77,7 @@ function OnboardingPopup({ onDismiss }: { onDismiss: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-4">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-            <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <VerifiedSeal size="lg" />
           <span className="text-[15px] font-semibold text-text-primary tracking-[-0.01em]">Welcome to the gallery</span>
         </div>
 
@@ -433,10 +431,7 @@ export default function BrowsePage() {
         <div className="px-4 h-[48px] flex items-center border-b border-border">
           <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
             vibechckd
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-              <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <VerifiedSeal size="sm" />
           </Link>
         </div>
 
@@ -513,10 +508,7 @@ export default function BrowsePage() {
             transition={{ duration: 0.5, delay: 0.1 }}
           >
             <h1 className="text-[11px] font-mono font-medium text-text-muted uppercase tracking-[0.1em]">Verified</h1>
-            <svg className="w-4 h-4 text-text-primary" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-              <path d="M7.5 12.5L10.5 15.5L16.5 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <VerifiedSeal size="md" />
             <span className="text-[11px] font-mono text-text-muted ml-1">{filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}</span>
           </motion.div>
 

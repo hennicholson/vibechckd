@@ -1,3 +1,5 @@
+import VerifiedSeal from "@/components/VerifiedSeal";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -5,10 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center gap-1.5">
             <span className="text-[16px] font-semibold text-text-primary">vibechckd</span>
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-              <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <VerifiedSeal size="sm" />
           </div>
           <span className="text-[11px] text-text-muted mt-1">The vetted coder marketplace</span>
         </div>

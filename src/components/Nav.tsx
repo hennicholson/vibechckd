@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
+import VerifiedSeal from "@/components/VerifiedSeal";
 
 const links = [
   { href: "/browse", label: "Browse" },
@@ -36,10 +37,7 @@ export default function Nav() {
         <div className="flex items-center gap-0">
           <Link href="/" className="font-body text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
             vibechckd
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-              <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <VerifiedSeal size="sm" />
           </Link>
 
           <div className="hidden md:block w-px h-4 bg-border mx-5" />

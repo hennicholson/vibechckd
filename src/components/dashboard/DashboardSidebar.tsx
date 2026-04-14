@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import VerifiedSeal from "@/components/VerifiedSeal";
 
 type NavItem = {
   href: string;
@@ -135,10 +136,7 @@ export default function DashboardSidebar() {
       <div className="px-4 h-[48px] flex items-center border-b border-border">
         <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
           vibechckd
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-            <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <VerifiedSeal size="sm" />
         </Link>
       </div>
 
@@ -174,10 +172,7 @@ export default function DashboardSidebar() {
             <span className="text-[10px] font-mono text-text-muted">
               {role === "creator" ? (
                 <span className="inline-flex items-center gap-1">
-                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-                    <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <VerifiedSeal size="xs" />
                   Creator
                 </span>
               ) : role ? (

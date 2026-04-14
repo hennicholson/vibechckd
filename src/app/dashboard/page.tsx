@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { coders, featuredCoders } from "@/lib/mock-data";
 import Badge from "@/components/Badge";
+import VerifiedSeal from "@/components/VerifiedSeal";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -36,10 +37,7 @@ function ClientOverview({ name }: { name: string }) {
       {/* Client label */}
       <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
-          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-            <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <VerifiedSeal size="xs" />
           Client Dashboard
         </span>
       </div>
@@ -200,10 +198,7 @@ function CreatorOverview() {
       {/* Creator label */}
       <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
-          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
-            <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <VerifiedSeal size="xs" />
           Creator Dashboard
         </span>
       </div>
