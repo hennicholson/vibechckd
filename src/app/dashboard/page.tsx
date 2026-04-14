@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { mockProject, coders, featuredCoders } from "@/lib/mock-data";
+import { coders, featuredCoders } from "@/lib/mock-data";
 import Badge from "@/components/Badge";
 
 function getGreeting(): string {
@@ -30,7 +30,6 @@ const activityItems = [
 /* ── Client Overview ── */
 function ClientOverview({ name }: { name: string }) {
   const recommendedCoders = featuredCoders.slice(0, 4);
-  const doneCount = mockProject.tasks.filter((t) => t.status === "done").length;
 
   return (
     <div className="max-w-3xl px-8 py-6">
@@ -98,25 +97,15 @@ function ClientOverview({ name }: { name: string }) {
       </div>
 
       {/* Active projects */}
+      {/* Active projects */}
       <div className="mb-8">
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
-          Active projects
+          Your projects
         </p>
-        <div className="border border-border rounded-[10px] divide-y divide-border">
-          <Link
-            href="/dashboard/projects/1"
-            className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors rounded-[10px]"
-          >
-            <div>
-              <p className="text-[13px] font-medium text-text-primary">
-                {mockProject.title}
-              </p>
-              <p className="text-[11px] font-mono text-text-muted mt-0.5">
-                {mockProject.teamMemberIds.length} team members &middot;{" "}
-                {doneCount}/{mockProject.tasks.length} tasks done
-              </p>
-            </div>
-            <Badge variant="pending" />
+        <div className="border border-border rounded-[10px] p-6 text-center">
+          <p className="text-[13px] text-text-muted">No projects yet</p>
+          <Link href="/dashboard/teams/new" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
+            Build your first team
           </Link>
         </div>
       </div>
@@ -196,17 +185,15 @@ function ClientOverview({ name }: { name: string }) {
 
 /* ── Creator Overview ── */
 function CreatorOverview() {
-  const creator = coders[0];
-  const inProgressCount = mockProject.tasks.filter(
-    (t) => t.status === "in_progress"
-  ).length;
-  const doneCount = mockProject.tasks.filter((t) => t.status === "done").length;
+  const { data: session } = useSession();
+  const userName = session?.user?.name || "Creator";
+  const creator = coders.find(c => c.displayName === userName) || null;
 
-  const portfolioItemCount = creator.portfolio.length;
-  const totalAssets = creator.portfolio.reduce(
+  const portfolioItemCount = creator?.portfolio.length || 0;
+  const totalAssets = creator?.portfolio.reduce(
     (sum, item) => sum + item.assets.length,
     0
-  );
+  ) || 0;
 
   return (
     <div className="max-w-3xl px-8 py-6">
@@ -224,7 +211,7 @@ function CreatorOverview() {
       {/* Greeting */}
       <div className="mb-2">
         <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
-          {getGreeting()}, {creator.displayName.split(" ")[0]}
+          {getGreeting()}, {userName.split(" ")[0]}
         </h1>
         <p className="text-[12px] font-mono text-text-muted mt-1">
           {formatDate()}
@@ -234,7 +221,7 @@ function CreatorOverview() {
       {/* Public profile link */}
       <div className="mb-8">
         <Link
-          href={`/coders/${creator.slug}`}
+          href={creator ? `/coders/${creator.slug}` : "/dashboard/profile"}
           className="inline-flex items-center gap-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors group"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,30 +275,51 @@ function CreatorOverview() {
         ))}
       </div>
 
-      {/* Your portfolio quick view */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-mono uppercase text-text-muted">
-            Your portfolio
-          </p>
-          <Link
-            href="/dashboard/portfolio"
-            className="text-[12px] text-text-muted hover:text-text-primary transition-colors"
-          >
-            Manage &rarr;
-          </Link>
-        </div>
-        {portfolioItemCount === 0 ? (
-          <div className="border border-border rounded-[10px] p-6 text-center">
-            <p className="text-[13px] text-text-muted">No portfolio items yet.</p>
-            <Link
-              href="/dashboard/portfolio"
-              className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block"
-            >
-              Add your first project
+      {/* Getting started checklist for new creators */}
+      {portfolioItemCount === 0 && (
+        <div className="border border-border rounded-[10px] p-5 mb-8">
+          <h3 className="text-[14px] font-medium text-text-primary mb-3">Get started</h3>
+          <div className="space-y-3">
+            <Link href="/dashboard/profile" className="flex items-center gap-3 group">
+              <div className="w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 group-hover:border-text-primary transition-colors">
+                <span className="text-[10px] font-mono text-text-muted">1</span>
+              </div>
+              <div>
+                <p className="text-[13px] text-text-primary group-hover:underline">Complete your profile</p>
+                <p className="text-[11px] text-text-muted">Add bio, specialties, rate, and social links</p>
+              </div>
+            </Link>
+            <Link href="/dashboard/portfolio" className="flex items-center gap-3 group">
+              <div className="w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 group-hover:border-text-primary transition-colors">
+                <span className="text-[10px] font-mono text-text-muted">2</span>
+              </div>
+              <div>
+                <p className="text-[13px] text-text-primary group-hover:underline">Add your first project</p>
+                <p className="text-[11px] text-text-muted">Upload portfolio work with live previews and assets</p>
+              </div>
+            </Link>
+            <Link href="/browse" className="flex items-center gap-3 group">
+              <div className="w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 group-hover:border-text-primary transition-colors">
+                <span className="text-[10px] font-mono text-text-muted">3</span>
+              </div>
+              <div>
+                <p className="text-[13px] text-text-primary group-hover:underline">Browse the gallery</p>
+                <p className="text-[11px] text-text-muted">See how other verified coders present their work</p>
+              </div>
             </Link>
           </div>
-        ) : (
+        </div>
+      )}
+
+      {/* Your portfolio quick view */}
+      {portfolioItemCount > 0 && creator && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-mono uppercase text-text-muted">Your portfolio</p>
+            <Link href="/dashboard/portfolio" className="text-[12px] text-text-muted hover:text-text-primary transition-colors">
+              Manage &rarr;
+            </Link>
+          </div>
           <div className="border border-border rounded-[10px] divide-y divide-border">
             {creator.portfolio.slice(0, 3).map((item) => (
               <div key={item.id} className="flex items-center justify-between p-3.5">
@@ -324,51 +332,17 @@ function CreatorOverview() {
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Active projects */}
       <div className="mb-8">
-        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
-          Active projects
-        </p>
-        <div className="border border-border rounded-[10px] divide-y divide-border">
-          <Link
-            href="/dashboard/projects/1"
-            className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors rounded-[10px]"
-          >
-            <div>
-              <p className="text-[13px] font-medium text-text-primary">
-                {mockProject.title}
-              </p>
-              <p className="text-[11px] font-mono text-text-muted mt-0.5">
-                {doneCount}/{mockProject.tasks.length} tasks done
-                {inProgressCount > 0 &&
-                  ` \u00B7 ${inProgressCount} in progress`}
-              </p>
-            </div>
-            <Badge variant="pending" />
+        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Projects</p>
+        <div className="border border-border rounded-[10px] p-6 text-center">
+          <p className="text-[13px] text-text-muted">No active projects yet</p>
+          <Link href="/browse" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
+            Browse the gallery to get discovered
           </Link>
-        </div>
-      </div>
-
-      {/* Recent activity */}
-      <div>
-        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
-          Recent
-        </p>
-        <div className="space-y-0">
-          {activityItems.map((item, i) => (
-            <div
-              key={i}
-              className="flex items-baseline justify-between py-2.5"
-            >
-              <p className="text-[13px] text-text-primary">{item.text}</p>
-              <span className="text-[11px] font-mono text-text-muted ml-4 flex-shrink-0">
-                {item.time}
-              </span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
