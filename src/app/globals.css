@@ -1,26 +1,108 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* vibechckd — Minimal Design System */
+
+  /* Backgrounds */
+  --color-background: #ffffff;
+  --color-background-alt: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f5f5;
+  --color-bg-glass: #fafafa;
+
+  /* Text */
+  --color-text-primary: #0a0a0a;
+  --color-text-secondary: #525252;
+  --color-text-muted: #a3a3a3;
+
+  /* Accent — mapped to primary black */
+  --color-accent: #171717;
+  --color-accent-hover: #0a0a0a;
+  --color-accent-light: #f5f5f5;
+  --color-accent-dim: #fafafa;
+  --color-accent-glow: transparent;
+
+  /* Borders */
+  --color-border: #e5e5e5;
+  --color-border-hover: #d4d4d4;
+  --color-border-card: #e5e5e5;
+
+  /* Semantic */
+  --color-positive: #22c55e;
+  --color-negative: #ef4444;
+  --color-warning: #f59e0b;
+
+  /* Fonts */
+  --font-display: "Geist", system-ui, -apple-system, sans-serif;
+  --font-body: "Geist", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", monospace;
+  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+
+  /* Easing */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-entrance: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+::selection {
+  background: #0a0a0a;
+  color: #fff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+*:focus-visible {
+  outline: 1.5px solid #a3a3a3;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Subtle static scan effect on PFP images */
+@keyframes pfpScan {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 -200%; }
+}
+
+.pfp-static {
+  position: relative;
+  overflow: hidden;
+}
+
+.pfp-static::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.015) 2px,
+    rgba(0, 0, 0, 0.015) 4px
+  );
+  background-size: 100% 200%;
+  animation: pfpScan 8s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* Hide scrollbar for horizontal strip */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.pfp-static:hover::after {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.04) 1px,
+    rgba(0, 0, 0, 0.04) 3px
+  );
+  background-size: 100% 200%;
+  animation: pfpScan 2s linear infinite;
 }
