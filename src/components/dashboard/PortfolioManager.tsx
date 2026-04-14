@@ -1,18 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { coders } from "@/lib/mock-data";
 import type { PortfolioItem } from "@/lib/mock-data";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { useToast } from "@/components/Toast";
 import PortfolioItemEditor from "./PortfolioItemEditor";
 
-export default function PortfolioManager() {
-  const [items, setItems] = useState<PortfolioItem[]>(coders[0].portfolio);
+interface PortfolioManagerProps {
+  initialItems: PortfolioItem[];
+}
+
+export default function PortfolioManager({ initialItems }: PortfolioManagerProps) {
+  const [items, setItems] = useState<PortfolioItem[]>(initialItems);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PortfolioItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   function openEditor(item: PortfolioItem | null) {
@@ -25,7 +29,7 @@ export default function PortfolioManager() {
     setEditingItem(null);
   }
 
-  function handleSave(saved: PortfolioItem) {
+  async function handleSave(saved: PortfolioItem) {
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.id === saved.id);
       if (idx >= 0) {
@@ -39,10 +43,36 @@ export default function PortfolioManager() {
     toast("Project saved", "success");
   }
 
-  function handleDelete(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    setDeleteConfirmId(null);
-    toast("Project removed", "success");
+  async function handleDelete(id: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/portfolio/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete");
+      }
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      setDeleteConfirmId(null);
+      toast("Project removed", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to delete", "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function persistReorder(newItems: PortfolioItem[]) {
+    const order = newItems.map((item, idx) => ({ id: item.id, sortOrder: idx }));
+    try {
+      const res = await fetch("/api/portfolio/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+      if (!res.ok) throw new Error("Failed to save order");
+    } catch {
+      toast("Failed to save order", "error");
+    }
   }
 
   function moveUp(idx: number) {
@@ -50,6 +80,7 @@ export default function PortfolioManager() {
     setItems((prev) => {
       const next = [...prev];
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      persistReorder(next);
       return next;
     });
     toast("Order updated");
@@ -60,6 +91,7 @@ export default function PortfolioManager() {
     setItems((prev) => {
       const next = [...prev];
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      persistReorder(next);
       return next;
     });
     toast("Order updated");
@@ -226,9 +258,10 @@ export default function PortfolioManager() {
           <Button
             size="sm"
             onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+            disabled={deleting}
             className="bg-negative hover:bg-negative/90 text-white"
           >
-            Delete
+            {deleting ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </Modal>

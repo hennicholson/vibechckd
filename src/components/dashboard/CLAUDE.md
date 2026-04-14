@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |
 | #9027 | 2:40 PM | 🟣 | Profile and Portfolio API Database Integration | ~524 |
 | #9004 | 2:27 PM | 🟣 | Role-based dashboard navigation and overview pages | ~525 |
 </claude-mem-context>

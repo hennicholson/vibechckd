@@ -7,5 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |
 | #8905 | 1:10 PM | 🟣 | User settings API endpoint created | ~310 |
 </claude-mem-context>

@@ -7,5 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |
 | #8946 | 1:37 PM | 🟣 | Portfolio Manager API routes implemented | ~360 |
 </claude-mem-context>

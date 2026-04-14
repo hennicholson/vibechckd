@@ -56,6 +56,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
   const [title, setTitle] = useState(item?.title ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [assets, setAssets] = useState<PortfolioAsset[]>(item?.assets ?? []);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   // Add asset form state
@@ -65,34 +66,121 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
 
   const livePreviewAsset = assets.find((a) => a.type === "live_preview");
 
-  function handleAddAsset() {
+  async function handleAddAsset() {
     if (!newAssetTitle.trim() || !newAssetUrl.trim()) return;
-    const asset: PortfolioAsset = {
-      id: `a-${Date.now()}`,
-      type: newAssetType,
-      title: newAssetTitle.trim(),
-      url: newAssetUrl.trim(),
-    };
-    setAssets((prev) => [...prev, asset]);
+
+    // If we have a saved item, persist asset to DB
+    if (item?.id) {
+      try {
+        const res = await fetch(`/api/portfolio/${item.id}/assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assetType: newAssetType,
+            title: newAssetTitle.trim(),
+            fileUrl: newAssetUrl.trim(),
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add asset");
+        const data = await res.json();
+        const asset: PortfolioAsset = {
+          id: data.asset.id,
+          type: newAssetType,
+          title: newAssetTitle.trim(),
+          url: newAssetUrl.trim(),
+        };
+        setAssets((prev) => [...prev, asset]);
+      } catch {
+        toast("Failed to add asset", "error");
+        return;
+      }
+    } else {
+      // New item not yet saved - keep in local state
+      const asset: PortfolioAsset = {
+        id: `a-${Date.now()}`,
+        type: newAssetType,
+        title: newAssetTitle.trim(),
+        url: newAssetUrl.trim(),
+      };
+      setAssets((prev) => [...prev, asset]);
+    }
+
     setNewAssetTitle("");
     setNewAssetUrl("");
     setNewAssetType("image");
     toast("Asset added", "success");
   }
 
-  function handleRemoveAsset(assetId: string) {
+  async function handleRemoveAsset(assetId: string) {
+    // If item is saved, remove from DB
+    if (item?.id) {
+      try {
+        const res = await fetch(`/api/portfolio/${item.id}/assets`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assetId }),
+        });
+        if (!res.ok) throw new Error("Failed to remove asset");
+      } catch {
+        toast("Failed to remove asset", "error");
+        return;
+      }
+    }
     setAssets((prev) => prev.filter((a) => a.id !== assetId));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) return;
-    onSave({
-      id: item?.id ?? `pi-${Date.now()}`,
-      title: title.trim(),
-      description: description.trim(),
-      thumbnailUrl: item?.thumbnailUrl ?? "",
-      assets,
-    });
+    setSaving(true);
+
+    try {
+      const isEditing = !!item?.id;
+      const url = isEditing ? `/api/portfolio/${item.id}` : "/api/portfolio";
+      const method = isEditing ? "PUT" : "POST";
+
+      const payload: any = {
+        title: title.trim(),
+        description: description.trim(),
+        thumbnailUrl: item?.thumbnailUrl ?? "",
+      };
+
+      // For new items, include assets in the payload
+      if (!isEditing) {
+        payload.assets = assets.map((a) => ({
+          assetType: a.type,
+          title: a.title,
+          fileUrl: a.url,
+        }));
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save");
+      }
+
+      const data = await res.json();
+
+      // Build the saved item to return to the parent
+      const savedItem: PortfolioItem = {
+        id: data.item?.id ?? item?.id ?? `pi-${Date.now()}`,
+        title: title.trim(),
+        description: description.trim(),
+        thumbnailUrl: item?.thumbnailUrl ?? "",
+        assets,
+      };
+
+      onSave(savedItem);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to save", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -258,8 +346,8 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
         <Button variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={!title.trim()}>
-          Save
+        <Button onClick={handleSave} disabled={!title.trim() || saving}>
+          {saving ? "Saving..." : "Save"}
         </Button>
       </div>
     </div>

@@ -7,11 +7,18 @@ import { coders as mockCoders } from "@/lib/mock-data";
 export async function GET() {
   try {
     // Query all active/verified coder profiles from Neon
-    const profiles = await db
+    const allProfiles = await db
       .select()
       .from(coderProfiles)
       .innerJoin(users, eq(coderProfiles.userId, users.id))
       .where(isNotNull(coderProfiles.creatorSlug));
+
+    // Filter out coders with empty profiles (no name or no slug)
+    const profiles = allProfiles.filter((row) => {
+      const user = row.users;
+      const profile = row.coder_profiles;
+      return user.name && user.name.trim() !== "" && profile.creatorSlug && profile.creatorSlug.trim() !== "";
+    });
 
     if (profiles.length === 0) {
       return NextResponse.json(mockCoders);
