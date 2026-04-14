@@ -104,15 +104,42 @@ function OnboardingPopup({ onDismiss }: { onDismiss: () => void }) {
 export default function BrowsePage() {
   const [filter, setFilter] = useState<string>("all");
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !sessionStorage.getItem("vibechckd_onboarding_dismissed");
+    }
+    return true;
+  });
+  const [searchQuery, setSearchQuery] = useState("");
 
   const filteredCoders = useMemo(() => {
     if (filter === "all") return coders;
     return coders.filter((c) => c.specialties.includes(filter as Specialty));
   }, [filter]);
 
+  // Compute specialty counts from all coders (unfiltered)
+  const specialtyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    SPECIALTIES.forEach((s) => {
+      counts[s] = coders.filter((c) => c.specialties.includes(s)).length;
+    });
+    return counts;
+  }, []);
+
   const workItems = useMemo(() => buildWorkItems(filteredCoders), [filteredCoders]);
-  const columns = useMemo(() => assignColumns(workItems, 3), [workItems]);
+
+  // Apply search filter
+  const searchedItems = useMemo(() => {
+    if (!searchQuery.trim()) return workItems;
+    const q = searchQuery.toLowerCase();
+    return workItems.filter(
+      (w) =>
+        w.coder.displayName.toLowerCase().includes(q) ||
+        w.item.title.toLowerCase().includes(q)
+    );
+  }, [workItems, searchQuery]);
+
+  const columns = useMemo(() => assignColumns(searchedItems, 3), [searchedItems]);
 
   // More work from the selected coder (excluding current)
   const moreFromCoder = selectedWork
@@ -167,7 +194,7 @@ export default function BrowsePage() {
                   filter === s ? "text-text-primary font-medium bg-surface-muted" : "text-text-muted hover:text-text-primary hover:bg-background-alt"
                 }`}
               >
-                {SPECIALTY_LABELS[s]}
+                {SPECIALTY_LABELS[s]} <span className="text-text-muted font-normal">({specialtyCounts[s]})</span>
               </button>
             ))}
           </div>
@@ -193,6 +220,22 @@ export default function BrowsePage() {
         <div className="flex">
           {/* Masonry Grid */}
           <div className="flex-1 min-w-0 p-4">
+            {/* Search */}
+            <div className="mb-4 px-1">
+              <div className="relative">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search by coder or project..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-[13px] text-text-primary bg-background border border-border rounded-lg placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors"
+                />
+              </div>
+            </div>
+
             {/* Verified Header */}
             <motion.div
               className="flex items-center gap-2 mb-5 px-1"
@@ -221,7 +264,7 @@ export default function BrowsePage() {
                         selectedWork?.item.id === work.item.id
                           ? "border-text-primary"
                           : "border-border hover:border-border-hover"
-                      }`}
+                      } hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}
                     >
                       {/* Thumbnail */}
                       <div className="aspect-video bg-surface-muted overflow-hidden pfp-static">
@@ -489,7 +532,7 @@ export default function BrowsePage() {
 
       {/* Onboarding popup */}
       <AnimatePresence>
-        {showOnboarding && <OnboardingPopup onDismiss={() => setShowOnboarding(false)} />}
+        {showOnboarding && <OnboardingPopup onDismiss={() => { setShowOnboarding(false); sessionStorage.setItem("vibechckd_onboarding_dismissed", "1"); }} />}
       </AnimatePresence>
     </div>
   );

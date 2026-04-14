@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import Input from "../Input";
 import Textarea from "../Textarea";
 import Button from "../Button";
@@ -13,6 +15,14 @@ import {
 
 const defaultProfile = coders[0];
 
+const AVAILABILITY_OPTIONS = [
+  { value: "available", label: "Available" },
+  { value: "selective", label: "Selective" },
+  { value: "unavailable", label: "Unavailable" },
+] as const;
+
+type Availability = "available" | "selective" | "unavailable";
+
 type ProfileData = {
   displayName: string;
   tagline: string;
@@ -20,6 +30,7 @@ type ProfileData = {
   bio: string;
   specialties: Specialty[];
   hourlyRate: string;
+  availability: Availability;
   githubUrl: string;
   twitterUrl: string;
   linkedinUrl: string;
@@ -34,6 +45,7 @@ export default function ProfileForm() {
     bio: defaultProfile.bio,
     specialties: [...defaultProfile.specialties],
     hourlyRate: defaultProfile.hourlyRate,
+    availability: defaultProfile.availability,
     githubUrl: defaultProfile.githubUrl ?? "",
     twitterUrl: defaultProfile.twitterUrl ?? "",
     linkedinUrl: defaultProfile.linkedinUrl ?? "",
@@ -65,6 +77,8 @@ export default function ProfileForm() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const hasPfp = defaultProfile.avatarUrl.startsWith("/pfp/");
+
   const initials = form.displayName
     .split(" ")
     .map((n) => n[0])
@@ -76,15 +90,38 @@ export default function ProfileForm() {
     <div className="mt-6 pb-24">
       {/* Photo */}
       <div className="flex items-center gap-4">
-        <div className="w-[80px] h-[80px] rounded-[10px] bg-surface-muted flex items-center justify-center text-[20px] font-semibold text-text-muted select-none">
-          {initials}
+        {hasPfp ? (
+          <div className="w-[80px] h-[80px] rounded-[10px] overflow-hidden flex-shrink-0 pfp-static">
+            <Image
+              src={defaultProfile.avatarUrl}
+              alt={defaultProfile.displayName}
+              width={80}
+              height={80}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="w-[80px] h-[80px] rounded-[10px] bg-surface-muted flex items-center justify-center text-[20px] font-semibold text-text-muted select-none">
+            {initials}
+          </div>
+        )}
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            className="text-[13px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer text-left"
+          >
+            Change photo
+          </button>
+          <Link
+            href={`/coders/${defaultProfile.slug}`}
+            className="inline-flex items-center gap-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Preview profile
+          </Link>
         </div>
-        <button
-          type="button"
-          className="text-[13px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
-        >
-          Change photo
-        </button>
       </div>
 
       {/* Basic Info */}
@@ -163,6 +200,36 @@ export default function ProfileForm() {
           value={form.hourlyRate}
           onChange={(e) => update("hourlyRate", e.target.value)}
         />
+      </div>
+
+      {/* Availability */}
+      <div className="border-t border-border pt-6 mt-6">
+        <label className="block text-[13px] font-medium text-text-primary mb-3">
+          Availability
+        </label>
+        <div className="inline-flex border border-border rounded-lg overflow-hidden">
+          {AVAILABILITY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => update("availability", opt.value)}
+              className={`px-4 py-2 text-[13px] font-medium transition-colors cursor-pointer border-r border-border last:border-r-0 ${
+                form.availability === opt.value
+                  ? "bg-[#0a0a0a] text-white"
+                  : "bg-background text-text-secondary hover:bg-surface-muted"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-text-muted mt-2">
+          {form.availability === "available"
+            ? "You are open to new project inquiries."
+            : form.availability === "selective"
+              ? "You are selectively accepting projects."
+              : "You are not accepting new projects."}
+        </p>
       </div>
 
       {/* Social Links */}

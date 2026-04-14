@@ -84,6 +84,15 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Stats row */}
+      <section>
+        <div className="max-w-[960px] mx-auto px-6 py-6">
+          <p className="text-[12px] font-mono text-text-muted text-center tracking-[0.02em]">
+            12 verified coders &middot; 30+ portfolio pieces &middot; 5 specialties
+          </p>
+        </div>
+      </section>
+
       {/* For Clients */}
       <section className="py-20 border-t border-border mt-12">
         <div className="max-w-[960px] mx-auto px-6">
@@ -177,7 +186,7 @@ export default function LandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-30px" }}
                 transition={{ duration: 0.5, delay: i * 0.15 }}
-                className="border border-border rounded-[10px] p-5 bg-background"
+                className="border border-border rounded-[10px] p-5 bg-background hover:border-border-hover hover:-translate-y-px transition-all duration-200"
               >
                 <div className="mb-3">
                   <span className="text-[11px] font-mono text-border-hover">{step.step}</span>

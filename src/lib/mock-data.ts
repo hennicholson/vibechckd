@@ -709,10 +709,15 @@ export type MockDeliverable = {
   liveUrl?: string;
 };
 
+export type ProjectStatus = "active" | "draft" | "completed";
+
 export type MockProject = {
   id: string;
   title: string;
   description: string;
+  status: ProjectStatus;
+  createdAt: string;
+  updatedAt: string;
   teamMemberIds: string[];
   tasks: MockTask[];
   deliverables: MockDeliverable[];
@@ -723,6 +728,9 @@ export const mockProject: MockProject = {
   title: "vibechckd Marketing Site",
   description:
     "Landing page and marketing site for vibechckd. Includes hero section, feature breakdowns, testimonials, and a waitlist signup flow.",
+  status: "active",
+  createdAt: "2026-03-28",
+  updatedAt: "2026-04-14",
   teamMemberIds: ["1", "2", "4"],
   tasks: [
     {
@@ -783,3 +791,136 @@ export const mockProject: MockProject = {
     },
   ],
 };
+
+export const mockProjects: MockProject[] = [
+  mockProject,
+  {
+    id: "proj-2",
+    title: "Personal Portfolio Site",
+    description:
+      "A minimal portfolio site with project showcase, blog, and contact form.",
+    status: "draft",
+    createdAt: "2026-04-02",
+    updatedAt: "2026-04-10",
+    teamMemberIds: ["3"],
+    tasks: [
+      {
+        id: "t-p2-1",
+        title: "Design homepage wireframe",
+        assigneeId: "3",
+        status: "done",
+        dueDate: "2026-04-08",
+      },
+      {
+        id: "t-p2-2",
+        title: "Build project grid component",
+        assigneeId: "3",
+        status: "in_progress",
+        dueDate: "2026-04-14",
+      },
+    ],
+    deliverables: [
+      {
+        id: "d-p2-1",
+        title: "Homepage Mockup",
+        status: "pending",
+      },
+    ],
+  },
+  {
+    id: "proj-3",
+    title: "E-Commerce Redesign",
+    description:
+      "Full redesign of the storefront with improved checkout flow and mobile experience.",
+    status: "active",
+    createdAt: "2026-03-15",
+    updatedAt: "2026-04-13",
+    teamMemberIds: ["1", "2", "5", "7"],
+    tasks: [
+      {
+        id: "t-p3-1",
+        title: "Audit existing checkout flow",
+        assigneeId: "7",
+        status: "done",
+        dueDate: "2026-03-22",
+      },
+      {
+        id: "t-p3-2",
+        title: "Design new product page layout",
+        assigneeId: "1",
+        status: "done",
+        dueDate: "2026-03-28",
+      },
+      {
+        id: "t-p3-3",
+        title: "Implement cart sidebar",
+        assigneeId: "2",
+        status: "in_progress",
+        dueDate: "2026-04-16",
+      },
+      {
+        id: "t-p3-4",
+        title: "Build data visualization dashboard",
+        assigneeId: "5",
+        status: "todo",
+        dueDate: "2026-04-20",
+      },
+    ],
+    deliverables: [
+      {
+        id: "d-p3-1",
+        title: "Checkout Flow Prototype",
+        status: "approved",
+        submittedById: "7",
+      },
+      {
+        id: "d-p3-2",
+        title: "Product Page Build",
+        status: "submitted",
+        submittedById: "1",
+      },
+    ],
+  },
+  {
+    id: "proj-4",
+    title: "API Documentation Portal",
+    description:
+      "Developer-facing documentation portal with interactive API explorer and code samples.",
+    status: "completed",
+    createdAt: "2026-02-10",
+    updatedAt: "2026-03-30",
+    teamMemberIds: ["8", "9"],
+    tasks: [
+      {
+        id: "t-p4-1",
+        title: "Set up documentation framework",
+        assigneeId: "8",
+        status: "done",
+        dueDate: "2026-02-18",
+      },
+      {
+        id: "t-p4-2",
+        title: "Build API explorer component",
+        assigneeId: "9",
+        status: "done",
+        dueDate: "2026-03-01",
+      },
+      {
+        id: "t-p4-3",
+        title: "Write endpoint documentation",
+        assigneeId: "8",
+        status: "done",
+        dueDate: "2026-03-15",
+      },
+    ],
+    deliverables: [
+      {
+        id: "d-p4-1",
+        title: "Documentation Portal",
+        status: "approved",
+        submittedById: "8",
+        liveUrl: "docs.vibechckd.com",
+      },
+    ],
+  },
+];

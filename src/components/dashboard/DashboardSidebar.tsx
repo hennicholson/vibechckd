@@ -4,10 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 
-const navItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  roles: ("client" | "creator")[];
+};
+
+const navItems: NavItem[] = [
   {
     href: "/dashboard",
     label: "Overview",
+    roles: ["client", "creator"],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -15,8 +23,29 @@ const navItems = [
     ),
   },
   {
+    href: "/browse",
+    label: "Browse Talent",
+    roles: ["client"],
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/teams/new",
+    label: "Build a Team",
+    roles: ["client"],
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/profile",
     label: "Profile",
+    roles: ["creator"],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -26,6 +55,7 @@ const navItems = [
   {
     href: "/dashboard/portfolio",
     label: "Portfolio",
+    roles: ["creator"],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -35,6 +65,7 @@ const navItems = [
   {
     href: "/dashboard/projects",
     label: "Projects",
+    roles: ["client", "creator"],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -44,6 +75,7 @@ const navItems = [
   {
     href: "/dashboard/inbox",
     label: "Inbox",
+    roles: ["client", "creator"],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -53,6 +85,7 @@ const navItems = [
   {
     href: "/dashboard/settings",
     label: "Settings",
+    roles: ["client", "creator"],
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -65,6 +98,12 @@ const navItems = [
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+
+  const role = (session?.user as any)?.role as "client" | "creator" | undefined;
+
+  const filteredItems = role
+    ? navItems.filter((item) => item.roles.includes(role))
+    : navItems;
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -86,7 +125,7 @@ export default function DashboardSidebar() {
 
       {/* Nav */}
       <div className="px-3 py-3 space-y-0.5 flex-1">
-        {navItems.map((item) => (
+        {filteredItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -97,7 +136,10 @@ export default function DashboardSidebar() {
             }`}
           >
             {item.icon}
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.label === "Inbox" && (
+              <span className="w-2 h-2 rounded-full bg-[#0a0a0a] flex-shrink-0" />
+            )}
           </Link>
         ))}
       </div>
@@ -108,7 +150,22 @@ export default function DashboardSidebar() {
           <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
             {session?.user?.name?.charAt(0) || "?"}
           </div>
-          <span className="text-[12px] text-text-primary truncate">{session?.user?.name || "User"}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[12px] text-text-primary truncate">{session?.user?.name || "User"}</span>
+            <span className="text-[10px] font-mono text-text-muted">
+              {role === "creator" ? (
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="12" fill="#0a0a0a" />
+                    <path d="M7 12.5L10.5 16L17 9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Creator
+                </span>
+              ) : role ? (
+                <span className="capitalize">{role}</span>
+              ) : null}
+            </span>
+          </div>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/" })}

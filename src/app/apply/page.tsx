@@ -15,10 +15,14 @@ export default function ApplyPage() {
           className="text-center mb-10"
         >
           <h1 className="text-[30px] font-semibold text-text-primary tracking-[-0.03em]">
-            Apply to join vibechckd
+            Apply to become a verified coder
           </h1>
-          <p className="text-[14px] text-text-muted mt-2">
-            We&apos;re looking for craft, taste, and technical quality.
+          <p className="text-[14px] text-text-muted mt-2 max-w-md mx-auto">
+            Every coder on vibechckd goes through our AI-assisted vetting process.
+            We evaluate craft, taste, and technical quality.
+          </p>
+          <p className="text-[12px] text-text-muted mt-3">
+            Applications are reviewed within 3-5 business days.
           </p>
         </motion.div>
 

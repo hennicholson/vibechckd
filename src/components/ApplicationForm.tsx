@@ -63,9 +63,43 @@ export default function ApplicationForm() {
     update("portfolioLinks", form.portfolioLinks.filter((_, j) => j !== i));
   };
 
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   const goNext = () => { if (step < 5) { setDirection(1); setStep(step + 1); } };
   const goBack = () => { if (step > 1) { setDirection(-1); setStep(step - 1); } };
-  const handleSubmit = () => { setSubmitted(true); };
+
+  const handleSubmit = async () => {
+    setSubmitError("");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          specialties: form.specialties,
+          portfolioLinks: form.portfolioLinks,
+          rateExpectation: form.rateExpectation,
+          pitch: form.pitch,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSubmitError(data.error || "Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -207,12 +241,18 @@ export default function ApplicationForm() {
         </AnimatePresence>
       </div>
 
+      {submitError && (
+        <p className="text-[12px] text-negative text-center mt-4">{submitError}</p>
+      )}
+
       <div className="flex justify-between mt-8">
         <Button variant="ghost" onClick={goBack} disabled={step === 1}>Back</Button>
         {step < 5 ? (
           <Button onClick={goNext}>Continue</Button>
         ) : (
-          <Button onClick={handleSubmit}>Submit</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Submitting..." : "Submit Application"}
+          </Button>
         )}
       </div>
     </div>

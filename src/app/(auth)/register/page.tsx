@@ -74,14 +74,21 @@ function RegisterContent() {
         <div className="space-y-3">
           <button
             onClick={() => setRole("client")}
-            className="w-full text-left border border-border rounded-[10px] p-4 hover:border-border-hover hover:bg-surface-muted transition-colors cursor-pointer group"
+            className="w-full text-left border border-border rounded-[10px] p-4 hover:border-border-hover hover:bg-surface-muted transition-all duration-150 hover:-translate-y-[1px] cursor-pointer group"
           >
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[14px] font-medium text-text-primary">I&apos;m hiring</p>
-                <p className="text-[12px] text-text-muted mt-0.5">Browse vetted coders, build teams, ship projects</p>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-surface-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[14px] font-medium text-text-primary">I&apos;m hiring</p>
+                  <p className="text-[12px] text-text-muted mt-0.5">Browse vetted coders, build teams, ship projects</p>
+                </div>
               </div>
-              <svg className="w-4 h-4 text-text-muted group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-text-muted group-hover:translate-x-0.5 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
@@ -89,14 +96,21 @@ function RegisterContent() {
 
           <button
             onClick={() => setRole("coder")}
-            className="w-full text-left border border-border rounded-[10px] p-4 hover:border-border-hover hover:bg-surface-muted transition-colors cursor-pointer group"
+            className="w-full text-left border border-border rounded-[10px] p-4 hover:border-border-hover hover:bg-surface-muted transition-all duration-150 hover:-translate-y-[1px] cursor-pointer group"
           >
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[14px] font-medium text-text-primary">I&apos;m a coder</p>
-                <p className="text-[12px] text-text-muted mt-0.5">Get verified, showcase your portfolio, get hired</p>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-surface-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[14px] font-medium text-text-primary">I&apos;m a coder</p>
+                  <p className="text-[12px] text-text-muted mt-0.5">Get verified, showcase your portfolio, get hired</p>
+                </div>
               </div>
-              <svg className="w-4 h-4 text-text-muted group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-text-muted group-hover:translate-x-0.5 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
@@ -129,10 +143,15 @@ function RegisterContent() {
       <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] text-center">
         {role === "client" ? "Create client account" : "Create coder account"}
       </h1>
-      <p className="text-[13px] text-text-muted text-center mt-1 mb-6">
+      <p className="text-[13px] text-text-muted text-center mt-1 mb-1.5">
         {role === "client"
           ? "Start hiring vetted vibe coders"
           : "Apply to join the verified coder marketplace"}
+      </p>
+      <p className="text-[11px] text-text-muted text-center mb-6">
+        {role === "client"
+          ? "Start browsing vetted talent immediately after signup"
+          : "You\u2019ll complete your vetting application after creating your account"}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">

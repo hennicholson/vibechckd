@@ -1,6 +1,6 @@
 "use client";
 
-import { Coder } from "@/lib/mock-data";
+import { Coder, SPECIALTY_LABELS } from "@/lib/mock-data";
 import Badge from "@/components/Badge";
 import Button from "@/components/Button";
 
@@ -29,9 +29,14 @@ export default function TeamRoster({
 
       {/* Team heading */}
       <div className="px-5 pt-4 pb-2">
-        <p className="text-[11px] font-mono text-text-muted uppercase tracking-wider">
-          Team
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-mono text-text-muted uppercase tracking-wider">
+            Team
+          </p>
+          <span className="text-[11px] font-mono text-text-muted">
+            {members.length} member{members.length !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
 
       {/* Client row */}
@@ -62,34 +67,42 @@ export default function TeamRoster({
       </div>
 
       {/* Coder rows */}
-      {members.map((coder) => (
-        <div
-          key={coder.id}
-          className="px-5 py-3 border-b border-border flex items-center gap-3"
-        >
-          <img
-            src={coder.avatarUrl}
-            alt={coder.displayName}
-            className="w-8 h-8 rounded-lg object-cover"
-          />
-          <div className="flex flex-col min-w-0">
-            <span className="flex items-center gap-1.5">
-              <span className="text-[13px] font-medium text-text-primary truncate">
-                {coder.displayName}
+      {members.map((coder) => {
+        const primarySpecialty = coder.specialties[0];
+        return (
+          <div
+            key={coder.id}
+            className="px-5 py-3 border-b border-border flex items-center gap-3"
+          >
+            <img
+              src={coder.avatarUrl}
+              alt={coder.displayName}
+              className="w-8 h-8 rounded-lg object-cover"
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="flex items-center gap-1.5">
+                <span className="text-[13px] font-medium text-text-primary truncate">
+                  {coder.displayName}
+                </span>
+                {coder.verified && <Badge variant="verified" size="sm" />}
               </span>
-              {coder.verified && <Badge variant="verified" size="sm" />}
-            </span>
-            <span className="text-[11px] font-mono text-text-muted">
-              {coder.title}
-            </span>
+              <span className="text-[11px] font-mono text-text-muted">
+                {coder.title}
+              </span>
+              {primarySpecialty && (
+                <span className="text-[10px] font-mono text-text-muted mt-0.5">
+                  {SPECIALTY_LABELS[primarySpecialty]}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* View deliverables button */}
       <div className="mt-auto p-4">
         <Button
-          variant="secondary"
+          variant="primary"
           size="sm"
           className="w-full"
           onClick={onViewDeliverables}

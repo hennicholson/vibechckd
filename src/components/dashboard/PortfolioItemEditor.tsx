@@ -187,6 +187,31 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
             Add
           </Button>
         </div>
+
+        {/* Instant live preview when typing a live_preview URL */}
+        {newAssetType === "live_preview" && newAssetUrl.trim().startsWith("http") && (
+          <div className="mt-3">
+            <p className="text-[11px] font-mono text-text-muted mb-2 uppercase">Preview</p>
+            <div className="border border-border rounded-[10px] overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-surface-muted border-b border-border">
+                <div className="flex gap-1.5">
+                  <span className="w-[10px] h-[10px] rounded-full bg-border" />
+                  <span className="w-[10px] h-[10px] rounded-full bg-border" />
+                  <span className="w-[10px] h-[10px] rounded-full bg-border" />
+                </div>
+                <div className="flex-1 bg-background border border-border rounded-md px-2.5 py-1 text-[11px] font-mono text-text-muted truncate">
+                  {newAssetUrl.trim()}
+                </div>
+              </div>
+              <iframe
+                src={newAssetUrl.trim()}
+                title="Live preview"
+                className="w-full h-[240px] bg-white"
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Live preview iframe */}

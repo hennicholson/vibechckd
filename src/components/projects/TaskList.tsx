@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { MockTask, TaskStatus, coders } from "@/lib/mock-data";
 
 interface TaskListProps {
@@ -18,7 +18,7 @@ function StatusPill({ status }: { status: TaskStatus }) {
   const styles: Record<TaskStatus, string> = {
     todo: "text-text-muted bg-surface-muted",
     in_progress: "text-text-primary bg-surface-muted",
-    done: "text-text-muted bg-surface-muted line-through",
+    done: "text-text-muted bg-surface-muted",
   };
   return (
     <span className={`${base} ${styles[status]}`}>
@@ -29,6 +29,9 @@ function StatusPill({ status }: { status: TaskStatus }) {
 
 export default function TaskList({ tasks: initialTasks }: TaskListProps) {
   const [tasks, setTasks] = useState(initialTasks);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const toggleTask = (id: string) => {
     setTasks((prev) =>
@@ -38,6 +41,42 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
           : t
       )
     );
+  };
+
+  const handleAddClick = () => {
+    setIsAdding(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleAddSubmit = () => {
+    const title = newTitle.trim();
+    if (!title) {
+      setIsAdding(false);
+      return;
+    }
+
+    const newTask: MockTask = {
+      id: `t-new-${Date.now()}`,
+      title,
+      assigneeId: "",
+      status: "todo",
+      dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+    };
+
+    setTasks((prev) => [...prev, newTask]);
+    setNewTitle("");
+    setIsAdding(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddSubmit();
+    }
+    if (e.key === "Escape") {
+      setNewTitle("");
+      setIsAdding(false);
+    }
   };
 
   return (
@@ -56,7 +95,7 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
             {/* Checkbox */}
             <button
               onClick={() => toggleTask(task.id)}
-              className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+              className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors duration-150 cursor-pointer ${
                 isDone
                   ? "bg-text-primary border-text-primary"
                   : "border-border-hover bg-background hover:border-text-muted"
@@ -80,9 +119,9 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
 
             {/* Title */}
             <span
-              className={`flex-1 text-[13px] ${
+              className={`flex-1 text-[13px] transition-all duration-200 ${
                 isDone
-                  ? "text-text-muted line-through"
+                  ? "text-text-muted line-through decoration-text-muted/50"
                   : "text-text-primary"
               }`}
             >
@@ -114,23 +153,49 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
       })}
 
       {/* Add task row */}
-      <div className="flex items-center gap-3 px-4 py-3 border-t border-border cursor-pointer hover:bg-surface-muted transition-colors">
-        <div className="w-4 h-4 flex items-center justify-center text-text-muted">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      <div
+        className="flex items-center gap-3 px-4 py-3 border-t border-border"
+      >
+        {isAdding ? (
+          <>
+            <div className="w-4 h-4 rounded border border-border-hover bg-background flex-shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleAddSubmit}
+              placeholder="Task title..."
+              className="flex-1 text-[13px] text-text-primary placeholder:text-text-muted bg-transparent outline-none"
+            />
+            <span className="text-[11px] font-mono text-text-muted">
+              Enter to add
+            </span>
+          </>
+        ) : (
+          <button
+            onClick={handleAddClick}
+            className="flex items-center gap-3 w-full cursor-pointer hover:opacity-70 transition-opacity duration-150"
           >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </div>
-        <span className="text-[13px] text-text-muted">Add task</span>
+            <div className="w-4 h-4 flex items-center justify-center text-text-muted">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </div>
+            <span className="text-[13px] text-text-muted">Add task</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import TeamRoster from "@/components/projects/TeamRoster";
 import TaskList from "@/components/projects/TaskList";
 import DeliverablesList from "@/components/projects/DeliverablesList";
 import ProjectChat from "@/components/projects/ProjectChat";
-import { mockProject, coders } from "@/lib/mock-data";
+import { mockProject, coders, ProjectStatus } from "@/lib/mock-data";
 
 type Tab = "tasks" | "deliverables" | "chat";
 
@@ -16,6 +16,21 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "chat", label: "Chat" },
 ];
 
+const STATUS_DISPLAY: Record<ProjectStatus, { label: string; className: string }> = {
+  active: {
+    label: "Active",
+    className: "text-text-primary bg-surface-muted",
+  },
+  draft: {
+    label: "Draft",
+    className: "text-text-muted bg-surface-muted",
+  },
+  completed: {
+    label: "Completed",
+    className: "text-text-muted bg-surface-muted",
+  },
+};
+
 export default function ProjectDashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("tasks");
 
@@ -24,6 +39,8 @@ export default function ProjectDashboardPage() {
     .filter(Boolean) as (typeof coders)[number][];
 
   const handleViewDeliverables = () => setActiveTab("deliverables");
+
+  const statusConfig = STATUS_DISPLAY[mockProject.status];
 
   return (
       <div className="flex min-h-[calc(100vh-120px)]">
@@ -38,12 +55,32 @@ export default function ProjectDashboardPage() {
         <div className="flex-1 px-8 py-6 max-w-3xl">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-[20px] font-semibold text-text-primary leading-tight">
-              {mockProject.title}
-            </h1>
-            <p className="text-[13px] text-text-secondary mt-1.5 leading-relaxed">
+            <div className="flex items-center gap-2.5 mb-1">
+              <h1 className="text-[20px] font-semibold text-text-primary leading-tight">
+                {mockProject.title}
+              </h1>
+              <span
+                className={`text-[11px] font-mono px-2 py-0.5 rounded-md ${statusConfig.className}`}
+              >
+                {statusConfig.label}
+              </span>
+            </div>
+            <p className="text-[13px] text-text-secondary mt-1 leading-relaxed">
               {mockProject.description}
             </p>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[11px] font-mono text-text-muted">
+                Created {new Date(mockProject.createdAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+              <span className="text-[11px] text-border">|</span>
+              <span className="text-[11px] font-mono text-text-muted">
+                {teamMembers.length} member{teamMembers.length !== 1 ? "s" : ""}
+              </span>
+            </div>
           </div>
 
           {/* Segmented Control */}
@@ -61,7 +98,7 @@ export default function ProjectDashboardPage() {
                 {activeTab === tab.key && (
                   <motion.div
                     layoutId="segment-indicator"
-                    className="absolute inset-0 bg-background border border-border rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                    className="absolute inset-0 bg-background border border-border rounded-md"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}

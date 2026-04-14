@@ -2,39 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import Button from "@/components/Button";
-import { mockProject } from "@/lib/mock-data";
+import { mockProjects, ProjectStatus } from "@/lib/mock-data";
 
-type ProjectRow = {
-  id: string;
-  title: string;
-  description: string;
-  status: "Active" | "Draft";
-  memberCount: number;
+const STATUS_STYLES: Record<ProjectStatus, string> = {
+  active: "text-text-primary",
+  draft: "text-text-muted",
+  completed: "text-text-muted",
 };
 
-const projects: ProjectRow[] = [
-  {
-    id: "proj-1",
-    title: mockProject.title,
-    description: mockProject.description,
-    status: "Active",
-    memberCount: mockProject.teamMemberIds.length,
-  },
-  {
-    id: "proj-2",
-    title: "Personal Portfolio Site",
-    description: "A minimal portfolio site with project showcase, blog, and contact form.",
-    status: "Draft",
-    memberCount: 1,
-  },
-  {
-    id: "proj-3",
-    title: "E-Commerce Redesign",
-    description: "Full redesign of the storefront with improved checkout flow and mobile experience.",
-    status: "Active",
-    memberCount: 4,
-  },
-];
+const STATUS_LABELS: Record<ProjectStatus, string> = {
+  active: "Active",
+  draft: "Draft",
+  completed: "Completed",
+};
 
 function ChevronRightIcon() {
   return (
@@ -53,6 +33,18 @@ function UsersIcon() {
       <path d="M16 3.13a4 4 0 010 7.75" />
     </svg>
   );
+}
+
+function formatUpdated(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export default function ProjectsPage() {
@@ -75,7 +67,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* Project list */}
-      {projects.length === 0 ? (
+      {mockProjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-[13px] text-text-muted font-body mb-4">
             No projects yet
@@ -89,39 +81,58 @@ export default function ProjectsPage() {
           </Button>
         </div>
       ) : (
-        <div className="border border-border rounded-[10px] divide-y divide-border">
-          {projects.map((project) => (
+        <div className="border border-border rounded-[10px] overflow-hidden">
+          {/* Column headers */}
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-surface-muted">
+            <span className="flex-1 text-[11px] font-mono text-text-muted uppercase tracking-wider">
+              Project
+            </span>
+            <span className="w-20 text-[11px] font-mono text-text-muted uppercase tracking-wider text-center">
+              Status
+            </span>
+            <span className="w-14 text-[11px] font-mono text-text-muted uppercase tracking-wider text-center">
+              Team
+            </span>
+            <span className="w-20 text-[11px] font-mono text-text-muted uppercase tracking-wider text-right">
+              Updated
+            </span>
+            <span className="w-[14px]" />
+          </div>
+
+          {/* Rows */}
+          {mockProjects.map((project) => (
             <button
               key={project.id}
               onClick={() => router.push(`/dashboard/projects/1`)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-background-alt transition-colors duration-150 cursor-pointer first:rounded-t-[10px] last:rounded-b-[10px]"
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-background-alt transition-colors duration-150 cursor-pointer border-b border-border last:border-b-0"
             >
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 mb-0.5">
-                  <span className="text-[13px] font-medium text-text-primary font-body">
-                    {project.title}
-                  </span>
-                  <span
-                    className={`text-[11px] font-mono ${
-                      project.status === "Active"
-                        ? "text-text-primary"
-                        : "text-text-muted"
-                    }`}
-                  >
-                    {project.status}
-                  </span>
-                </div>
-                <p className="text-[12px] text-text-muted font-body truncate">
+                <span className="text-[13px] font-medium text-text-primary font-body block truncate">
+                  {project.title}
+                </span>
+                <p className="text-[12px] text-text-muted font-body truncate mt-0.5">
                   {project.description}
                 </p>
               </div>
 
+              {/* Status */}
+              <span
+                className={`w-20 text-center text-[11px] font-mono ${STATUS_STYLES[project.status]}`}
+              >
+                {STATUS_LABELS[project.status]}
+              </span>
+
               {/* Member count */}
-              <div className="flex items-center gap-1 text-text-muted flex-shrink-0">
+              <div className="w-14 flex items-center justify-center gap-1 text-text-muted flex-shrink-0">
                 <UsersIcon />
-                <span className="text-[11px] font-mono">{project.memberCount}</span>
+                <span className="text-[11px] font-mono">{project.teamMemberIds.length}</span>
               </div>
+
+              {/* Updated */}
+              <span className="w-20 text-right text-[11px] font-mono text-text-muted flex-shrink-0">
+                {formatUpdated(project.updatedAt)}
+              </span>
 
               {/* Chevron */}
               <span className="text-text-muted flex-shrink-0">

@@ -74,6 +74,17 @@ export default function LoginPage() {
           Sign up
         </Link>
       </p>
+
+      <p className="text-[11px] text-text-muted text-center mt-3">
+        New to vibechckd?{" "}
+        <Link href="/register?role=client" className="text-text-secondary hover:text-text-primary transition-colors">
+          Sign up as a client
+        </Link>
+        {" "}&middot;{" "}
+        <Link href="/register?role=coder" className="text-text-secondary hover:text-text-primary transition-colors">
+          Sign up as a coder
+        </Link>
+      </p>
     </div>
   );
 }

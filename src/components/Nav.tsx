@@ -76,7 +76,11 @@ export default function Nav() {
           </div>
 
           {status === "authenticated" && session?.user ? (
-            /* Logged in — user menu */
+            /* Logged in — Dashboard button + user menu */
+            <>
+            <Link href="/dashboard" className="hidden md:inline-flex items-center px-2.5 py-1 text-[12px] font-medium text-text-muted border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors duration-150">
+              Dashboard
+            </Link>
             <div className="relative hidden md:block" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -97,12 +101,15 @@ export default function Nav() {
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25, mass: 0.6 }}
                     className="absolute right-0 top-full mt-1 w-[200px] bg-background border border-border rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.08)] overflow-hidden"
                   >
                     <div className="px-3 py-2 border-b border-border">
                       <p className="text-[13px] font-medium text-text-primary">{session.user.name}</p>
                       <p className="text-[11px] text-text-muted truncate">{session.user.email}</p>
+                      <p className="text-[10px] font-mono text-text-muted mt-0.5 uppercase tracking-[0.04em]">
+                        {(session.user as any).role === "client" ? "Client" : "Creator"}
+                      </p>
                     </div>
 
                     <div className="py-1">
@@ -138,6 +145,7 @@ export default function Nav() {
                 )}
               </AnimatePresence>
             </div>
+          </>
           ) : null}
 
           {/* Mobile hamburger */}
