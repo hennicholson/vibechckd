@@ -5,6 +5,7 @@ import { coders } from "@/lib/mock-data";
 import type { PortfolioItem } from "@/lib/mock-data";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import { useToast } from "@/components/Toast";
 import PortfolioItemEditor from "./PortfolioItemEditor";
 
 export default function PortfolioManager() {
@@ -12,6 +13,7 @@ export default function PortfolioManager() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PortfolioItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   function openEditor(item: PortfolioItem | null) {
     setEditingItem(item);
@@ -34,11 +36,13 @@ export default function PortfolioManager() {
       return [...prev, saved];
     });
     closeEditor();
+    toast("Project saved", "success");
   }
 
   function handleDelete(id: string) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setDeleteConfirmId(null);
+    toast("Project removed", "success");
   }
 
   function moveUp(idx: number) {
@@ -48,15 +52,17 @@ export default function PortfolioManager() {
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
       return next;
     });
+    toast("Order updated");
   }
 
   function moveDown(idx: number) {
+    if (idx === items.length - 1) return;
     setItems((prev) => {
-      if (idx === prev.length - 1) return prev;
       const next = [...prev];
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
       return next;
     });
+    toast("Order updated");
   }
 
   return (

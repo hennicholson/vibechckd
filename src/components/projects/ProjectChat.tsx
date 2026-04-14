@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Button from "../Button";
+import { useToast } from "../Toast";
 
 // --- Types ---
 
@@ -253,6 +254,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   // keep projectId for future use
   void projectId;
@@ -260,6 +262,16 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isAiTyping]);
+
+  function handleToggleAi() {
+    const next = !aiEnabled;
+    setAiEnabled(next);
+    toast(next ? "AI assistant enabled" : "AI assistant disabled");
+  }
+
+  function handleAttach() {
+    toast("File attachment coming soon");
+  }
 
   function handleSend() {
     const text = inputValue.trim();
@@ -281,6 +293,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
     setMessages((prev) => [...prev, newMessage]);
     setInputValue("");
     inputRef.current?.focus();
+    toast("Message sent");
 
     // Simulate AI typing response
     if (aiEnabled) {
@@ -319,7 +332,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
           </span>
         </div>
         <button
-          onClick={() => setAiEnabled((v) => !v)}
+          onClick={handleToggleAi}
           className={`
             inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-mono
             transition-colors duration-150 cursor-pointer
@@ -349,11 +362,19 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {messages.map((msg) => {
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0">
+        {messages.map((msg, idx) => {
+          const prevMsg = idx > 0 ? messages[idx - 1] : null;
+          const isSameSenderAsPrev =
+            prevMsg &&
+            prevMsg.type !== "system" &&
+            msg.type !== "system" &&
+            prevMsg.sender === msg.sender;
+          const isDifferentSender = prevMsg && !isSameSenderAsPrev;
+
           if (msg.type === "system") {
             return (
-              <div key={msg.id} className="flex justify-center py-1">
+              <div key={msg.id} className="flex justify-center py-3">
                 <span className="text-[12px] italic text-text-muted font-body">
                   {msg.content}
                 </span>
@@ -363,88 +384,103 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
 
           const isOwn = msg.sender === "Client";
           const isAi = msg.type === "ai";
+          const showHeader = !isSameSenderAsPrev;
 
           return (
-            <div
-              key={msg.id}
-              className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}
-            >
-              {/* Avatar */}
-              <div
-                className={`
-                  flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center
-                  text-[10px] font-medium font-mono
-                  ${
-                    isAi
-                      ? "bg-text-primary text-background"
-                      : "bg-surface-muted text-text-secondary"
-                  }
-                `}
-              >
-                {isAi ? <BotIcon /> : msg.initial}
-              </div>
+            <div key={msg.id}>
+              {/* Divider between different senders */}
+              {isDifferentSender && (
+                <div className="border-t border-border/50 my-2" />
+              )}
 
-              {/* Content */}
               <div
-                className={`
-                  max-w-[75%] min-w-0
-                  ${isOwn ? "items-end" : "items-start"}
-                `}
+                className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""} ${
+                  isSameSenderAsPrev ? "mt-0.5" : "mt-2"
+                }`}
               >
-                {/* Sender + time */}
-                <div
-                  className={`flex items-center gap-2 mb-0.5 ${
-                    isOwn ? "flex-row-reverse" : ""
-                  }`}
-                >
-                  <span className="text-[12px] font-medium text-text-primary font-body">
-                    {msg.sender}
-                  </span>
-                  <span className="text-[11px] font-mono text-text-muted">
-                    {relativeTime(msg.sentAt)}
-                  </span>
-                </div>
-
-                {/* Message body */}
-                {msg.type === "file" ? (
+                {/* Avatar — only show on first message in a group */}
+                {showHeader ? (
                   <div
                     className={`
-                      border border-border rounded-md px-3 py-2 flex items-center gap-2.5
-                      ${isOwn ? "bg-surface-muted" : "bg-background"}
+                      flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center
+                      text-[10px] font-medium font-mono
+                      ${
+                        isAi
+                          ? "bg-text-primary text-background"
+                          : "bg-surface-muted text-text-secondary"
+                      }
                     `}
                   >
-                    <span className="text-text-muted">
-                      <FileIcon />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[13px] text-text-primary font-body truncate">
-                        {msg.fileName}
-                      </div>
-                      <div className="text-[11px] font-mono text-text-muted">
-                        {msg.fileSize}
-                      </div>
-                    </div>
-                    <span className="text-[12px] text-text-muted hover:text-text-primary transition-colors duration-150 cursor-pointer font-body">
-                      Download
-                    </span>
+                    {isAi ? <BotIcon /> : msg.initial}
                   </div>
                 ) : (
-                  <div
-                    className={`
-                      rounded-md px-3 py-2 text-[14px] font-body text-text-primary leading-relaxed whitespace-pre-wrap
-                      ${isAi ? "bg-surface-muted border border-border" : ""}
-                      ${isOwn && !isAi ? "bg-surface-muted" : ""}
-                      ${!isOwn && !isAi ? "bg-background" : ""}
-                    `}
-                  >
-                    {msg.content}
-                  </div>
+                  <div className="flex-shrink-0 w-6" />
                 )}
+
+                {/* Content */}
+                <div
+                  className={`
+                    max-w-[75%] min-w-0
+                    ${isOwn ? "items-end" : "items-start"}
+                  `}
+                >
+                  {/* Sender + time — only on first in group */}
+                  {showHeader && (
+                    <div
+                      className={`flex items-center gap-2 mb-0.5 ${
+                        isOwn ? "flex-row-reverse" : ""
+                      }`}
+                    >
+                      <span className="text-[12px] font-medium text-text-primary font-body">
+                        {msg.sender}
+                      </span>
+                      <span className="text-[11px] font-mono text-text-muted">
+                        {relativeTime(msg.sentAt)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Message body */}
+                  {msg.type === "file" ? (
+                    <div
+                      className={`
+                        border border-border rounded-md px-3 py-2 flex items-center gap-2.5
+                        ${isOwn ? "bg-surface-muted" : "bg-background"}
+                      `}
+                    >
+                      <span className="text-text-muted">
+                        <FileIcon />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] text-text-primary font-body truncate">
+                          {msg.fileName}
+                        </div>
+                        <div className="text-[11px] font-mono text-text-muted">
+                          {msg.fileSize}
+                        </div>
+                      </div>
+                      <span className="text-[12px] text-text-muted hover:text-text-primary transition-colors duration-150 cursor-pointer font-body">
+                        Download
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      className={`
+                        rounded-md px-3 py-2 text-[14px] font-body text-text-primary leading-relaxed whitespace-pre-wrap
+                        ${isAi ? "bg-surface-muted border border-border" : ""}
+                        ${isOwn && !isAi ? "bg-surface-muted" : ""}
+                        ${!isOwn && !isAi ? "bg-background" : ""}
+                      `}
+                    >
+                      {msg.content}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
         })}
-        {isAiTyping && <TypingIndicator />}
+        {isAiTyping && <div className="mt-2"><TypingIndicator /></div>}
         <div ref={messagesEndRef} />
       </div>
 
@@ -452,6 +488,7 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
       <div className="border-t border-border px-3 py-2.5 bg-background">
         <div className="flex items-center gap-2">
           <button
+            onClick={handleAttach}
             className="flex-shrink-0 p-1.5 text-text-muted hover:text-text-primary transition-colors duration-150 cursor-pointer rounded"
             aria-label="Attach file"
           >

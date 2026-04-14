@@ -378,7 +378,8 @@ function CreatorOverview() {
 /* ── Main Page ── */
 export default function DashboardPage() {
   const { data: session, status } = useSession();
-  const role = (session?.user as any)?.role as "client" | "creator" | undefined;
+  const rawRole = (session?.user as any)?.role as string | undefined;
+  const role = rawRole === "client" ? "client" : rawRole ? "creator" : undefined;
   const name = session?.user?.name || "there";
 
   if (status === "loading") {
@@ -402,26 +403,11 @@ export default function DashboardPage() {
     return <ClientOverview name={name} />;
   }
 
+  // Coders and admins get the creator dashboard
   if (role === "creator") {
     return <CreatorOverview />;
   }
 
-  // Unknown role fallback
-  return (
-    <div className="max-w-3xl px-8 py-6">
-      <div className="mb-8">
-        <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
-          {getGreeting()}, {name}
-        </h1>
-        <p className="text-[12px] font-mono text-text-muted mt-1">
-          {formatDate()}
-        </p>
-      </div>
-      <div className="border border-border rounded-[10px] p-5">
-        <p className="text-[13px] text-text-primary">
-          Welcome to vibechckd. Your dashboard is being set up.
-        </p>
-      </div>
-    </div>
-  );
+  // Fallback — show creator dashboard for any authenticated user
+  return <CreatorOverview />;
 }

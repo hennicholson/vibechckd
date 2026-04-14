@@ -6,6 +6,7 @@ import Link from "next/link";
 import Input from "../Input";
 import Textarea from "../Textarea";
 import Button from "../Button";
+import { useToast } from "../Toast";
 import {
   SPECIALTIES,
   SPECIALTY_LABELS,
@@ -37,29 +38,33 @@ type ProfileData = {
   websiteUrl: string;
 };
 
-export default function ProfileForm() {
+interface ProfileFormProps {
+  initialData?: Partial<ProfileData>;
+}
+
+export default function ProfileForm({ initialData }: ProfileFormProps) {
   const [form, setForm] = useState<ProfileData>({
-    displayName: defaultProfile.displayName,
-    tagline: defaultProfile.tagline,
-    location: defaultProfile.location,
-    bio: defaultProfile.bio,
-    specialties: [...defaultProfile.specialties],
-    hourlyRate: defaultProfile.hourlyRate,
-    availability: defaultProfile.availability,
-    githubUrl: defaultProfile.githubUrl ?? "",
-    twitterUrl: defaultProfile.twitterUrl ?? "",
-    linkedinUrl: defaultProfile.linkedinUrl ?? "",
-    websiteUrl: defaultProfile.websiteUrl ?? "",
+    displayName: initialData?.displayName ?? defaultProfile.displayName,
+    tagline: initialData?.tagline ?? defaultProfile.tagline,
+    location: initialData?.location ?? defaultProfile.location,
+    bio: initialData?.bio ?? defaultProfile.bio,
+    specialties: initialData?.specialties ?? [...defaultProfile.specialties],
+    hourlyRate: initialData?.hourlyRate ?? defaultProfile.hourlyRate,
+    availability: initialData?.availability ?? defaultProfile.availability,
+    githubUrl: initialData?.githubUrl ?? defaultProfile.githubUrl ?? "",
+    twitterUrl: initialData?.twitterUrl ?? defaultProfile.twitterUrl ?? "",
+    linkedinUrl: initialData?.linkedinUrl ?? defaultProfile.linkedinUrl ?? "",
+    websiteUrl: initialData?.websiteUrl ?? defaultProfile.websiteUrl ?? "",
   });
 
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   const update = <K extends keyof ProfileData>(
     field: K,
     value: ProfileData[K]
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    setSaved(false);
   };
 
   const toggleSpecialty = (s: Specialty) => {
@@ -69,12 +74,29 @@ export default function ProfileForm() {
         ? prev.specialties.filter((x) => x !== s)
         : [...prev.specialties, s],
     }));
-    setSaved(false);
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save");
+      }
+      toast("Profile saved", "success");
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "Something went wrong",
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const hasPfp = defaultProfile.avatarUrl.startsWith("/pfp/");
@@ -266,12 +288,9 @@ export default function ProfileForm() {
       {/* Sticky Save */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-8 py-4">
         <div className="max-w-2xl flex items-center justify-end gap-3">
-          {saved && (
-            <span className="text-[13px] text-positive font-medium">
-              Saved
-            </span>
-          )}
-          <Button onClick={handleSave}>Save changes</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save changes"}
+          </Button>
         </div>
       </div>
     </div>

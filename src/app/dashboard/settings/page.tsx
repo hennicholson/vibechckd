@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 import Modal from "@/components/Modal";
+import { useToast } from "@/components/Toast";
 
 const availabilityOptions = [
   { label: "Available", dot: "bg-positive" },
@@ -13,6 +14,8 @@ const availabilityOptions = [
 ] as const;
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+
   // Password section
   const [showPassword, setShowPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -106,7 +109,10 @@ export default function SettingsPage() {
           {availabilityOptions.map((option) => (
             <button
               key={option.label}
-              onClick={() => setAvailability(option.label)}
+              onClick={() => {
+                setAvailability(option.label);
+                toast("Availability updated", "success");
+              }}
               className={`relative px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors duration-150 cursor-pointer ${
                 availability === option.label
                   ? "text-text-primary"
@@ -178,17 +184,17 @@ export default function SettingsPage() {
           <ToggleRow
             label="Email notifications"
             checked={emailNotifications}
-            onChange={setEmailNotifications}
+            onChange={(v) => { setEmailNotifications(v); toast("Settings saved", "success"); }}
           />
           <ToggleRow
             label="Project updates"
             checked={projectUpdates}
-            onChange={setProjectUpdates}
+            onChange={(v) => { setProjectUpdates(v); toast("Settings saved", "success"); }}
           />
           <ToggleRow
             label="New inquiries"
             checked={newInquiries}
-            onChange={setNewInquiries}
+            onChange={(v) => { setNewInquiries(v); toast("Settings saved", "success"); }}
           />
         </div>
       </div>

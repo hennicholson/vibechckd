@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
+import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col font-body bg-background text-text-primary">
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider><ToastProvider>{children}</ToastProvider></SessionProvider>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import Input from "@/components/Input";
 import Textarea from "@/components/Textarea";
 import Button from "@/components/Button";
 import Tag from "@/components/Tag";
+import { useToast } from "@/components/Toast";
 
 const ASSET_TYPES = ["pdf", "image", "video", "live_preview", "figma"] as const;
 
@@ -55,6 +56,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
   const [title, setTitle] = useState(item?.title ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [assets, setAssets] = useState<PortfolioAsset[]>(item?.assets ?? []);
+  const { toast } = useToast();
 
   // Add asset form state
   const [newAssetType, setNewAssetType] = useState<PortfolioAsset["type"]>("image");
@@ -75,6 +77,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
     setNewAssetTitle("");
     setNewAssetUrl("");
     setNewAssetType("image");
+    toast("Asset added", "success");
   }
 
   function handleRemoveAsset(assetId: string) {

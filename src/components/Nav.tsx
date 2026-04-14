@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "framer-motion";
 const links = [
   { href: "/browse", label: "Browse" },
   { href: "/dashboard/teams/new", label: "Build a Team" },
+  { href: "/docs", label: "Docs" },
 ];
 
 export default function Nav() {

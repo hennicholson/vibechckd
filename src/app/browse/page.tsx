@@ -6,6 +6,7 @@ import Link from "next/link";
 import Badge from "@/components/Badge";
 import Tag from "@/components/Tag";
 import Button from "@/components/Button";
+import { useSession, signOut } from "next-auth/react";
 import { coders, SPECIALTIES, SPECIALTY_LABELS, type Coder, type PortfolioItem, type Specialty } from "@/lib/mock-data";
 
 // Build a flat list of "work items" — each portfolio piece attributed to its coder
@@ -31,6 +32,53 @@ function assignColumns(items: WorkItem[], cols: number): WorkItem[][] {
     columns[i % cols].push(item);
   });
   return columns;
+}
+
+function BrowseSidebarUser() {
+  const { data: session, status } = useSession();
+
+  if (status === "authenticated" && session?.user) {
+    return (
+      <div className="mt-auto px-3 py-3 border-t border-border space-y-1">
+        <div className="flex items-center gap-2 px-2 mb-2">
+          <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
+            {session.user.name?.charAt(0) || "?"}
+          </div>
+          <span className="text-[12px] text-text-primary truncate">{session.user.name}</span>
+        </div>
+        <Link href="/dashboard" className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary hover:bg-surface-muted rounded-md transition-colors">
+          Dashboard
+        </Link>
+        <Link href="/dashboard/profile" className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary hover:bg-surface-muted rounded-md transition-colors">
+          Profile
+        </Link>
+        <Link href="/dashboard/portfolio" className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary hover:bg-surface-muted rounded-md transition-colors">
+          Portfolio
+        </Link>
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-auto px-3 py-4 border-t border-border space-y-2">
+      <Link href="/apply">
+        <button className="w-full px-3 py-2 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover transition-colors cursor-pointer">
+          Apply to join
+        </button>
+      </Link>
+      <Link href="/login">
+        <button className="w-full px-3 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+          Log in
+        </button>
+      </Link>
+    </div>
+  );
 }
 
 function OnboardingPopup({ onDismiss }: { onDismiss: () => void }) {
@@ -200,14 +248,8 @@ export default function BrowsePage() {
           </div>
         </div>
 
-        {/* Apply CTA */}
-        <div className="mt-auto px-3 py-4 border-t border-border">
-          <Link href="/apply">
-            <button className="w-full px-3 py-2 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover transition-colors cursor-pointer">
-              Apply to join
-            </button>
-          </Link>
-        </div>
+        {/* User section / CTA */}
+        <BrowseSidebarUser />
       </aside>
 
       {/* Main Content */}
