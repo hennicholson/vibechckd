@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Badge from "@/components/Badge";
 import Tag from "@/components/Tag";
 import Button from "@/components/Button";
 import { useSession, signOut } from "next-auth/react";
-import { coders, SPECIALTIES, SPECIALTY_LABELS, type Coder, type PortfolioItem, type Specialty } from "@/lib/mock-data";
+import { coders as fallbackCoders, SPECIALTIES, SPECIALTY_LABELS, type Coder, type PortfolioItem, type Specialty } from "@/lib/mock-data";
 
 // Build a flat list of "work items" — each portfolio piece attributed to its coder
 type WorkItem = {
@@ -150,8 +150,18 @@ function OnboardingPopup({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export default function BrowsePage() {
+  const [coders, setCoders] = useState<Coder[]>(fallbackCoders);
   const [filter, setFilter] = useState<string>("all");
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
+
+  // Fetch coders from API (includes DB profiles + mock fallback)
+  useEffect(() => {
+    fetch("/api/coders")
+      .then((res) => res.json())
+      .then((data) => { if (Array.isArray(data) && data.length > 0) setCoders(data); })
+      .catch(() => {}); // fallback already set
+  }, []);
+
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (typeof window !== "undefined") {
       return !sessionStorage.getItem("vibechckd_onboarding_dismissed");
