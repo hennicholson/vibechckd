@@ -39,7 +39,7 @@ export default function HeroVSL() {
     >
       <video
         ref={videoRef}
-        src="/hero.mp4"
+        src="https://vibechckd-cdn.b-cdn.net/hero/hero.mp4"
         autoPlay
         loop
         muted
