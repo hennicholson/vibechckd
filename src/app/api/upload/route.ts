@@ -61,8 +61,14 @@ export async function POST(request: NextRequest) {
     path = `uploads/${session.user.id}/${safeName}`;
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const url = await uploadToBunny(buffer, path, file.type || "application/octet-stream");
+  let url: string;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    url = await uploadToBunny(buffer, path, file.type || "application/octet-stream");
+  } catch (error) {
+    console.error("CDN upload failed:", error);
+    return Response.json({ error: "Upload to CDN failed. Please try again." }, { status: 502 });
+  }
 
   // Update database based on upload type
   try {

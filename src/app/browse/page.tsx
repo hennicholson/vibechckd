@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import Link from "next/link";
 import Badge from "@/components/Badge";
 import Tag from "@/components/Tag";
 import Button from "@/components/Button";
 import { useSession, signOut } from "next-auth/react";
-import { coders as fallbackCoders, SPECIALTIES, SPECIALTY_LABELS, type Coder, type Specialty } from "@/lib/mock-data";
+import { coders as fallbackCoders, SPECIALTIES, SPECIALTY_LABELS, FILTER_OPTIONS, type Coder, type Specialty } from "@/lib/mock-data";
 import VerifiedSeal from "@/components/VerifiedSeal";
 
 function BrowseSidebarUser() {
@@ -126,38 +126,124 @@ function isRealUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
 
+function SkeletonCard() {
+  return (
+    <div className="rounded-[10px] overflow-hidden border border-border">
+      <div className="aspect-[3/2] bg-surface-muted animate-pulse" />
+      <div className="px-3 py-2.5 flex items-center gap-2">
+        <div className="w-6 h-6 rounded-md bg-surface-muted animate-pulse flex-shrink-0" />
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="h-3 bg-surface-muted animate-pulse rounded w-24" />
+          <div className="h-2.5 bg-surface-muted animate-pulse rounded w-32" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileFilterBar({
+  options,
+  value,
+  onChange,
+  counts,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  counts: Record<string, number>;
+}) {
+  return (
+    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-4 py-2">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors duration-150 cursor-pointer border ${
+            value === opt.value
+              ? "bg-text-primary text-white border-text-primary"
+              : "bg-background text-text-muted border-border hover:border-border-hover hover:text-text-primary"
+          }`}
+        >
+          {opt.label}
+          {opt.value !== "all" && counts[opt.value] !== undefined && (
+            <span className={`ml-1 ${value === opt.value ? "text-white/60" : "text-text-muted"}`}>
+              {counts[opt.value]}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CoderCard({ coder, onClick, index }: { coder: Coder; onClick: () => void; index: number }) {
-  const thumbnailUrl = coder.gifPreviewUrl && isRealUrl(coder.gifPreviewUrl)
-    ? coder.gifPreviewUrl
-    : coder.avatarUrl;
+  const hasGif = coder.gifPreviewUrl && isRealUrl(coder.gifPreviewUrl);
+  const thumbnailUrl = hasGif ? coder.gifPreviewUrl : coder.avatarUrl;
+  const projectCount = coder.portfolio.length;
+  const availabilityColor = coder.availability === "available"
+    ? "bg-emerald-500"
+    : coder.availability === "selective"
+      ? "bg-amber-400"
+      : "bg-neutral-400";
+  const skillsPreview = coder.skills.slice(0, 3).join(", ");
 
   return (
     <motion.button
+      layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: index * 0.03 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3) }}
       onClick={onClick}
-      className="w-full text-left rounded-[10px] overflow-hidden border border-border hover:border-border-hover hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-150 cursor-pointer group"
+      className="w-full text-left rounded-[10px] overflow-hidden border border-border hover:border-border-hover hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-200 cursor-pointer group"
     >
-      <div className="aspect-[3/2] bg-surface-muted overflow-hidden pfp-static">
+      {/* Thumbnail area */}
+      <div className={`relative aspect-[3/2] bg-surface-muted overflow-hidden ${hasGif ? "" : "pfp-static"}`}>
         <img
           src={thumbnailUrl}
           alt={coder.displayName}
+          loading="lazy"
           className="w-full h-full object-cover grayscale-[15%] group-hover:grayscale-0 transition-all duration-500"
         />
+        {/* Bottom gradient for contrast */}
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
+        {/* Project count badge */}
+        {projectCount > 0 && (
+          <span className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-mono leading-none rounded-md px-1.5 py-1">
+            {projectCount} project{projectCount !== 1 ? "s" : ""}
+          </span>
+        )}
+        {/* View profile hover overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">
+          <span className="text-[13px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 tracking-[-0.01em]">
+            View profile &rarr;
+          </span>
+        </div>
       </div>
-      <div className="px-3 py-2.5 flex items-center gap-2">
-        <div className="w-6 h-6 rounded-md bg-surface-muted overflow-hidden flex-shrink-0">
-          <img src={coder.avatarUrl} alt={coder.displayName} className="w-full h-full object-cover" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            <span className="text-[13px] font-medium text-text-primary truncate">{coder.displayName}</span>
-            {coder.verified && <Badge variant="verified" />}
+      {/* Info section */}
+      <div className="px-3 py-2.5 transition-colors duration-150 group-hover:bg-surface-muted/50">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-surface-muted overflow-hidden flex-shrink-0">
+            <img src={coder.avatarUrl} alt={coder.displayName} loading="lazy" className="w-full h-full object-cover" />
           </div>
-          <span className="text-[12px] text-text-muted truncate block">{coder.title}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1">
+              <span className="text-[13px] font-medium text-text-primary truncate">{coder.displayName}</span>
+              {coder.verified && <Badge variant="verified" />}
+            </div>
+            <span className="text-[12px] text-text-muted truncate block">
+              {SPECIALTY_LABELS[coder.specialties[0]]} &middot; {coder.location}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className={`w-[6px] h-[6px] rounded-full ${availabilityColor} flex-shrink-0`} />
+            <span className="text-[11px] font-mono text-text-muted">{coder.hourlyRate}</span>
+          </div>
         </div>
-        <span className="text-[11px] font-mono text-text-muted flex-shrink-0 hidden sm:block">{coder.hourlyRate}</span>
+        {/* Skills preview */}
+        <p className="text-[11px] text-text-muted/70 truncate mt-1.5 pl-8">
+          {skillsPreview}
+        </p>
       </div>
     </motion.button>
   );
@@ -380,14 +466,17 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
 
 export default function BrowsePage() {
   const [coders, setCoders] = useState<Coder[]>(fallbackCoders);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
 
   useEffect(() => {
+    setIsLoading(true);
     fetch("/api/coders")
       .then((res) => res.json())
       .then((data) => { if (Array.isArray(data) && data.length > 0) setCoders(data); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -397,6 +486,10 @@ export default function BrowsePage() {
     return true;
   });
   const [searchQuery, setSearchQuery] = useState("");
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+  }, []);
 
   const filteredCoders = useMemo(() => {
     let list = coders;
@@ -416,13 +509,25 @@ export default function BrowsePage() {
     return list;
   }, [coders, filter, searchQuery]);
 
+  // Filtered counts: reflect current search query so sidebar counts update
   const specialtyCounts = useMemo(() => {
+    let base = coders;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      base = base.filter(
+        (c) =>
+          c.displayName.toLowerCase().includes(q) ||
+          c.title.toLowerCase().includes(q) ||
+          c.specialties.some((s) => SPECIALTY_LABELS[s].toLowerCase().includes(q)) ||
+          c.skills.some((s) => s.toLowerCase().includes(q))
+      );
+    }
     const counts: Record<string, number> = {};
     SPECIALTIES.forEach((s) => {
-      counts[s] = coders.filter((c) => c.specialties.includes(s)).length;
+      counts[s] = base.filter((c) => c.specialties.includes(s)).length;
     });
     return counts;
-  }, [coders]);
+  }, [coders, searchQuery]);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -453,21 +558,25 @@ export default function BrowsePage() {
           <div className="space-y-0.5">
             <button
               onClick={() => setFilter("all")}
-              className={`w-full text-left px-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer ${
-                filter === "all" ? "text-text-primary font-medium bg-surface-muted" : "text-text-muted hover:text-text-primary hover:bg-background-alt"
+              className={`w-full text-left py-1.5 rounded-md text-[13px] transition-colors cursor-pointer flex items-center gap-2 ${
+                filter === "all" ? "text-text-primary font-medium bg-surface-muted px-2" : "text-text-muted hover:text-text-primary hover:bg-background-alt px-2"
               }`}
             >
-              All coders
+              {filter === "all" && <span className="w-1 h-4 rounded-full bg-text-primary flex-shrink-0" />}
+              <span className={filter !== "all" ? "ml-3" : ""}>All coders</span>
             </button>
             {SPECIALTIES.map((s) => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
-                className={`w-full text-left px-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer ${
-                  filter === s ? "text-text-primary font-medium bg-surface-muted" : "text-text-muted hover:text-text-primary hover:bg-background-alt"
+                className={`w-full text-left py-1.5 rounded-md text-[13px] transition-colors cursor-pointer flex items-center gap-2 ${
+                  filter === s ? "text-text-primary font-medium bg-surface-muted px-2" : "text-text-muted hover:text-text-primary hover:bg-background-alt px-2"
                 }`}
               >
-                {SPECIALTY_LABELS[s]} <span className="text-text-muted font-normal">({specialtyCounts[s]})</span>
+                {filter === s && <span className="w-1 h-4 rounded-full bg-text-primary flex-shrink-0" />}
+                <span className={filter !== s ? "ml-3" : ""}>
+                  {SPECIALTY_LABELS[s]} <span className="text-text-muted font-normal">({specialtyCounts[s]})</span>
+                </span>
               </button>
             ))}
           </div>
@@ -479,24 +588,45 @@ export default function BrowsePage() {
       {/* Main Content */}
       <main className="flex-1 min-w-0">
         {/* Top bar (mobile) */}
-        <div className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border h-[48px] flex items-center px-4">
-          <Link href="/" className="text-[14px] font-semibold text-text-primary">vibechckd</Link>
+        <div className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
+          <div className="h-[48px] flex items-center px-4">
+            <Link href="/" className="text-[14px] font-semibold text-text-primary">vibechckd</Link>
+          </div>
+          {/* Mobile filter pills */}
+          <MobileFilterBar
+            options={FILTER_OPTIONS}
+            value={filter}
+            onChange={setFilter}
+            counts={specialtyCounts}
+          />
         </div>
 
         <div className="flex-1 min-w-0 p-4">
-          {/* Search */}
-          <div className="mb-4 px-1">
-            <div className="relative">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by name, specialty, or skill..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-[13px] text-text-primary bg-background border border-border rounded-lg placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors"
-              />
+          {/* Sticky search */}
+          <div className="sticky top-0 md:top-0 z-20 bg-background pb-3 pt-1 border-b border-border mb-4">
+            <div className="px-1">
+              <div className="relative">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search by name, specialty, or skill..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-8 py-2 text-[13px] text-text-primary bg-background border border-border rounded-lg placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -512,22 +642,46 @@ export default function BrowsePage() {
             <span className="text-[11px] font-mono text-text-muted ml-1">{filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}</span>
           </motion.div>
 
-          {/* Coder Grid */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCoders.map((coder, i) => (
-              <CoderCard
-                key={coder.id}
-                coder={coder}
-                onClick={() => setSelectedCoder(coder)}
-                index={i}
-              />
-            ))}
-          </div>
-
-          {filteredCoders.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-[13px] text-text-muted">No coders found matching your criteria.</p>
+          {/* Loading skeleton */}
+          {isLoading ? (
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
             </div>
+          ) : filteredCoders.length === 0 ? (
+            /* Empty state */
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-12 h-12 rounded-full bg-surface-muted flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <p className="text-[14px] font-medium text-text-primary mb-1">No coders found</p>
+              <p className="text-[13px] text-text-muted mb-4">Try adjusting your search or filters.</p>
+              <button
+                onClick={() => { clearSearch(); setFilter("all"); }}
+                className="px-4 py-2 text-[13px] font-medium text-text-primary border border-border rounded-lg hover:border-border-hover transition-colors cursor-pointer"
+              >
+                Clear search
+              </button>
+            </div>
+          ) : (
+            /* Coder Grid */
+            <LayoutGroup>
+              <motion.div layout className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <AnimatePresence mode="popLayout">
+                  {filteredCoders.map((coder, i) => (
+                    <CoderCard
+                      key={coder.id}
+                      coder={coder}
+                      onClick={() => setSelectedCoder(coder)}
+                      index={i}
+                    />
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            </LayoutGroup>
           )}
         </div>
       </main>
