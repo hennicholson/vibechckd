@@ -1,26 +1,30 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default auth((req) => {
-  const { pathname } = req.nextUrl;
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
-  if (!req.auth) {
+  // Check for session token (NextAuth v5 uses this cookie name)
+  const token = request.cookies.get("authjs.session-token") ||
+                request.cookies.get("__Secure-authjs.session-token");
+
+  if (!token) {
     // Team builder → redirect to client signup
     if (pathname.startsWith("/dashboard/teams")) {
-      const url = req.nextUrl.clone();
+      const url = request.nextUrl.clone();
       url.pathname = "/register";
       url.searchParams.set("role", "client");
       return NextResponse.redirect(url);
     }
 
     // Other dashboard pages → redirect to login
-    const url = req.nextUrl.clone();
+    const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/dashboard/:path*"],
