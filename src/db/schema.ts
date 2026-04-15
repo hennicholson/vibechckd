@@ -212,6 +212,40 @@ export const invoiceSplits = pgTable("invoice_splits", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// ── Transactions ──
+
+export const transactionTypeEnum = pgEnum("transaction_type", ["invoice_payment", "direct_payment", "withdrawal", "refund", "platform_fee"]);
+export const transactionStatusEnum = pgEnum("transaction_status", ["pending", "completed", "failed", "cancelled"]);
+
+export const transactions = pgTable("transactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  projectId: uuid("project_id").references(() => projects.id),
+  invoiceId: uuid("invoice_id").references(() => invoices.id),
+  type: transactionTypeEnum("type").notNull(),
+  status: transactionStatusEnum("status").default("pending").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  description: text("description").notNull(),
+  whopTransferId: text("whop_transfer_id"),
+  whopCheckoutId: text("whop_checkout_id"),
+  paymentUrl: text("payment_url"),
+  senderId: uuid("sender_id").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { mode: "date" }),
+});
+
+export const withdrawals = pgTable("withdrawals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  amountCents: integer("amount_cents").notNull(),
+  status: transactionStatusEnum("status").default("pending").notNull(),
+  whopWithdrawalId: text("whop_withdrawal_id"),
+  payoutMethod: text("payout_method"),
+  requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { mode: "date" }),
+  failureReason: text("failure_reason"),
+});
+
 // ── Applications ──
 
 export const applications = pgTable("applications", {

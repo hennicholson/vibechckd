@@ -173,3 +173,92 @@ export async function markPaid(invoiceId: string): Promise<void> {
     throw new Error(`Whop API error (${res.status}): ${errorText}`);
   }
 }
+
+export async function createCheckoutSession(params: {
+  amount: number; // dollars
+  description: string;
+  metadata?: Record<string, string>;
+}): Promise<{ id: string; purchaseUrl: string }> {
+  const body = {
+    company_id: getCompanyId(),
+    plan: {
+      plan_type: "one_time",
+      initial_price: params.amount,
+    },
+    product: { title: params.description },
+    metadata: params.metadata || {},
+  };
+
+  const res = await fetch(`${WHOP_BASE_URL}/checkout_sessions`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Checkout creation failed (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return {
+    id: data.id,
+    purchaseUrl: data.purchase_url || data.url || "",
+  };
+}
+
+export async function createTransfer(params: {
+  fromAccount: string;
+  toAccount: string;
+  amount: number; // dollars
+  description?: string;
+  metadata?: Record<string, string>;
+}): Promise<{ id: string; status: string }> {
+  const body: Record<string, unknown> = {
+    amount: params.amount,
+    currency: "usd",
+    origin_id: params.fromAccount,
+    destination_id: params.toAccount,
+    idempotence_key: crypto.randomUUID(),
+  };
+  if (params.description) body.notes = params.description.slice(0, 50);
+  if (params.metadata) body.metadata = params.metadata;
+
+  const res = await fetch(`${WHOP_BASE_URL}/transfers`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Transfer failed (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return { id: data.id, status: data.status || "completed" };
+}
+
+export async function createWhopWithdrawal(params: {
+  amountDollars: number;
+}): Promise<{ id: string; status: string }> {
+  const body = {
+    amount: params.amountDollars,
+    company_id: getCompanyId(),
+    currency: "usd",
+  };
+
+  const res = await fetch(`${WHOP_BASE_URL}/withdrawals`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Withdrawal failed (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return { id: data.id, status: data.status || "pending" };
+}

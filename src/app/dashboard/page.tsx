@@ -267,6 +267,7 @@ function CreatorOverview() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [portfolioCount, setPortfolioCount] = useState<number>(0);
   const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [earningsCents, setEarningsCents] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -274,11 +275,13 @@ function CreatorOverview() {
       fetch("/api/profile").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/portfolio").then((r) => (r.ok ? r.json() : [])),
       fetch("/api/projects").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/balance").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([profileData, portfolioData, projectData]) => {
+      .then(([profileData, portfolioData, projectData, balanceData]) => {
         setProfile(profileData);
         setPortfolioCount(Array.isArray(portfolioData) ? portfolioData.length : 0);
         setProjects(projectData);
+        if (balanceData) setEarningsCents(balanceData.totalEarnedCents || 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -372,7 +375,7 @@ function CreatorOverview() {
           { label: "Projects", value: String(projects.length) },
           { label: "Portfolio items", value: String(portfolioCount) },
           { label: "Profile views", value: "\u2014" },
-          { label: "Earnings", value: "\u2014" },
+          { label: "Earnings", value: earningsCents > 0 ? `$${(earningsCents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}` : "\u2014" },
         ].map((stat) => (
           <div
             key={stat.label}

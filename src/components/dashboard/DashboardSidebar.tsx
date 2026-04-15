@@ -65,6 +65,17 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    href: "/dashboard/earnings",
+    label: "Earnings",
+    roles: ["creator"],
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <rect x="2" y="6" width="20" height="14" rx="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2 10h20M16 14h2" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/projects",
     label: "Projects",
     roles: ["client", "creator"],
@@ -141,7 +152,7 @@ export default function DashboardSidebar() {
 
   // Select up to 5 items for mobile bottom nav (Overview, Projects, Inbox, Settings + role-specific)
   const mobileItems = filteredItems.filter((item) =>
-    ["/dashboard", "/dashboard/projects", "/dashboard/inbox", "/dashboard/settings", "/dashboard/profile", "/dashboard/portfolio"].includes(item.href)
+    ["/dashboard", "/dashboard/projects", "/dashboard/inbox", "/dashboard/settings", "/dashboard/profile", "/dashboard/portfolio", "/dashboard/earnings"].includes(item.href)
   ).slice(0, 5);
 
   return (

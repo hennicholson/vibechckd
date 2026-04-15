@@ -9,7 +9,7 @@ import { useToast } from "../Toast";
 // ---------------------------------------------------------------------------
 
 type MessageType = "text" | "file" | "system" | "ai";
-type ActiveAction = "invoice" | "proposal" | "milestone" | "files" | "task" | null;
+type ActiveAction = "invoice" | "proposal" | "milestone" | "files" | "task" | "payment" | null;
 
 interface ChatMessage {
   id: string;
@@ -1018,6 +1018,95 @@ function TaskForm({ onSend, onCancel, sending, members }: { onSend: (title: stri
   );
 }
 
+function PaymentForm({
+  onSend,
+  onCancel,
+  sending,
+  members,
+  currentUserId,
+}: {
+  onSend: (data: { recipientId: string; amountCents: number; description: string }) => void;
+  onCancel: () => void;
+  sending: boolean;
+  members: ProjectMember[];
+  currentUserId?: string;
+}) {
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const otherMembers = members.filter((m) => m.userId !== currentUserId);
+  const [recipientId, setRecipientId] = useState(otherMembers[0]?.userId || "");
+
+  const handleSubmit = () => {
+    const rawAmount = amount.replace(/[$,]/g, "");
+    const parsed = parseFloat(rawAmount);
+    if (isNaN(parsed) || parsed <= 0 || !recipientId) return;
+    onSend({ recipientId, amountCents: Math.round(parsed * 100), description: description.trim() || "Direct payment" });
+  };
+
+  return (
+    <div className="border border-border rounded-lg p-4 mx-3 mb-2 bg-background animate-[slideDown_0.2s_ease-out]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <IconDollar size={14} />
+          <span className="text-[13px] font-medium text-text-primary">Send Payment</span>
+        </div>
+        <button onClick={onCancel} className="text-text-muted hover:text-text-primary transition-colors cursor-pointer p-0.5">
+          <IconX size={14} />
+        </button>
+      </div>
+
+      {otherMembers.length > 1 && (
+        <div className="mb-2">
+          <label className="text-[11px] text-text-muted font-medium mb-1.5 block">Send to</label>
+          <div className="flex flex-wrap gap-1.5">
+            {otherMembers.map((m) => (
+              <button
+                key={m.userId}
+                onClick={() => setRecipientId(m.userId)}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-full border transition-colors cursor-pointer ${
+                  recipientId === m.userId
+                    ? "border-[#171717] bg-[#171717] text-white"
+                    : "border-border text-text-secondary hover:border-border-hover"
+                }`}
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="relative mb-2">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-text-muted">$</span>
+        <input
+          type="text"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
+        />
+      </div>
+
+      <input
+        type="text"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="What is this payment for? (optional)"
+        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-3 focus:border-border-hover transition-colors"
+      />
+
+      <button
+        onClick={handleSubmit}
+        disabled={!amount.trim() || !recipientId || sending}
+        className="w-full py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+      >
+        <IconDollar size={12} />
+        {sending ? "Processing..." : "Send payment"}
+      </button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -1420,6 +1509,44 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     sendStructuredMessage("TERMS ACCEPTED -- Looking forward to working together. Let's get started.");
   }
 
+  // ---- Direct payment handler ----
+
+  async function handleSendPayment(data: { recipientId: string; amountCents: number; description: string }) {
+    if (isSending) return;
+    setIsSending(true);
+
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientId: data.recipientId,
+          projectId,
+          amountCents: data.amountCents,
+          description: data.description,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast(err.error || "Payment failed");
+        setIsSending(false);
+        return;
+      }
+
+      const result = await res.json();
+      toast("Payment link created");
+      userScrolledRef.current = false;
+      await fetchMessages();
+      await fetchBalance();
+    } catch {
+      toast("Payment failed");
+    }
+
+    setIsSending(false);
+    setActiveAction(null);
+  }
+
   // ---- File handler ----
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1487,6 +1614,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     { key: "proposal", icon: <IconProposal size={13} />, label: "Proposal" },
     { key: "milestone", icon: <IconMilestone size={13} />, label: "Milestone" },
     { key: "task", icon: <IconTask size={13} />, label: "Task" },
+    { key: "payment", icon: <IconDollar size={13} />, label: "Payment" },
     { key: "files", icon: <IconPaperclip size={13} />, label: "Files", immediate: true },
   ];
 
@@ -1540,13 +1668,17 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 msg.content?.includes("PROPOSAL") ||
                 msg.content?.includes("MILESTONE") ||
                 msg.content?.includes("TASK CREATED") ||
-                msg.content?.includes("TERMS ACCEPTED");
+                msg.content?.includes("TERMS ACCEPTED") ||
+                msg.content?.includes("DIRECT PAYMENT") ||
+                msg.content?.includes("PAYMENT RECEIVED");
               const prevIsStructured =
                 prev?.content?.includes("INVOICE") ||
                 prev?.content?.includes("PROPOSAL") ||
                 prev?.content?.includes("MILESTONE") ||
                 prev?.content?.includes("TASK CREATED") ||
-                prev?.content?.includes("TERMS ACCEPTED");
+                prev?.content?.includes("TERMS ACCEPTED") ||
+                prev?.content?.includes("DIRECT PAYMENT") ||
+                prev?.content?.includes("PAYMENT RECEIVED");
 
               const isSameGroup =
                 prev &&
@@ -1594,6 +1726,60 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 return (
                   <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
                     <MilestoneCard title={milestone.title} amount={milestone.amount} status={milestone.status} />
+                  </div>
+                );
+              }
+
+              // Direct payment / payment received message
+              if (msg.content?.includes("DIRECT PAYMENT") || msg.content?.includes("PAYMENT RECEIVED")) {
+                const lines = msg.content.split("\n");
+                const isPaid = msg.content.includes("PAYMENT RECEIVED") || msg.content.includes("Status: Completed");
+                let payAmount = "";
+                let payDesc = "";
+                let payUrl = "";
+                for (const line of lines) {
+                  const t = line.trim();
+                  if (t.startsWith("Amount:")) payAmount = t.slice(7).trim();
+                  else if (t.startsWith("Description:")) payDesc = t.slice(12).trim();
+                  else if (t.startsWith("Pay:")) payUrl = t.slice(4).trim();
+                }
+                return (
+                  <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
+                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[380px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+                      <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-secondary"><IconDollar size={14} /></span>
+                          <span className="text-[13px] font-medium text-text-primary">{isPaid ? "Payment received" : "Payment"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-[6px] h-[6px] rounded-full ${isPaid ? "bg-positive" : "bg-warning"}`} />
+                          <span className={`text-[11px] font-medium ${isPaid ? "text-positive" : "text-warning"}`}>
+                            {isPaid ? "Completed" : "Pending"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3">
+                        {payDesc && <p className="text-[13px] text-text-secondary leading-snug mb-2">{payDesc}</p>}
+                        {payAmount && <p className="text-[22px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
+                      </div>
+                      {payUrl && !isPaid && (
+                        <div className="px-4 py-2.5 border-t border-border">
+                          <a href={payUrl} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline w-fit">
+                            <IconWallet size={12} />
+                            Pay now
+                          </a>
+                        </div>
+                      )}
+                      {isPaid && (
+                        <div className="px-4 py-2 border-t border-positive/10 bg-positive/5">
+                          <div className="flex items-center gap-1.5">
+                            <IconCheck size={12} />
+                            <span className="text-[11px] font-medium text-positive">Payment complete</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               }
@@ -1702,6 +1888,15 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
           onCancel={() => setActiveAction(null)}
           sending={isSending}
           members={members}
+        />
+      )}
+      {activeAction === "payment" && (
+        <PaymentForm
+          onSend={handleSendPayment}
+          onCancel={() => setActiveAction(null)}
+          sending={isSending}
+          members={members}
+          currentUserId={currentUserId}
         />
       )}
 

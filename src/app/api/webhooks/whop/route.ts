@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
-import { invoices, messages } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { invoices, messages, transactions, withdrawals } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { createHmac, timingSafeEqual } from "crypto";
 
 // Standard Webhooks signature verification
@@ -57,70 +57,34 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body);
     const eventType = payload.event || payload.type;
-    const whopInvoiceId = payload.data?.id || payload.invoice_id;
 
-    if (!eventType || !whopInvoiceId) {
+    if (!eventType) {
       return new Response("OK", { status: 200 });
     }
-
-    // Look up the invoice in our table
-    const [invoice] = await db
-      .select()
-      .from(invoices)
-      .where(eq(invoices.whopInvoiceId, whopInvoiceId))
-      .limit(1);
-
-    if (!invoice) {
-      console.warn(
-        `Whop webhook: no matching invoice found for ${whopInvoiceId}`
-      );
-      return new Response("OK", { status: 200 });
-    }
-
-    let newStatus: "paid" | "voided" | "past_due" | null = null;
-    let systemContent: string | null = null;
 
     switch (eventType) {
-      case "invoice.paid": {
-        newStatus = "paid";
-        systemContent = `INVOICE PAID\nInvoice ${whopInvoiceId} has been paid`;
-        break;
-      }
-      case "invoice.voided": {
-        newStatus = "voided";
-        systemContent = `INVOICE VOIDED\nInvoice ${whopInvoiceId} has been voided`;
-        break;
-      }
+      case "invoice.paid":
+      case "invoice.voided":
       case "invoice.past_due": {
-        newStatus = "past_due";
-        systemContent = `INVOICE PAST DUE\nInvoice ${whopInvoiceId} is past due`;
+        await handleInvoiceEvent(eventType, payload);
+        break;
+      }
+      case "payment.succeeded": {
+        await handlePaymentSucceeded(payload);
+        break;
+      }
+      case "withdrawal.completed": {
+        await handleWithdrawalCompleted(payload);
+        break;
+      }
+      case "withdrawal.failed": {
+        await handleWithdrawalFailed(payload);
         break;
       }
       default: {
-        return new Response("OK", { status: 200 });
+        // Unhandled event type
+        break;
       }
-    }
-
-    // Update the invoice status
-    if (newStatus) {
-      await db
-        .update(invoices)
-        .set({
-          status: newStatus,
-          ...(newStatus === "paid" ? { paidAt: new Date() } : {}),
-        })
-        .where(eq(invoices.whopInvoiceId, whopInvoiceId));
-    }
-
-    // Post a system message to the project chat
-    if (systemContent && invoice.projectId) {
-      await db.insert(messages).values({
-        projectId: invoice.projectId,
-        senderId: null,
-        content: systemContent,
-        messageType: "system",
-        fileUrl: null,
-      });
     }
 
     return new Response("OK", { status: 200 });
@@ -129,4 +93,218 @@ export async function POST(request: NextRequest) {
     // Always return 200 to prevent Whop from retrying
     return new Response("OK", { status: 200 });
   }
+}
+
+async function handleInvoiceEvent(
+  eventType: string,
+  payload: Record<string, any>
+) {
+  const whopInvoiceId = payload.data?.id || payload.invoice_id;
+  if (!whopInvoiceId) return;
+
+  // Look up the invoice in our table
+  const [invoice] = await db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.whopInvoiceId, whopInvoiceId))
+    .limit(1);
+
+  if (!invoice) {
+    console.warn(
+      `Whop webhook: no matching invoice found for ${whopInvoiceId}`
+    );
+    return;
+  }
+
+  let newStatus: "paid" | "voided" | "past_due" | null = null;
+  let systemContent: string | null = null;
+
+  switch (eventType) {
+    case "invoice.paid": {
+      newStatus = "paid";
+      systemContent = `INVOICE PAID\nInvoice ${whopInvoiceId} has been paid`;
+      break;
+    }
+    case "invoice.voided": {
+      newStatus = "voided";
+      systemContent = `INVOICE VOIDED\nInvoice ${whopInvoiceId} has been voided`;
+      break;
+    }
+    case "invoice.past_due": {
+      newStatus = "past_due";
+      systemContent = `INVOICE PAST DUE\nInvoice ${whopInvoiceId} is past due`;
+      break;
+    }
+  }
+
+  // Update the invoice status
+  if (newStatus) {
+    await db
+      .update(invoices)
+      .set({
+        status: newStatus,
+        ...(newStatus === "paid" ? { paidAt: new Date() } : {}),
+      })
+      .where(eq(invoices.whopInvoiceId, whopInvoiceId));
+  }
+
+  // Post a system message to the project chat
+  if (systemContent && invoice.projectId) {
+    await db.insert(messages).values({
+      projectId: invoice.projectId,
+      senderId: null,
+      content: systemContent,
+      messageType: "system",
+      fileUrl: null,
+    });
+  }
+
+  // On invoice.paid, also create a transaction record (idempotent)
+  if (eventType === "invoice.paid" && invoice.senderId) {
+    // Check if a transaction already exists for this invoice
+    const [existing] = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.invoiceId, invoice.id),
+          eq(transactions.type, "invoice_payment")
+        )
+      )
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(transactions).values({
+        userId: invoice.senderId,
+        projectId: invoice.projectId,
+        invoiceId: invoice.id,
+        type: "invoice_payment",
+        status: "completed",
+        amountCents: invoice.amountCents,
+        description: `Invoice payment: ${invoice.description}`,
+        completedAt: new Date(),
+      });
+    }
+  }
+}
+
+async function handlePaymentSucceeded(payload: Record<string, any>) {
+  const checkoutId =
+    payload.data?.checkout_session_id ||
+    payload.data?.checkout_id ||
+    payload.data?.id;
+
+  if (!checkoutId) return;
+
+  // Look up the transaction by checkout ID
+  const [transaction] = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.whopCheckoutId, checkoutId))
+    .limit(1);
+
+  if (!transaction || transaction.status !== "pending") return;
+
+  // Update transaction to completed
+  await db
+    .update(transactions)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+    })
+    .where(eq(transactions.id, transaction.id));
+
+  // Post system message if linked to a project
+  if (transaction.projectId) {
+    const displayAmount = (transaction.amountCents / 100).toLocaleString(
+      "en-US",
+      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    );
+
+    await db.insert(messages).values({
+      projectId: transaction.projectId,
+      senderId: null,
+      content: `PAYMENT RECEIVED\nAmount: $${displayAmount}\nDescription: ${transaction.description}\nStatus: Completed`,
+      messageType: "system",
+      fileUrl: null,
+    });
+  }
+}
+
+async function handleWithdrawalCompleted(payload: Record<string, any>) {
+  const whopWithdrawalId = payload.data?.id || payload.withdrawal_id;
+  if (!whopWithdrawalId) return;
+
+  // Update withdrawal record
+  const [withdrawal] = await db
+    .select()
+    .from(withdrawals)
+    .where(eq(withdrawals.whopWithdrawalId, whopWithdrawalId))
+    .limit(1);
+
+  if (!withdrawal) return;
+
+  await db
+    .update(withdrawals)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+    })
+    .where(eq(withdrawals.id, withdrawal.id));
+
+  // Update the corresponding transaction
+  await db
+    .update(transactions)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(transactions.userId, withdrawal.userId),
+        eq(transactions.type, "withdrawal"),
+        eq(transactions.status, "pending"),
+        eq(transactions.amountCents, -withdrawal.amountCents)
+      )
+    );
+}
+
+async function handleWithdrawalFailed(payload: Record<string, any>) {
+  const whopWithdrawalId = payload.data?.id || payload.withdrawal_id;
+  const failureReason =
+    payload.data?.failure_reason || payload.data?.error || "Unknown error";
+
+  if (!whopWithdrawalId) return;
+
+  // Update withdrawal record
+  const [withdrawal] = await db
+    .select()
+    .from(withdrawals)
+    .where(eq(withdrawals.whopWithdrawalId, whopWithdrawalId))
+    .limit(1);
+
+  if (!withdrawal) return;
+
+  await db
+    .update(withdrawals)
+    .set({
+      status: "failed",
+      failureReason,
+    })
+    .where(eq(withdrawals.id, withdrawal.id));
+
+  // Update the corresponding transaction
+  await db
+    .update(transactions)
+    .set({
+      status: "failed",
+    })
+    .where(
+      and(
+        eq(transactions.userId, withdrawal.userId),
+        eq(transactions.type, "withdrawal"),
+        eq(transactions.status, "pending"),
+        eq(transactions.amountCents, -withdrawal.amountCents)
+      )
+    );
 }
