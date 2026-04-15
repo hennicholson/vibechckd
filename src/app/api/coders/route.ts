@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, coderProfiles, portfolioItems, portfolioAssets } from "@/db/schema";
 import { eq, isNotNull } from "drizzle-orm";
-import { coders as mockCoders } from "@/lib/mock-data";
+// No mock data — only real DB coders
 
 export async function GET() {
   try {
@@ -21,7 +21,7 @@ export async function GET() {
     });
 
     if (profiles.length === 0) {
-      return NextResponse.json(mockCoders);
+      return NextResponse.json([]);
     }
 
     // For each profile, get their portfolio items + assets
@@ -88,17 +88,9 @@ export async function GET() {
       })
     );
 
-    // Merge DB coders with mock coders (mock coders fill the gallery)
-    // DB coders take priority if slug matches
-    const dbSlugs = new Set(codersWithPortfolio.map((c) => c.slug));
-    const mergedCoders = [
-      ...codersWithPortfolio,
-      ...mockCoders.filter((c) => !dbSlugs.has(c.slug)),
-    ];
-
-    return NextResponse.json(mergedCoders);
+    return NextResponse.json(codersWithPortfolio);
   } catch (error) {
     console.error("Error fetching coders:", error);
-    return NextResponse.json(mockCoders);
+    return NextResponse.json([]);
   }
 }

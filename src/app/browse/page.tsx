@@ -7,7 +7,7 @@ import Badge from "@/components/Badge";
 import Tag from "@/components/Tag";
 import Button from "@/components/Button";
 import { useSession, signOut } from "next-auth/react";
-import { coders as fallbackCoders, SPECIALTIES, SPECIALTY_LABELS, FILTER_OPTIONS, type Coder, type Specialty } from "@/lib/mock-data";
+import { SPECIALTIES, SPECIALTY_LABELS, FILTER_OPTIONS, type Coder, type Specialty } from "@/lib/mock-data";
 import VerifiedSeal from "@/components/VerifiedSeal";
 
 function BrowseSidebarUser() {
@@ -582,7 +582,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
 
 export default function BrowsePage() {
   const { data: session } = useSession();
-  const [coders, setCoders] = useState<Coder[]>(fallbackCoders);
+  const [coders, setCoders] = useState<Coder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
