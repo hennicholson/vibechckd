@@ -250,6 +250,9 @@ function CoderCard({ coder, onClick, index }: { coder: Coder; onClick: () => voi
 }
 
 function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void }) {
+  const { status: authStatus } = useSession();
+  const isLoggedIn = authStatus === "authenticated";
+  const startProjectHref = isLoggedIn ? "/dashboard/teams/new" : "/register?role=client";
   const livePreviewAsset = coder.portfolio
     .flatMap((p) => p.assets)
     .find((a) => a.type === "live_preview");
@@ -315,7 +318,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
             <Link href={`/coders/${coder.slug}`}>
               <Button variant="secondary" size="sm">View full profile</Button>
             </Link>
-            <Button size="sm">Start project</Button>
+            <Link href={startProjectHref}><Button size="sm">Start project</Button></Link>
           </div>
           {/* Spacer for mobile centering */}
           <div className="w-[44px] sm:hidden" />
@@ -390,7 +393,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
 
               {/* Mobile + Tablet CTAs -- full width, visible below lg */}
               <div className="flex flex-col gap-2 mt-5 lg:hidden">
-                <Button className="w-full min-h-[44px]">Start project</Button>
+                <Link href={startProjectHref}><Button className="w-full min-h-[44px]">Start project</Button></Link>
                 <Link href={`/coders/${coder.slug}`} className="w-full">
                   <Button variant="secondary" className="w-full min-h-[44px]">View full profile</Button>
                 </Link>
@@ -531,8 +534,8 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
                   </div>
 
                   <div className="flex gap-2 mt-5">
-                    <Button className="flex-1">Start project</Button>
-                    <Button variant="secondary" className="flex-1">Send inquiry</Button>
+                    <Link href={startProjectHref} className="flex-1"><Button className="w-full">Start project</Button></Link>
+                    <Link href={isLoggedIn ? "/dashboard/inbox" : "/register?role=client"} className="flex-1"><Button variant="secondary" className="w-full">Send inquiry</Button></Link>
                   </div>
                 </div>
               </div>
