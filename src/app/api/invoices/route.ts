@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { messages } from "@/db/schema";
-import { eq, asc, like } from "drizzle-orm";
+import { messages, projectMembers, users } from "@/db/schema";
+import { eq, asc, and, ne } from "drizzle-orm";
 import { createInvoice } from "@/lib/whop";
 
 export async function POST(request: NextRequest) {
@@ -30,14 +30,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Look up the other project member's email if not provided
+    let email = customerEmail || "";
+    let name = customerName || "";
+
+    if (!email && projectId) {
+      try {
+        const members = await db
+          .select({ email: users.email, name: users.name })
+          .from(projectMembers)
+          .innerJoin(users, eq(projectMembers.userId, users.id))
+          .where(
+            and(
+              eq(projectMembers.projectId, projectId),
+              ne(projectMembers.userId, session.user.id)
+            )
+          )
+          .limit(1);
+
+        if (members.length > 0) {
+          email = members[0].email;
+          name = name || members[0].name || "";
+        }
+      } catch {
+        // If lookup fails, save as draft
+      }
+    }
+
     // Create the invoice via Whop API
+    const saveDraft = !email;
     const invoice = await createInvoice({
-      customerEmail: customerEmail || "",
-      customerName: customerName || "",
+      customerEmail: email,
+      customerName: name,
       description,
       amount: Math.round(amount),
-      dueDate: dueDate || new Date().toISOString().split("T")[0],
+      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       lineItems,
+      saveDraft,
     });
 
     // Format amount for display
