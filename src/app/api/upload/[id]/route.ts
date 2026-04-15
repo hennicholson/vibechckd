@@ -9,8 +9,8 @@ import { deleteFromBunny } from "@/lib/bunny";
  * e.g. "https://vibechckd-cdn.b-cdn.net/pfp/abc.jpg" -> "pfp/abc.jpg"
  */
 function extractStoragePath(cdnUrl: string): string | null {
-  const base = process.env.BUNNY_CDN_URL;
-  if (!base || !cdnUrl.startsWith(base)) return null;
+  const base = process.env.BUNNY_CDN_URL || "https://vibechckd-cdn.b-cdn.net";
+  if (!cdnUrl.startsWith(base)) return null;
   return cdnUrl.slice(base.length + 1); // +1 for the trailing slash
 }
 
@@ -56,26 +56,22 @@ export async function DELETE(
       }
     } else if (type === "preview") {
       const [profile] = await db
-        .select({ tags: coderProfiles.tags })
+        .select({ gifPreviewUrl: coderProfiles.gifPreviewUrl })
         .from(coderProfiles)
         .where(eq(coderProfiles.userId, userId))
         .limit(1);
 
-      if (profile?.tags) {
-        const gifTag = profile.tags.find((t) => t.startsWith("gif_preview:"));
-        if (gifTag) {
-          const gifUrl = gifTag.replace("gif_preview:", "");
-          const storagePath = extractStoragePath(gifUrl);
-          if (storagePath) await deleteFromBunny(storagePath);
+      if (profile?.gifPreviewUrl) {
+        const storagePath = extractStoragePath(profile.gifPreviewUrl);
+        if (storagePath) await deleteFromBunny(storagePath);
 
-          await db
-            .update(coderProfiles)
-            .set({
-              tags: profile.tags.filter((t) => !t.startsWith("gif_preview:")),
-              updatedAt: new Date(),
-            })
-            .where(eq(coderProfiles.userId, userId));
-        }
+        await db
+          .update(coderProfiles)
+          .set({
+            gifPreviewUrl: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(coderProfiles.userId, userId));
       }
     } else if (type === "asset") {
       // id is the portfolio asset id

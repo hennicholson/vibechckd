@@ -549,6 +549,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
 }
 
 export default function BrowsePage() {
+  const { data: session } = useSession();
   const [coders, setCoders] = useState<Coder[]>(fallbackCoders);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -570,6 +571,7 @@ export default function BrowsePage() {
     }
   }, []);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const clearSearch = useCallback(() => {
     setSearchQuery("");
@@ -678,7 +680,55 @@ export default function BrowsePage() {
               vibechckd
               <VerifiedSeal size="sm" />
             </Link>
+            <button
+              className="flex flex-col justify-center items-center w-10 h-10 cursor-pointer"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
+            >
+              <span className={`block w-4 h-[1.5px] bg-text-primary transition-all duration-200 ${mobileMenuOpen ? "translate-y-[3px] rotate-45" : ""}`} />
+              <span className={`block w-4 h-[1.5px] bg-text-primary transition-all duration-200 mt-[5px] ${mobileMenuOpen ? "-translate-y-[2px] -rotate-45" : ""}`} />
+            </button>
           </div>
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="border-t border-border bg-background overflow-hidden"
+              >
+                <div className="px-4 py-3 space-y-1">
+                  <Link href="/browse" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-primary font-medium">Browse</Link>
+                  <Link href="/dashboard/teams/new" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted hover:text-text-primary">Build a Team</Link>
+                  <Link href="/docs" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted hover:text-text-primary">Docs</Link>
+                  {session?.user ? (
+                    <>
+                      <div className="border-t border-border pt-2 mt-2 space-y-1">
+                        <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted">Dashboard</Link>
+                        <Link href="/dashboard/profile" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted">Profile</Link>
+                        <Link href="/dashboard/portfolio" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted">Portfolio</Link>
+                        <Link href="/dashboard/projects" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted">Projects</Link>
+                        <Link href="/dashboard/inbox" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted">Inbox</Link>
+                        <Link href="/dashboard/settings" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-[13px] text-text-muted">Settings</Link>
+                      </div>
+                      <button onClick={() => { setMobileMenuOpen(false); signOut({ callbackUrl: "/" }); }} className="block py-2 text-[13px] text-text-muted cursor-pointer">Sign out</button>
+                    </>
+                  ) : (
+                    <div className="border-t border-border pt-2 mt-2 flex gap-2">
+                      <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="flex-1">
+                        <button className="w-full py-2 text-[13px] text-text-muted border border-border rounded-md cursor-pointer">Log in</button>
+                      </Link>
+                      <Link href="/apply" onClick={() => setMobileMenuOpen(false)} className="flex-1">
+                        <button className="w-full py-2 text-[13px] text-[#fafafa] bg-[#171717] rounded-md cursor-pointer">Apply</button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           {/* Mobile search -- full width under logo */}
           <div className="px-3 pb-2">
             <div className="relative">

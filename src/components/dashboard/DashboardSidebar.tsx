@@ -130,64 +130,111 @@ export default function DashboardSidebar() {
     return pathname.startsWith(href);
   };
 
+  // Select up to 5 items for mobile bottom nav (Overview, Projects, Inbox, Settings + role-specific)
+  const mobileItems = filteredItems.filter((item) =>
+    ["/dashboard", "/dashboard/projects", "/dashboard/inbox", "/dashboard/settings", "/dashboard/profile", "/dashboard/portfolio"].includes(item.href)
+  ).slice(0, 5);
+
   return (
-    <aside className="hidden md:flex flex-col w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen">
-      {/* Logo */}
-      <div className="px-4 h-[48px] flex items-center border-b border-border">
+    <>
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border h-[48px] flex items-center justify-between px-4">
         <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
           vibechckd
           <VerifiedSeal size="sm" />
         </Link>
-      </div>
-
-      {/* Nav */}
-      <div className="px-3 py-3 space-y-0.5 flex-1">
-        {filteredItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
-              isActive(item.href)
-                ? "text-text-primary font-medium bg-surface-muted"
-                : "text-text-muted hover:text-text-primary hover:bg-background-alt"
-            }`}
-          >
-            {item.icon}
-            <span className="flex-1">{item.label}</span>
-            {item.label === "Inbox" && (
-              <span className="w-2 h-2 rounded-full bg-[#0a0a0a] flex-shrink-0" />
-            )}
-          </Link>
-        ))}
-      </div>
-
-      {/* User */}
-      <div className="px-3 py-3 border-t border-border">
-        <div className="flex items-center gap-2 px-2 mb-2">
+        <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
             {session?.user?.name?.charAt(0) || "?"}
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[12px] text-text-primary truncate">{session?.user?.name || "User"}</span>
-            <span className="text-[10px] font-mono text-text-muted">
-              {role === "creator" ? (
-                <span className="inline-flex items-center gap-1">
-                  <VerifiedSeal size="xs" />
-                  Creator
-                </span>
-              ) : role ? (
-                <span className="capitalize">{role}</span>
-              ) : null}
-            </span>
-          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+          >
+            Sign out
+          </button>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: "/" })}
-          className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-        >
-          Sign out
-        </button>
       </div>
-    </aside>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-center justify-around h-[56px]">
+          {mobileItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
+                isActive(item.href)
+                  ? "text-text-primary"
+                  : "text-text-muted active:text-text-primary"
+              }`}
+            >
+              {item.icon}
+              <span className={`text-[10px] ${isActive(item.href) ? "font-medium" : ""}`}>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </nav>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex flex-col w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen">
+        {/* Logo */}
+        <div className="px-4 h-[48px] flex items-center border-b border-border">
+          <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
+            vibechckd
+            <VerifiedSeal size="sm" />
+          </Link>
+        </div>
+
+        {/* Nav */}
+        <div className="px-3 py-3 space-y-0.5 flex-1">
+          {filteredItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+                isActive(item.href)
+                  ? "text-text-primary font-medium bg-surface-muted"
+                  : "text-text-muted hover:text-text-primary hover:bg-background-alt"
+              }`}
+            >
+              {item.icon}
+              <span className="flex-1">{item.label}</span>
+              {item.label === "Inbox" && (
+                <span className="w-2 h-2 rounded-full bg-[#0a0a0a] flex-shrink-0" />
+              )}
+            </Link>
+          ))}
+        </div>
+
+        {/* User */}
+        <div className="px-3 py-3 border-t border-border">
+          <div className="flex items-center gap-2 px-2 mb-2">
+            <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
+              {session?.user?.name?.charAt(0) || "?"}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[12px] text-text-primary truncate">{session?.user?.name || "User"}</span>
+              <span className="text-[10px] font-mono text-text-muted">
+                {role === "creator" ? (
+                  <span className="inline-flex items-center gap-1">
+                    <VerifiedSeal size="xs" />
+                    Creator
+                  </span>
+                ) : role ? (
+                  <span className="capitalize">{role}</span>
+                ) : null}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+          >
+            Sign out
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
