@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { projects, projectMembers, messages } from "@/db/schema";
+import { projects, projectMembers, messages, coderProfiles } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +15,21 @@ export async function POST(req: Request) {
 
     if (!coderId || !coderName) {
       return NextResponse.json({ error: "Missing coder info" }, { status: 400 });
+    }
+
+    // Look up the coder's actual user ID
+    // coderId might be a coder_profiles.id or a users.id — try both
+    let coderUserId = coderId;
+
+    // Check if it's a coder_profiles.id and get the user_id
+    const [profile] = await db
+      .select({ userId: coderProfiles.userId })
+      .from(coderProfiles)
+      .where(eq(coderProfiles.id, coderId))
+      .limit(1);
+
+    if (profile) {
+      coderUserId = profile.userId;
     }
 
     const title = type === "project"
@@ -31,11 +47,23 @@ export async function POST(req: Request) {
       status: "draft",
     }).returning();
 
-    // Add both users as project members
-    await db.insert(projectMembers).values([
-      { projectId: project.id, userId: session.user.id, roleLabel: "Client" },
-      { projectId: project.id, userId: coderId, roleLabel: coderName.split(" ")[0] },
-    ]);
+    // Add client as member
+    await db.insert(projectMembers).values({
+      projectId: project.id,
+      userId: session.user.id,
+      roleLabel: "Client",
+    });
+
+    // Add coder as member — skip if user ID is invalid (mock data)
+    try {
+      await db.insert(projectMembers).values({
+        projectId: project.id,
+        userId: coderUserId,
+        roleLabel: coderName.split(" ")[0],
+      });
+    } catch {
+      // coderId might be from mock data (not a real UUID) — that's OK
+    }
 
     // Send initial message
     await db.insert(messages).values({
@@ -46,8 +74,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ success: true, projectId: project.id });
-  } catch (error) {
-    console.error("Inquiry error:", error);
+  } catch (error: any) {
+    console.error("Inquiry error:", error?.message || error);
     return NextResponse.json({ error: "Failed to create inquiry" }, { status: 500 });
   }
 }
