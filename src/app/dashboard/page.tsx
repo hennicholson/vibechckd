@@ -1,9 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { coders, featuredCoders } from "@/lib/mock-data";
-import Badge from "@/components/Badge";
 import VerifiedSeal from "@/components/VerifiedSeal";
 
 function getGreeting(): string {
@@ -22,30 +21,115 @@ function formatDate(): string {
   });
 }
 
-const activityItems = [
-  { text: "Sara Chen submitted a deliverable", time: "2h ago" },
-  { text: "New message in vibechckd Marketing Site", time: "5h ago" },
-  { text: "Task 'Design hero section' marked complete", time: "1d ago" },
-];
+/* ── Types ── */
+type ProfileData = {
+  displayName: string;
+  slug?: string;
+  tagline: string;
+  bio: string;
+  specialties: string[];
+  hourlyRate: string;
+  availability: string;
+  avatarUrl: string;
+  verified?: boolean;
+};
+
+type ProjectData = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  memberCount: number;
+  lastActivity: string;
+};
+
+type ConversationData = {
+  projectId: string;
+  projectName: string;
+  lastMessage: string;
+  lastSenderName: string;
+  lastMessageAt: string;
+};
+
+/* ── Profile completion calc ── */
+function calcProfileCompletion(profile: ProfileData | null): number {
+  if (!profile) return 0;
+  const fields = [
+    profile.displayName,
+    profile.tagline,
+    profile.bio,
+    profile.specialties.length > 0,
+    profile.hourlyRate,
+    profile.avatarUrl,
+  ];
+  const filled = fields.filter(Boolean).length;
+  return Math.round((filled / fields.length) * 100);
+}
+
+/* ── Relative time helper ── */
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+/* ── Status badge ── */
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    active: "bg-emerald-50 text-emerald-700",
+    in_progress: "bg-blue-50 text-blue-700",
+    pending: "bg-amber-50 text-amber-700",
+    completed: "bg-neutral-100 text-neutral-500",
+    cancelled: "bg-neutral-100 text-neutral-400",
+  };
+  const label = status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${colors[status] || "bg-neutral-100 text-neutral-500"}`}>
+      {label}
+    </span>
+  );
+}
 
 /* ── Client Overview ── */
 function ClientOverview({ name }: { name: string }) {
-  const recommendedCoders = featuredCoders.slice(0, 4);
+  const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [conversations, setConversations] = useState<ConversationData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/projects").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/conversations").then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([p, c]) => {
+        setProjects(p);
+        setConversations(c);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="max-w-3xl px-8 py-6">
       {/* Client label */}
       <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
-          <VerifiedSeal size="xs" />
-          Client Dashboard
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Client
         </span>
       </div>
 
       {/* Greeting */}
       <div className="mb-8">
         <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
-          Find your next team
+          {getGreeting()}, {name.split(" ")[0]}
         </h1>
         <p className="text-[12px] font-mono text-text-muted mt-1">
           {formatDate()}
@@ -57,7 +141,7 @@ function ClientOverview({ name }: { name: string }) {
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
           Quick actions
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <Link
             href="/browse"
             className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors group"
@@ -82,101 +166,95 @@ function ClientOverview({ name }: { name: string }) {
             <p className="text-[13px] font-medium text-text-primary">Build a team</p>
             <p className="text-[11px] text-text-muted mt-0.5">Assemble your dream squad</p>
           </Link>
-          <div className="border border-border rounded-[10px] p-4 opacity-50 cursor-not-allowed">
-            <div className="w-8 h-8 rounded-md bg-surface-muted flex items-center justify-center mb-3">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <p className="text-[13px] font-medium text-text-primary">Post a project</p>
-            <p className="text-[11px] text-text-muted mt-0.5">Coming soon</p>
-          </div>
         </div>
       </div>
 
-      {/* Active projects */}
       {/* Active projects */}
       <div className="mb-8">
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
           Your projects
         </p>
-        <div className="border border-border rounded-[10px] p-6 text-center">
-          <p className="text-[13px] text-text-muted">No projects yet</p>
-          <Link href="/dashboard/teams/new" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
-            Build your first team
-          </Link>
-        </div>
-      </div>
-
-      {/* Recommended coders */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-mono uppercase text-text-muted">
-            Recommended coders
-          </p>
-          <Link
-            href="/browse"
-            className="text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors"
-          >
-            View all
-          </Link>
-        </div>
-        <div className="border border-border rounded-[10px] divide-y divide-border">
-          {recommendedCoders.map((coder) => (
+        {loading ? (
+          <div className="border border-border rounded-[10px] p-6">
+            <div className="h-4 w-32 bg-surface-muted rounded animate-pulse" />
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="border border-border rounded-[10px] p-6 text-center">
+            <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mx-auto mb-3">
+              <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <p className="text-[13px] text-text-primary font-medium mb-1">No projects yet</p>
+            <p className="text-[11px] text-text-muted mb-3">Find a coder and start your first project.</p>
             <Link
-              key={coder.id}
-              href={`/coders/${coder.slug}`}
-              className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+              href="/browse"
+              className="inline-flex px-4 py-2 bg-text-primary text-white text-[12px] font-medium rounded-md hover:bg-accent-hover transition-colors"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-md bg-surface-muted flex items-center justify-center text-[11px] font-medium text-text-muted overflow-hidden">
-                  {coder.avatarUrl ? (
-                    <img
-                      src={coder.avatarUrl}
-                      alt={coder.displayName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    coder.displayName.charAt(0)
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-[13px] font-medium text-text-primary">
-                      {coder.displayName}
-                    </p>
-                    {coder.verified && <Badge variant="verified" />}
-                  </div>
+              Find your first coder
+            </Link>
+          </div>
+        ) : (
+          <div className="border border-border rounded-[10px] divide-y divide-border">
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                href={`/dashboard/projects/${project.id}`}
+                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-text-primary truncate">{project.title}</p>
                   <p className="text-[11px] font-mono text-text-muted mt-0.5">
-                    {coder.title} &middot; {coder.hourlyRate}
+                    {project.memberCount} member{project.memberCount !== 1 ? "s" : ""}
                   </p>
                 </div>
-              </div>
-              <span className="text-[11px] font-mono text-text-muted">
-                View profile
-              </span>
-            </Link>
-          ))}
-        </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <StatusBadge status={project.status} />
+                  <span className="text-[11px] font-mono text-text-muted">
+                    {relativeTime(project.lastActivity)}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Hire CTA */}
-      <div className="border border-border rounded-[10px] p-5 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] font-medium text-text-primary">
-            Ready to hire?
-          </p>
-          <p className="text-[11px] text-text-muted mt-0.5">
-            Browse our verified talent pool and start building today.
-          </p>
+      {/* Recent conversations */}
+      {conversations.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-mono uppercase text-text-muted">
+              Recent conversations
+            </p>
+            <Link
+              href="/dashboard/inbox"
+              className="text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors"
+            >
+              View all
+            </Link>
+          </div>
+          <div className="border border-border rounded-[10px] divide-y divide-border">
+            {conversations.slice(0, 3).map((convo) => (
+              <Link
+                key={convo.projectId}
+                href={`/dashboard/projects/${convo.projectId}`}
+                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-text-primary truncate">{convo.projectName}</p>
+                  <p className="text-[11px] text-text-muted mt-0.5 truncate">
+                    {convo.lastSenderName}: {convo.lastMessage}
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-text-muted flex-shrink-0 ml-3">
+                  {relativeTime(convo.lastMessageAt)}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
-        <Link
-          href="/browse"
-          className="px-4 py-2 bg-text-primary text-white text-[12px] font-medium rounded-md hover:bg-accent-hover transition-colors flex-shrink-0"
-        >
-          Hire a coder
-        </Link>
-      </div>
+      )}
     </div>
   );
 }
@@ -185,13 +263,46 @@ function ClientOverview({ name }: { name: string }) {
 function CreatorOverview() {
   const { data: session } = useSession();
   const userName = session?.user?.name || "Creator";
-  const creator = coders.find(c => c.displayName === userName) || null;
 
-  const portfolioItemCount = creator?.portfolio.length || 0;
-  const totalAssets = creator?.portfolio.reduce(
-    (sum, item) => sum + item.assets.length,
-    0
-  ) || 0;
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [portfolioCount, setPortfolioCount] = useState<number>(0);
+  const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/profile").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/portfolio").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/projects").then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([profileData, portfolioData, projectData]) => {
+        setProfile(profileData);
+        setPortfolioCount(Array.isArray(portfolioData) ? portfolioData.length : 0);
+        setProjects(projectData);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const completion = calcProfileCompletion(profile);
+  const isProfileIncomplete = completion < 100;
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl px-8 py-6">
+        <div className="mb-8">
+          <div className="h-6 w-48 bg-surface-muted rounded animate-pulse" />
+          <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />
+        </div>
+        <div className="h-20 bg-surface-muted rounded-[10px] animate-pulse mb-8" />
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-20 bg-surface-muted rounded-[10px] animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl px-8 py-6">
@@ -199,7 +310,7 @@ function CreatorOverview() {
       <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
           <VerifiedSeal size="xs" />
-          Creator Dashboard
+          Creator
         </span>
       </div>
 
@@ -216,7 +327,7 @@ function CreatorOverview() {
       {/* Public profile link */}
       <div className="mb-8">
         <Link
-          href={creator ? `/coders/${creator.slug}` : "/dashboard/profile"}
+          href={profile?.slug ? `/coders/${profile.slug}` : "/dashboard/profile"}
           className="inline-flex items-center gap-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors group"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,33 +339,40 @@ function CreatorOverview() {
       </div>
 
       {/* Profile completion card */}
-      <div className="border border-border rounded-[10px] p-5 mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[13px] text-text-primary">
-            Complete your profile to get discovered
-          </p>
-          <Link
-            href="/dashboard/profile"
-            className="text-[12px] font-medium text-text-primary underline underline-offset-2"
-          >
-            Complete profile
-          </Link>
+      {isProfileIncomplete && (
+        <div className="border border-border rounded-[10px] p-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[13px] font-medium text-text-primary">
+                Complete your profile to get discovered
+              </p>
+              <p className="text-[11px] text-text-muted mt-0.5">
+                {completion}% complete
+              </p>
+            </div>
+            <Link
+              href="/dashboard/profile"
+              className="text-[12px] font-medium text-text-primary underline underline-offset-2"
+            >
+              Complete profile
+            </Link>
+          </div>
+          <div className="h-1.5 bg-surface-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-text-primary rounded-full transition-all duration-500"
+              style={{ width: `${completion}%` }}
+            />
+          </div>
         </div>
-        <div className="h-1.5 bg-surface-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-text-primary rounded-full"
-            style={{ width: "30%" }}
-          />
-        </div>
-      </div>
+      )}
 
       {/* Quick stats row */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { label: "Projects", value: "1" },
-          { label: "Portfolio items", value: String(portfolioItemCount) },
-          { label: "Total assets", value: String(totalAssets) },
+          { label: "Projects", value: String(projects.length) },
+          { label: "Portfolio items", value: String(portfolioCount) },
           { label: "Profile views", value: "\u2014" },
+          { label: "Earnings", value: "\u2014" },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -270,61 +388,52 @@ function CreatorOverview() {
         ))}
       </div>
 
-      {/* Getting started checklist for new creators */}
-      {portfolioItemCount === 0 && (
+      {/* Getting started checklist for new/incomplete profiles */}
+      {isProfileIncomplete && (
         <div className="border border-border rounded-[10px] p-5 mb-8">
           <h3 className="text-[14px] font-medium text-text-primary mb-3">Get started</h3>
           <div className="space-y-3">
-            <Link href="/dashboard/profile" className="flex items-center gap-3 group">
-              <div className="w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 group-hover:border-text-primary transition-colors">
-                <span className="text-[10px] font-mono text-text-muted">1</span>
-              </div>
-              <div>
-                <p className="text-[13px] text-text-primary group-hover:underline">Complete your profile</p>
-                <p className="text-[11px] text-text-muted">Add bio, specialties, rate, and social links</p>
-              </div>
-            </Link>
-            <Link href="/dashboard/portfolio" className="flex items-center gap-3 group">
-              <div className="w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 group-hover:border-text-primary transition-colors">
-                <span className="text-[10px] font-mono text-text-muted">2</span>
-              </div>
-              <div>
-                <p className="text-[13px] text-text-primary group-hover:underline">Add your first project</p>
-                <p className="text-[11px] text-text-muted">Upload portfolio work with live previews and assets</p>
-              </div>
-            </Link>
-            <Link href="/browse" className="flex items-center gap-3 group">
-              <div className="w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 group-hover:border-text-primary transition-colors">
-                <span className="text-[10px] font-mono text-text-muted">3</span>
-              </div>
-              <div>
-                <p className="text-[13px] text-text-primary group-hover:underline">Browse the gallery</p>
-                <p className="text-[11px] text-text-muted">See how other verified coders present their work</p>
-              </div>
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Your portfolio quick view */}
-      {portfolioItemCount > 0 && creator && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-mono uppercase text-text-muted">Your portfolio</p>
-            <Link href="/dashboard/portfolio" className="text-[12px] text-text-muted hover:text-text-primary transition-colors">
-              Manage &rarr;
-            </Link>
-          </div>
-          <div className="border border-border rounded-[10px] divide-y divide-border">
-            {creator.portfolio.slice(0, 3).map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3.5">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-text-primary truncate">{item.title}</p>
-                  <p className="text-[11px] font-mono text-text-muted mt-0.5">
-                    {item.assets.length} asset{item.assets.length !== 1 ? "s" : ""}
-                  </p>
+            {[
+              {
+                href: "/dashboard/profile",
+                done: !!(profile?.displayName && profile?.bio && profile?.tagline),
+                title: "Complete your profile",
+                desc: "Add bio, specialties, rate, and social links",
+              },
+              {
+                href: "/dashboard/portfolio",
+                done: portfolioCount > 0,
+                title: "Add your first project",
+                desc: "Upload portfolio work with live previews and assets",
+              },
+              {
+                href: "/browse",
+                done: false,
+                title: "Browse the gallery",
+                desc: "See how other verified coders present their work",
+              },
+            ].map((step, i) => (
+              <Link key={i} href={step.href} className="flex items-center gap-3 group">
+                <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
+                  step.done
+                    ? "border-text-primary bg-text-primary"
+                    : "border-border group-hover:border-text-primary"
+                }`}>
+                  {step.done ? (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <span className="text-[10px] font-mono text-text-muted">{i + 1}</span>
+                  )}
                 </div>
-              </div>
+                <div>
+                  <p className={`text-[13px] group-hover:underline ${step.done ? "text-text-muted line-through" : "text-text-primary"}`}>
+                    {step.title}
+                  </p>
+                  <p className="text-[11px] text-text-muted">{step.desc}</p>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -333,10 +442,62 @@ function CreatorOverview() {
       {/* Active projects */}
       <div className="mb-8">
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Projects</p>
-        <div className="border border-border rounded-[10px] p-6 text-center">
-          <p className="text-[13px] text-text-muted">No active projects yet</p>
-          <Link href="/browse" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
-            Browse the gallery to get discovered
+        {projects.length === 0 ? (
+          <div className="border border-border rounded-[10px] p-6 text-center">
+            <p className="text-[13px] text-text-muted">No active projects yet</p>
+            <Link href="/browse" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
+              Browse the gallery to get discovered
+            </Link>
+          </div>
+        ) : (
+          <div className="border border-border rounded-[10px] divide-y divide-border">
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                href={`/dashboard/projects/${project.id}`}
+                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-text-primary truncate">{project.title}</p>
+                  <p className="text-[11px] font-mono text-text-muted mt-0.5">
+                    {project.memberCount} member{project.memberCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <StatusBadge status={project.status} />
+                  <span className="text-[11px] font-mono text-text-muted">
+                    {relativeTime(project.lastActivity)}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick links */}
+      <div className="border border-border rounded-[10px] p-5">
+        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Quick links</p>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard/profile"
+            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
+          >
+            Edit profile
+          </Link>
+          <span className="text-border">|</span>
+          <Link
+            href="/dashboard/portfolio"
+            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
+          >
+            Manage portfolio
+          </Link>
+          <span className="text-border">|</span>
+          <Link
+            href="/browse"
+            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
+          >
+            Browse gallery
           </Link>
         </div>
       </div>
@@ -359,8 +520,8 @@ export default function DashboardPage() {
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />
         </div>
         <div className="h-20 bg-surface-muted rounded-[10px] animate-pulse mb-8" />
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-20 bg-surface-muted rounded-[10px] animate-pulse" />
           ))}
         </div>
@@ -373,10 +534,5 @@ export default function DashboardPage() {
   }
 
   // Coders and admins get the creator dashboard
-  if (role === "creator") {
-    return <CreatorOverview />;
-  }
-
-  // Fallback — show creator dashboard for any authenticated user
   return <CreatorOverview />;
 }

@@ -2,14 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import Button from "../Button";
 import { useToast } from "../Toast";
 
-type QuickAction = "proposal" | "invoice" | "terms" | "review" | null;
-
-// --- Types ---
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type MessageType = "text" | "file" | "system" | "ai";
+type ActiveAction = "invoice" | "proposal" | "files" | "accept" | null;
 
 interface ChatMessage {
   id: string;
@@ -21,55 +21,7 @@ interface ChatMessage {
   createdAt: string;
 }
 
-// --- Relative time helper ---
-
-function relativeTime(dateStr: string): string {
-  const now = Date.now();
-  const sentAt = new Date(dateStr).getTime();
-  const diffMs = now - sentAt;
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay === 1) return "Yesterday";
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(sentAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function getInitials(name: string | null): string {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function getFileName(url: string): string {
-  try {
-    const path = new URL(url).pathname;
-    return path.split("/").pop() || "file";
-  } catch {
-    return "file";
-  }
-}
-
-const MAX_CHARS = 500;
-const POLL_INTERVAL = 5000;
-
-// --- Invoice message parser ---
-
 interface ParsedInvoice {
-  icon: string;
-  title: string;
   description: string | null;
   amount: string | null;
   due: string | null;
@@ -78,34 +30,65 @@ interface ParsedInvoice {
   payUrl: string | null;
 }
 
-function parseInvoiceMessage(content: string): ParsedInvoice | null {
-  if (!content.includes("INVOICE")) return null;
+interface ParsedProposal {
+  scope: string | null;
+  budget: string | null;
+  timeline: string | null;
+}
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAX_CHARS = 500;
+const CHAR_WARN_THRESHOLD = 400;
+const POLL_INTERVAL = 5000;
+
+const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|avif|svg)(\?|$)/i;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffMin < 1) return "now";
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHr < 24) return `${diffHr}h`;
+  if (diffDay === 1) return "yesterday";
+  if (diffDay < 7) return `${diffDay}d`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function getFileName(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    return decodeURIComponent(path.split("/").pop() || "file");
+  } catch {
+    return "file";
+  }
+}
+
+function isImageUrl(url: string): boolean {
+  return IMAGE_EXTENSIONS.test(url);
+}
+
+function parseInvoiceContent(content: string): ParsedInvoice | null {
+  if (!content.includes("INVOICE")) return null;
   const lines = content.split("\n");
 
-  // Determine type from first line
-  let icon = "\u{1F4B0}";
-  let title = "Invoice";
-  let status = "Sent";
-
+  let status = "Pending";
   const firstLine = lines[0] || "";
-  if (firstLine.includes("PAID")) {
-    icon = "\u2705";
-    title = "Invoice Paid";
-    status = "Paid";
-  } else if (firstLine.includes("VOIDED")) {
-    icon = "\u274C";
-    title = "Invoice Voided";
-    status = "Voided";
-  } else if (firstLine.includes("PAST DUE")) {
-    icon = "\u26A0\uFE0F";
-    title = "Invoice Past Due";
-    status = "Past Due";
-  } else if (firstLine.includes("SENT")) {
-    icon = "\u{1F4B0}";
-    title = "Invoice";
-    status = "Sent";
-  }
+  if (firstLine.includes("PAID")) status = "Paid";
+  else if (firstLine.includes("VOIDED")) status = "Voided";
+  else if (firstLine.includes("PAST DUE")) status = "Overdue";
+  else if (firstLine.includes("SENT")) status = "Pending";
 
   let description: string | null = null;
   let amount: string | null = null;
@@ -114,76 +97,65 @@ function parseInvoiceMessage(content: string): ParsedInvoice | null {
   let payUrl: string | null = null;
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("Description:")) {
-      description = trimmed.replace("Description:", "").trim();
-    } else if (trimmed.startsWith("Amount:")) {
-      amount = trimmed.replace("Amount:", "").trim();
-    } else if (trimmed.startsWith("Due:")) {
-      due = trimmed.replace("Due:", "").trim();
-    } else if (trimmed.startsWith("Status:")) {
-      const s = trimmed.replace("Status:", "").trim();
+    const t = line.trim();
+    if (t.startsWith("Description:")) description = t.slice(12).trim();
+    else if (t.startsWith("Amount:")) amount = t.slice(7).trim();
+    else if (t.startsWith("Due:")) due = t.slice(4).trim();
+    else if (t.startsWith("Status:")) {
+      const s = t.slice(7).trim();
       if (s) status = s;
-    } else if (trimmed.startsWith("Invoice ID:") || trimmed.startsWith("Invoice ")) {
-      const idMatch = trimmed.match(/Invoice(?:\s+ID)?:?\s+(.+)/);
-      if (idMatch) invoiceId = idMatch[1].trim();
-    } else if (trimmed.startsWith("Pay:")) {
-      payUrl = trimmed.replace("Pay:", "").trim();
-    }
+    } else if (t.startsWith("Invoice ID:") || t.startsWith("Invoice ")) {
+      const m = t.match(/Invoice(?:\s+ID)?:?\s+(.+)/);
+      if (m) invoiceId = m[1].trim();
+    } else if (t.startsWith("Pay:")) payUrl = t.slice(4).trim();
   }
 
-  return { icon, title, description, amount, due, status, invoiceId, payUrl };
+  return { description, amount, due, status, invoiceId, payUrl };
 }
 
-// --- Icons ---
+function parseProposalContent(content: string): ParsedProposal | null {
+  if (!content.includes("PROPOSAL")) return null;
+  const lines = content.split("\n");
 
-function PaperclipIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.49" />
-    </svg>
-  );
+  let scope: string | null = null;
+  let budget: string | null = null;
+  let timeline: string | null = null;
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith("Scope:")) scope = t.slice(6).trim();
+    else if (t.startsWith("Budget:")) budget = t.slice(7).trim();
+    else if (t.startsWith("Timeline:")) timeline = t.slice(9).trim();
+  }
+
+  return { scope, budget, timeline };
 }
 
-function SendIcon() {
+function statusColor(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "paid") return "#22c55e";
+  if (s === "pending" || s === "sent") return "#f59e0b";
+  if (s === "overdue" || s === "past due") return "#ef4444";
+  if (s === "voided" || s === "draft") return "#a3a3a3";
+  return "#a3a3a3";
+}
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVG, no deps)
+// ---------------------------------------------------------------------------
+
+function ArrowUpIcon() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="22" y1="2" x2="11" y2="13" />
-      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <polyline points="5 12 12 5 19 12" />
     </svg>
   );
 }
 
 function FileIcon() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <polyline points="14 2 14 8 20 8" />
     </svg>
@@ -192,16 +164,7 @@ function FileIcon() {
 
 function DownloadIcon() {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
@@ -209,43 +172,264 @@ function DownloadIcon() {
   );
 }
 
-function BotIcon() {
+function MessageCircleIcon() {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="11" width="18" height="10" rx="2" />
-      <circle cx="12" cy="5" r="2" />
-      <path d="M12 7v4" />
-      <line x1="8" y1="16" x2="8" y2="16" />
-      <line x1="16" y1="16" x2="16" y2="16" />
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
     </svg>
   );
 }
 
-function TypingIndicator() {
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function LoadingSkeleton() {
   return (
-    <div className="flex gap-2.5">
-      <div className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center bg-text-primary text-background">
-        <BotIcon />
+    <div className="flex flex-col gap-3 px-1 py-6 animate-pulse">
+      {/* Left-aligned skeleton */}
+      <div className="flex gap-2 max-w-[65%]">
+        <div className="w-[200px] h-[36px] rounded-[16px] rounded-bl-[4px] bg-surface-muted" />
       </div>
-      <div className="flex items-center gap-1 px-3 py-2 rounded-md bg-surface-muted">
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-[typingDot_1.4s_ease-in-out_infinite]" />
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-[typingDot_1.4s_ease-in-out_0.2s_infinite]" />
-        <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-[typingDot_1.4s_ease-in-out_0.4s_infinite]" />
+      {/* Right-aligned skeleton */}
+      <div className="flex gap-2 max-w-[55%] self-end">
+        <div className="w-[160px] h-[36px] rounded-[16px] rounded-br-[4px] bg-surface-muted" />
+      </div>
+      {/* Left-aligned skeleton */}
+      <div className="flex gap-2 max-w-[70%]">
+        <div className="w-[240px] h-[36px] rounded-[16px] rounded-bl-[4px] bg-surface-muted" />
       </div>
     </div>
   );
 }
 
-// --- Component ---
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
+      <MessageCircleIcon />
+      <div className="text-center">
+        <p className="text-[14px] font-medium text-text-primary">Start the conversation</p>
+        <p className="text-[13px] text-text-muted mt-0.5">Send a message to get started</p>
+      </div>
+    </div>
+  );
+}
+
+function SystemMessage({ content }: { content: string }) {
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div className="flex-1 h-px bg-border" />
+      <span className="text-[12px] text-text-muted italic font-body whitespace-nowrap px-1">{content}</span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+function InvoiceCard({ invoice }: { invoice: ParsedInvoice }) {
+  const dotColor = statusColor(invoice.status);
+  return (
+    <div className="border-l-4 border-l-[#171717] bg-surface-muted rounded-lg p-4 max-w-[340px] w-full">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[14px]">&#128176;</span>
+        <span className="text-[14px] font-medium text-text-primary">Invoice</span>
+      </div>
+      {invoice.description && (
+        <p className="text-[13px] text-text-secondary mb-2 leading-snug">{invoice.description}</p>
+      )}
+      {invoice.amount && (
+        <p className="text-[18px] font-semibold text-text-primary mb-2 tabular-nums">{invoice.amount}</p>
+      )}
+      {invoice.due && (
+        <p className="text-[12px] text-text-muted mb-1">Due: {invoice.due}</p>
+      )}
+      {invoice.invoiceId && (
+        <p className="text-[11px] text-text-muted font-mono mb-3 truncate">ID: {invoice.invoiceId}</p>
+      )}
+      <div className="flex items-center justify-between pt-2 border-t border-border">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+          <span className="text-[12px] text-text-secondary">{invoice.status}</span>
+        </div>
+        {invoice.payUrl && (
+          <a
+            href={invoice.payUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[12px] font-medium text-text-primary hover:underline no-underline"
+          >
+            Pay now &rarr;
+          </a>
+        )}
+        {!invoice.payUrl && invoice.status.toLowerCase() === "draft" && (
+          <span className="text-[12px] text-text-muted">Draft</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProposalCard({ proposal, onAccept }: { proposal: ParsedProposal; onAccept?: () => void }) {
+  return (
+    <div className="border-l-4 border-l-[#0a0a0a] bg-surface-muted rounded-lg p-4 max-w-[340px] w-full">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[14px]">&#128203;</span>
+        <span className="text-[14px] font-medium text-text-primary">Proposal</span>
+      </div>
+      {proposal.scope && (
+        <div className="mb-2">
+          <span className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Scope</span>
+          <p className="text-[13px] text-text-primary leading-snug mt-0.5">{proposal.scope}</p>
+        </div>
+      )}
+      <div className="flex gap-4 mb-3">
+        {proposal.budget && (
+          <div>
+            <span className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Budget</span>
+            <p className="text-[14px] font-semibold text-text-primary mt-0.5">{proposal.budget}</p>
+          </div>
+        )}
+        {proposal.timeline && (
+          <div>
+            <span className="text-[11px] uppercase tracking-wider text-text-muted font-medium">Timeline</span>
+            <p className="text-[14px] font-semibold text-text-primary mt-0.5">{proposal.timeline}</p>
+          </div>
+        )}
+      </div>
+      {onAccept && (
+        <button
+          onClick={onAccept}
+          className="w-full py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+        >
+          Accept proposal
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FileCard({ content, fileUrl }: { content: string; fileUrl: string | null }) {
+  const url = fileUrl || "#";
+  const name = content || getFileName(url);
+  const showThumbnail = fileUrl && isImageUrl(fileUrl);
+
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block no-underline max-w-[280px] w-full">
+      <div className="border border-border rounded-lg p-2.5 hover:border-border-hover transition-colors">
+        {showThumbnail && (
+          <div className="mb-2 rounded overflow-hidden bg-surface-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fileUrl} alt={name} className="w-full h-auto max-h-[160px] object-cover" />
+          </div>
+        )}
+        <div className="flex items-center gap-2.5">
+          <span className="text-text-muted flex-shrink-0"><FileIcon /></span>
+          <span className="text-[13px] text-text-primary truncate flex-1">{name}</span>
+          <span className="text-text-muted flex-shrink-0 hover:text-text-primary transition-colors"><DownloadIcon /></span>
+        </div>
+      </div>
+    </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline form components
+// ---------------------------------------------------------------------------
+
+function InvoiceForm({ onSend, onCancel, sending }: { onSend: (desc: string, amount: string, due: string) => void; onCancel: () => void; sending: boolean }) {
+  const [desc, setDesc] = useState("");
+  const [amount, setAmount] = useState("");
+  const [due, setDue] = useState("");
+
+  return (
+    <div className="border border-border rounded-lg p-3.5 mx-3 mb-2 bg-background animate-[slideDown_0.2s_ease-out]">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[13px] font-medium text-text-primary">Send Invoice</span>
+        <button onClick={onCancel} className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
+      </div>
+      <input
+        type="text"
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+        placeholder="Description"
+        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
+      />
+      <div className="flex gap-2 mb-3">
+        <div className="flex-1 relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-text-muted">$</span>
+          <input
+            type="text"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
+          />
+        </div>
+        <input
+          type="date"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          className="flex-1 text-[13px] font-body text-text-primary bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
+        />
+      </div>
+      <button
+        onClick={() => onSend(desc, amount, due)}
+        disabled={!desc.trim() || !amount.trim() || sending}
+        className="px-4 py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+      >
+        {sending ? "Sending..." : "Send invoice"}
+      </button>
+    </div>
+  );
+}
+
+function ProposalForm({ onSend, onCancel, sending }: { onSend: (scope: string, budget: string, timeline: string) => void; onCancel: () => void; sending: boolean }) {
+  const [scope, setScope] = useState("");
+  const [budget, setBudget] = useState("");
+  const [timeline, setTimeline] = useState("");
+
+  return (
+    <div className="border border-border rounded-lg p-3.5 mx-3 mb-2 bg-background animate-[slideDown_0.2s_ease-out]">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[13px] font-medium text-text-primary">Send Proposal</span>
+        <button onClick={onCancel} className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
+      </div>
+      <textarea
+        value={scope}
+        onChange={(e) => setScope(e.target.value)}
+        placeholder="Project scope..."
+        rows={3}
+        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none mb-2 focus:border-border-hover transition-colors"
+      />
+      <div className="flex gap-2 mb-3">
+        <input
+          type="text"
+          value={budget}
+          onChange={(e) => setBudget(e.target.value)}
+          placeholder="$5,000"
+          className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
+        />
+        <input
+          type="text"
+          value={timeline}
+          onChange={(e) => setTimeline(e.target.value)}
+          placeholder="2 weeks"
+          className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
+        />
+      </div>
+      <button
+        onClick={() => onSend(scope, budget, timeline)}
+        disabled={!scope.trim() || sending}
+        className="px-4 py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+      >
+        {sending ? "Sending..." : "Send proposal"}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 
 interface ProjectChatProps {
   projectId: string;
@@ -253,32 +437,25 @@ interface ProjectChatProps {
 
 export default function ProjectChat({ projectId }: ProjectChatProps) {
   const { data: session } = useSession();
-  const [aiEnabled, setAiEnabled] = useState(true);
-  const [inputValue, setInputValue] = useState("");
+  const { toast } = useToast();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [quickAction, setQuickAction] = useState<QuickAction>(null);
+  const [activeAction, setActiveAction] = useState<ActiveAction>(null);
 
-  // Quick action form state
-  const [proposalScope, setProposalScope] = useState("");
-  const [proposalBudget, setProposalBudget] = useState("");
-  const [proposalTimeline, setProposalTimeline] = useState("");
-  const [invoiceDesc, setInvoiceDesc] = useState("");
-  const [invoiceAmount, setInvoiceAmount] = useState("");
-  const [invoiceDue, setInvoiceDue] = useState("");
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  const userScrolledRef = useRef(false);
 
   const currentUserId = session?.user?.id;
   const currentUserName = session?.user?.name || "You";
 
-  // Fetch messages
+  // ---- Data fetching ----
+
   const fetchMessages = useCallback(async () => {
     try {
       const res = await fetch(`/api/messages?projectId=${projectId}`);
@@ -286,49 +463,215 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
       const data: ChatMessage[] = await res.json();
       setMessages(data);
     } catch {
-      // silently fail on poll
+      // Silent fail on poll
     } finally {
       setIsLoading(false);
     }
   }, [projectId]);
 
-  // Initial load
   useEffect(() => {
     setMessages([]);
     setIsLoading(true);
     fetchMessages();
   }, [fetchMessages]);
 
-  // Poll for new messages every 5 seconds
   useEffect(() => {
     const interval = setInterval(fetchMessages, POLL_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchMessages]);
 
-  // Auto-scroll
+  // ---- Auto-scroll with scroll-awareness ----
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    if (!userScrolledRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isAiTyping]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
-  function handleToggleAi() {
-    const next = !aiEnabled;
-    setAiEnabled(next);
-    toast(next ? "AI assistant enabled" : "AI assistant disabled");
+  // Detect if user scrolled up
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userScrolledRef.current = distanceFromBottom > 80;
+  }, []);
+
+  // ---- Auto-resize textarea ----
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [inputValue]);
+
+  // ---- Send message ----
+
+  async function handleSend() {
+    const text = inputValue.trim();
+    if (!text || isSending) return;
+
+    setIsSending(true);
+    setInputValue("");
+
+    const optimisticId = `opt-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: optimisticId,
+      senderId: currentUserId || null,
+      senderName: currentUserName,
+      content: text,
+      messageType: "text",
+      fileUrl: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+    userScrolledRef.current = false;
+    textareaRef.current?.focus();
+
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, content: text }),
+      });
+
+      if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        toast("Failed to send message");
+        setInputValue(text);
+        setIsSending(false);
+        return;
+      }
+
+      const created: ChatMessage = await res.json();
+      setMessages((prev) => prev.map((m) => (m.id === optimisticId ? created : m)));
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      toast("Failed to send message");
+      setInputValue(text);
+    }
+
+    setIsSending(false);
   }
 
-  function handleAttach() {
-    fileInputRef.current?.click();
+  // ---- Send structured message ----
+
+  async function sendStructuredMessage(content: string) {
+    if (isSending) return;
+    setIsSending(true);
+
+    const optimisticId = `opt-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: optimisticId,
+      senderId: currentUserId || null,
+      senderName: currentUserName,
+      content,
+      messageType: "text",
+      fileUrl: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+    userScrolledRef.current = false;
+
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, content }),
+      });
+
+      if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        toast("Failed to send message");
+        setIsSending(false);
+        return;
+      }
+
+      const created: ChatMessage = await res.json();
+      setMessages((prev) => prev.map((m) => (m.id === optimisticId ? created : m)));
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      toast("Failed to send message");
+    }
+
+    setIsSending(false);
+    setActiveAction(null);
   }
+
+  // ---- Invoice handler ----
+
+  async function handleSendInvoice(desc: string, amount: string, due: string) {
+    if (!desc.trim() || !amount.trim() || isSending) return;
+
+    const rawAmount = amount.replace(/[$,]/g, "");
+    const parsed = parseFloat(rawAmount);
+    if (isNaN(parsed) || parsed <= 0) {
+      toast("Enter a valid amount");
+      return;
+    }
+    const amountCents = Math.round(parsed * 100);
+
+    setIsSending(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          description: desc.trim(),
+          amount: amountCents,
+          dueDate: due || undefined,
+          customerEmail: "",
+          customerName: "",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to create invoice" }));
+        toast(err.error || "Failed to send invoice");
+        setIsSending(false);
+        return;
+      }
+
+      toast("Invoice sent");
+      userScrolledRef.current = false;
+      await fetchMessages();
+    } catch {
+      toast("Failed to send invoice");
+    }
+
+    setIsSending(false);
+    setActiveAction(null);
+  }
+
+  // ---- Proposal handler ----
+
+  function handleSendProposal(scope: string, budget: string, timeline: string) {
+    if (!scope.trim()) return;
+    const content = `\u{1F4CB} PROPOSAL\nScope: ${scope.trim()}\nBudget: ${budget.trim() || "TBD"}\nTimeline: ${timeline.trim() || "TBD"}`;
+    sendStructuredMessage(content);
+  }
+
+  // ---- Accept handler ----
+
+  function handleAccept() {
+    sendStructuredMessage("\u2705 Terms accepted, let's proceed.");
+    setActiveAction(null);
+  }
+
+  // ---- File handler ----
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Reset input so same file can be selected again
     e.target.value = "";
 
     try {
-      toast("Uploading file...");
+      toast("Uploading...");
       const formData = new FormData();
       formData.append("file", file);
       formData.append("type", "asset");
@@ -339,13 +682,12 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
       });
 
       if (!uploadRes.ok) {
-        toast("Failed to upload file");
+        toast("Upload failed");
         return;
       }
 
       const { url } = await uploadRes.json();
 
-      // Send file message
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -364,466 +706,133 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
 
       const created: ChatMessage = await res.json();
       setMessages((prev) => [...prev, created]);
+      userScrolledRef.current = false;
       toast("File shared");
     } catch {
-      toast("Failed to upload file");
+      toast("Upload failed");
+    }
+    setActiveAction(null);
+  }
+
+  // ---- Key handling ----
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   }
 
-  async function handleSend() {
-    const text = inputValue.trim();
-    if (!text || isSending) return;
+  // ---- Accept proposal helper ----
 
-    setIsSending(true);
-    setInputValue("");
-
-    // Optimistically add the message
-    const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticMsg: ChatMessage = {
-      id: optimisticId,
-      senderId: currentUserId || null,
-      senderName: currentUserName,
-      content: text,
-      messageType: "text",
-      fileUrl: null,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, optimisticMsg]);
-    inputRef.current?.focus();
-
-    try {
-      const res = await fetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, content: text }),
-      });
-
-      if (!res.ok) {
-        // Remove optimistic message on failure
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        toast("Failed to send message");
-        setInputValue(text);
-        setIsSending(false);
-        return;
-      }
-
-      const created: ChatMessage = await res.json();
-      // Replace optimistic message with real one
-      setMessages((prev) =>
-        prev.map((m) => (m.id === optimisticId ? created : m))
-      );
-    } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      toast("Failed to send message");
-      setInputValue(text);
-    }
-
-    setIsSending(false);
-
-    // Simulate AI typing (cosmetic for now)
-    if (aiEnabled) {
-      setIsAiTyping(true);
-      setTimeout(() => {
-        setIsAiTyping(false);
-      }, 2000);
-    }
+  function handleAcceptProposal() {
+    sendStructuredMessage("\u2705 Proposal accepted. Let's move forward.");
   }
 
-  function resetQuickActionForm() {
-    setQuickAction(null);
-    setProposalScope("");
-    setProposalBudget("");
-    setProposalTimeline("");
-    setInvoiceDesc("");
-    setInvoiceAmount("");
-    setInvoiceDue("");
-    setReviewRating(0);
-    setReviewComment("");
-  }
+  // ---- Quick action definitions ----
 
-  async function sendQuickMessage(content: string) {
-    if (isSending) return;
-    setIsSending(true);
-
-    const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticMsg: ChatMessage = {
-      id: optimisticId,
-      senderId: currentUserId || null,
-      senderName: currentUserName,
-      content,
-      messageType: "text",
-      fileUrl: null,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, optimisticMsg]);
-
-    try {
-      const res = await fetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, content }),
-      });
-
-      if (!res.ok) {
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        toast("Failed to send message");
-        setIsSending(false);
-        return;
-      }
-
-      const created: ChatMessage = await res.json();
-      setMessages((prev) =>
-        prev.map((m) => (m.id === optimisticId ? created : m))
-      );
-    } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      toast("Failed to send message");
-    }
-
-    setIsSending(false);
-    resetQuickActionForm();
-
-    if (aiEnabled) {
-      setIsAiTyping(true);
-      setTimeout(() => setIsAiTyping(false), 2000);
-    }
-  }
-
-  function handleSendProposal() {
-    if (!proposalScope.trim()) return;
-    const content = `\u{1F4CB} PROPOSAL\nScope: ${proposalScope.trim()}\nBudget: ${proposalBudget.trim() || "TBD"}\nTimeline: ${proposalTimeline.trim() || "TBD"}`;
-    sendQuickMessage(content);
-  }
-
-  async function handleSendInvoice() {
-    if (!invoiceDesc.trim() || !invoiceAmount.trim()) return;
-    if (isSending) return;
-
-    setIsSending(true);
-
-    // Parse dollar amount to cents (strip $ and commas)
-    const rawAmount = invoiceAmount.trim().replace(/[$,]/g, "");
-    const parsedAmount = parseFloat(rawAmount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast("Enter a valid amount");
-      setIsSending(false);
-      return;
-    }
-    const amountCents = Math.round(parsedAmount * 100);
-
-    try {
-      const res = await fetch("/api/invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          description: invoiceDesc.trim(),
-          amount: amountCents,
-          dueDate: invoiceDue || undefined,
-          customerEmail: "",
-          customerName: "",
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed to create invoice" }));
-        toast(err.error || "Failed to send invoice");
-        setIsSending(false);
-        return;
-      }
-
-      toast("Invoice sent via Whop");
-      // Refresh messages to pick up the system message
-      await fetchMessages();
-    } catch {
-      toast("Failed to send invoice");
-    }
-
-    setIsSending(false);
-    resetQuickActionForm();
-  }
-
-  function handleAssembleTeam() {
-    const content = `\u{1F465} I'd like to assemble a team for this project. Let's discuss roles and specialties needed.\n\u2192 Open Team Builder: /dashboard/teams/new`;
-    sendQuickMessage(content);
-  }
-
-  function handleAcceptTerms() {
-    const content = `\u2705 TERMS ACCEPTED\nBoth parties have agreed to proceed. Project is now active.`;
-    sendQuickMessage(content);
-  }
-
-  function handleSendReview() {
-    if (reviewRating === 0) return;
-    const stars = "\u2B50".repeat(reviewRating);
-    const content = `\u2B50 REVIEW (${reviewRating}/5) ${stars}\n${reviewComment.trim() || "No comment provided."}`;
-    sendQuickMessage(content);
-  }
-
-  const quickActions = [
-    { key: "proposal" as const, icon: "\u{1F4CB}", label: "Send Proposal" },
-    { key: "invoice" as const, icon: "\u{1F4B0}", label: "Send Invoice" },
-    { key: "team" as const, icon: "\u{1F465}", label: "Assemble Team" },
-    { key: "files" as const, icon: "\u{1F4CE}", label: "Share Files" },
-    { key: "terms" as const, icon: "\u2705", label: "Accept Terms" },
-    { key: "review" as const, icon: "\u2B50", label: "Leave Review" },
+  const actions: { key: ActiveAction; icon: string; label: string }[] = [
+    { key: "invoice", icon: "\u{1F4B0}", label: "Invoice" },
+    { key: "proposal", icon: "\u{1F4CB}", label: "Proposal" },
+    { key: "files", icon: "\u{1F4CE}", label: "Files" },
+    { key: "accept", icon: "\u2705", label: "Accept" },
   ];
 
   const charCount = inputValue.length;
 
+  // ---- Render ----
+
   return (
-    <div className="flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <span className="text-[13px] font-medium text-text-primary font-body">
-            Chat
-          </span>
-        </div>
-        <button
-          onClick={handleToggleAi}
-          className={`
-            inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-mono
-            transition-colors duration-150 cursor-pointer
-            ${
-              aiEnabled
-                ? "bg-text-primary text-background"
-                : "bg-surface-muted text-text-muted hover:text-text-secondary"
-            }
-          `}
-        >
-          AI
-          <span
-            className={`w-1.5 h-1.5 rounded-full transition-colors duration-150 ${
-              aiEnabled ? "bg-positive" : "bg-border"
-            }`}
-          />
-        </button>
-      </div>
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      {/* Messages area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-3"
+      >
+        {isLoading && <LoadingSkeleton />}
 
-      {/* AI banner */}
-      {aiEnabled && (
-        <div className="px-4 py-1.5 border-b border-border bg-background-alt">
-          <span className="text-[11px] font-mono text-text-muted">
-            AI assistant is active
-          </span>
-        </div>
-      )}
+        {!isLoading && messages.length === 0 && <EmptyState />}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0">
-        {isLoading && (
-          <div className="flex justify-center py-8">
-            <span className="text-[12px] text-text-muted font-mono">
-              Loading messages...
-            </span>
-          </div>
-        )}
-        {!isLoading && messages.length === 0 && (
-          <div className="flex justify-center py-8">
-            <span className="text-[12px] text-text-muted font-body italic">
-              No messages yet. Start the conversation.
-            </span>
-          </div>
-        )}
-        {messages.map((msg, idx) => {
-          const prevMsg = idx > 0 ? messages[idx - 1] : null;
-          const isSameSenderAsPrev =
-            prevMsg &&
-            prevMsg.messageType !== "system" &&
-            msg.messageType !== "system" &&
-            prevMsg.senderId === msg.senderId;
-          const isDifferentSender = prevMsg && !isSameSenderAsPrev;
+        {!isLoading && messages.length > 0 && (
+          <div className="flex flex-col gap-0.5">
+            {messages.map((msg, idx) => {
+              const prev = idx > 0 ? messages[idx - 1] : null;
+              const isSameGroup =
+                prev &&
+                prev.messageType !== "system" &&
+                msg.messageType !== "system" &&
+                prev.senderId === msg.senderId &&
+                !prev.content?.includes("INVOICE") &&
+                !prev.content?.includes("PROPOSAL") &&
+                !msg.content?.includes("INVOICE") &&
+                !msg.content?.includes("PROPOSAL");
 
-          // Invoice card rendering
-          if (msg.content && msg.content.includes("INVOICE")) {
-            const parsed = parseInvoiceMessage(msg.content);
-            if (parsed) {
+              // System message
+              if (msg.messageType === "system" && !msg.content?.includes("INVOICE") && !msg.content?.includes("PROPOSAL")) {
+                return <SystemMessage key={msg.id} content={msg.content} />;
+              }
+
+              // Invoice message
+              const invoice = parseInvoiceContent(msg.content);
+              if (invoice) {
+                return (
+                  <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
+                    <InvoiceCard invoice={invoice} />
+                  </div>
+                );
+              }
+
+              // Proposal message
+              const proposal = parseProposalContent(msg.content);
+              if (proposal) {
+                const isOwn = msg.senderId === currentUserId;
+                return (
+                  <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${isOwn ? "justify-end" : "justify-start"}`}>
+                    <ProposalCard proposal={proposal} onAccept={!isOwn ? handleAcceptProposal : undefined} />
+                  </div>
+                );
+              }
+
+              const isOwn = msg.senderId === currentUserId;
+              const showMeta = !isSameGroup;
+
               return (
-                <div key={msg.id} className="flex justify-center py-3">
-                  <div className="w-full max-w-[320px] border border-border rounded-[10px] p-3 bg-background" style={{ borderLeft: "3px solid #0a0a0a" }}>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-[13px]">{parsed.icon}</span>
-                      <span className="text-[13px] font-medium text-text-primary font-body">
-                        {parsed.title}
-                      </span>
-                    </div>
-                    {parsed.description && (
-                      <div className="text-[12px] text-text-secondary font-body mb-1">
-                        {parsed.description}
-                      </div>
-                    )}
-                    {parsed.amount && (
-                      <div className="text-[12px] text-text-primary font-body mb-1">
-                        Amount: <span className="font-medium">{parsed.amount}</span>
-                      </div>
-                    )}
-                    {parsed.due && (
-                      <div className="text-[12px] text-text-muted font-body mb-1">
-                        Due: {parsed.due}
-                      </div>
-                    )}
-                    {parsed.invoiceId && (
-                      <div className="text-[11px] text-text-muted font-mono mb-2">
-                        ID: {parsed.invoiceId}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{
-                            backgroundColor:
-                              parsed.status === "Paid"
-                                ? "#22c55e"
-                                : parsed.status === "Voided"
-                                ? "#ef4444"
-                                : parsed.status === "Past Due"
-                                ? "#f59e0b"
-                                : "#a3a3a3",
-                          }}
-                        />
-                        <span className="text-[11px] font-mono text-text-muted">
-                          {parsed.status}
-                        </span>
-                      </div>
-                      {parsed.payUrl && (
-                        <a
-                          href={parsed.payUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] font-medium text-text-primary bg-surface-muted border border-border rounded px-2 py-0.5 hover:bg-border/50 transition-colors no-underline"
-                        >
-                          Pay now
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-          }
-
-          if (msg.messageType === "system") {
-            return (
-              <div key={msg.id} className="flex justify-center py-3">
-                <span className="text-[12px] italic text-text-muted font-body">
-                  {msg.content}
-                </span>
-              </div>
-            );
-          }
-
-          const isOwn = msg.senderId === currentUserId;
-          const isAi = msg.messageType === "ai";
-          const showHeader = !isSameSenderAsPrev;
-          const displayName = msg.senderName || "Unknown";
-          const initial = isAi ? null : getInitials(displayName);
-
-          return (
-            <div key={msg.id}>
-              {/* Divider between different senders */}
-              {isDifferentSender && (
-                <div className="border-t border-border/50 my-2" />
-              )}
-
-              <div
-                className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""} ${
-                  isSameSenderAsPrev ? "mt-0.5" : "mt-2"
-                }`}
-              >
-                {/* Avatar */}
-                {showHeader ? (
-                  <div
-                    className={`
-                      flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center
-                      text-[10px] font-medium font-mono
-                      ${
-                        isAi
-                          ? "bg-text-primary text-background"
-                          : "bg-surface-muted text-text-secondary"
-                      }
-                    `}
-                  >
-                    {isAi ? <BotIcon /> : initial}
-                  </div>
-                ) : (
-                  <div className="flex-shrink-0 w-6" />
-                )}
-
-                {/* Content */}
                 <div
-                  className={`
-                    max-w-[75%] min-w-0
-                    ${isOwn ? "items-end" : "items-start"}
-                  `}
+                  key={msg.id}
+                  className={`flex flex-col animate-[fadeInUp_0.2s_ease-out] ${isOwn ? "items-end" : "items-start"} ${showMeta ? "mt-3" : "mt-0.5"}`}
                 >
-                  {/* Sender + time */}
-                  {showHeader && (
-                    <div
-                      className={`flex items-center gap-2 mb-0.5 ${
-                        isOwn ? "flex-row-reverse" : ""
-                      }`}
-                    >
-                      <span className="text-[12px] font-medium text-text-primary font-body">
-                        {isOwn ? "You" : displayName}
-                      </span>
-                      <span className="text-[11px] font-mono text-text-muted">
-                        {relativeTime(msg.createdAt)}
-                      </span>
+                  {/* Sender name + timestamp */}
+                  {showMeta && (
+                    <div className={`flex items-center gap-2 mb-1 px-1 ${isOwn ? "flex-row-reverse" : ""}`}>
+                      <span className="text-[12px] text-text-muted">{isOwn ? "You" : msg.senderName || "Unknown"}</span>
+                      <span className="text-[11px] font-mono text-text-muted">{formatTime(msg.createdAt)}</span>
                     </div>
                   )}
 
-                  {/* Message body */}
+                  {/* File message */}
                   {msg.messageType === "file" ? (
-                    <a
-                      href={msg.fileUrl || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block no-underline"
-                    >
-                      <div
-                        className={`
-                          border border-border rounded-md px-3 py-2 flex items-center gap-2.5
-                          hover:bg-surface-muted/80 transition-colors duration-150
-                          ${isOwn ? "bg-surface-muted" : "bg-background"}
-                        `}
-                      >
-                        <span className="text-text-muted">
-                          <FileIcon />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] text-text-primary font-body truncate">
-                            {msg.content || getFileName(msg.fileUrl || "")}
-                          </div>
-                        </div>
-                        <span className="text-text-muted hover:text-text-primary transition-colors duration-150">
-                          <DownloadIcon />
-                        </span>
-                      </div>
-                    </a>
+                    <FileCard content={msg.content} fileUrl={msg.fileUrl} />
                   ) : (
+                    /* Text bubble */
                     <div
                       className={`
-                        rounded-md px-3 py-2 text-[14px] font-body text-text-primary leading-relaxed whitespace-pre-wrap
-                        ${isAi ? "bg-surface-muted border border-border" : ""}
-                        ${isOwn && !isAi ? "bg-surface-muted" : ""}
-                        ${!isOwn && !isAi ? "bg-background" : ""}
+                        max-w-[75%] px-3.5 py-2 text-[14px] font-body leading-relaxed whitespace-pre-wrap break-words
+                        ${isOwn
+                          ? "bg-[#171717] text-white rounded-[16px] rounded-br-[4px]"
+                          : "bg-surface-muted text-text-primary rounded-[16px] rounded-bl-[4px]"
+                        }
                       `}
                     >
                       {msg.content}
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-          );
-        })}
-        {isAiTyping && (
-          <div className="mt-2">
-            <TypingIndicator />
+              );
+            })}
           </div>
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -835,216 +844,86 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
         onChange={handleFileChange}
       />
 
-      {/* Quick Actions toolbar */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-border overflow-x-auto scrollbar-hide">
-        {quickActions.map((action) => (
+      {/* Inline forms */}
+      {activeAction === "invoice" && (
+        <InvoiceForm
+          onSend={handleSendInvoice}
+          onCancel={() => setActiveAction(null)}
+          sending={isSending}
+        />
+      )}
+      {activeAction === "proposal" && (
+        <ProposalForm
+          onSend={handleSendProposal}
+          onCancel={() => setActiveAction(null)}
+          sending={isSending}
+        />
+      )}
+
+      {/* Quick actions bar */}
+      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-border">
+        {actions.map((action) => (
           <button
             key={action.key}
             onClick={() => {
-              if (action.key === "team") {
-                handleAssembleTeam();
-              } else if (action.key === "files") {
-                handleAttach();
+              if (action.key === "files") {
+                fileInputRef.current?.click();
+              } else if (action.key === "accept") {
+                handleAccept();
               } else {
-                setQuickAction(
-                  quickAction === action.key ? null : (action.key as QuickAction)
-                );
+                setActiveAction(activeAction === action.key ? null : action.key);
               }
             }}
-            className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium border rounded-md transition-colors whitespace-nowrap cursor-pointer ${
-              quickAction === action.key
-                ? "border-text-primary text-text-primary bg-surface-muted"
-                : "text-text-muted border-border hover:border-border-hover hover:text-text-primary"
-            }`}
+            className={`
+              flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium border rounded-full transition-all duration-150 whitespace-nowrap cursor-pointer
+              ${activeAction === action.key
+                ? "border-[#171717] text-text-primary bg-surface-muted"
+                : "text-text-muted border-border hover:border-border-hover hover:text-text-secondary"
+              }
+            `}
           >
-            <span>{action.icon}</span>
+            <span className="text-[12px]">{action.icon}</span>
             {action.label}
           </button>
         ))}
       </div>
 
-      {/* Quick Action inline forms */}
-      {quickAction === "proposal" && (
-        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-text-primary">Send Proposal</span>
-            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
-          </div>
-          <textarea
-            value={proposalScope}
-            onChange={(e) => setProposalScope(e.target.value)}
-            placeholder="Project scope..."
-            rows={3}
-            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none resize-none mb-2"
-          />
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={proposalBudget}
-              onChange={(e) => setProposalBudget(e.target.value)}
-              placeholder="$5,000"
-              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
-            />
-            <input
-              type="text"
-              value={proposalTimeline}
-              onChange={(e) => setProposalTimeline(e.target.value)}
-              placeholder="2 weeks"
-              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
-            />
-          </div>
-          <button
-            onClick={handleSendProposal}
-            disabled={!proposalScope.trim() || isSending}
-            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            Send proposal
-          </button>
-        </div>
-      )}
-
-      {quickAction === "invoice" && (
-        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-text-primary">Send Invoice</span>
-            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
-          </div>
-          <input
-            type="text"
-            value={invoiceDesc}
-            onChange={(e) => setInvoiceDesc(e.target.value)}
-            placeholder="Description"
-            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none mb-2"
-          />
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={invoiceAmount}
-              onChange={(e) => setInvoiceAmount(e.target.value)}
-              placeholder="$2,500"
-              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
-            />
-            <input
-              type="date"
-              value={invoiceDue}
-              onChange={(e) => setInvoiceDue(e.target.value)}
-              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
-            />
-          </div>
-          <button
-            onClick={handleSendInvoice}
-            disabled={!invoiceDesc.trim() || !invoiceAmount.trim() || isSending}
-            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            Send invoice
-          </button>
-        </div>
-      )}
-
-      {quickAction === "terms" && (
-        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-text-primary">Accept Terms</span>
-            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
-          </div>
-          <p className="text-[12px] text-text-secondary font-body mb-3 leading-relaxed">
-            By accepting, both parties agree to the scope, budget, and timeline discussed.
-          </p>
-          <button
-            onClick={handleAcceptTerms}
-            disabled={isSending}
-            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            Accept &amp; Start
-          </button>
-        </div>
-      )}
-
-      {quickAction === "review" && (
-        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-medium text-text-primary">Leave Review</span>
-            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
-          </div>
-          <div className="flex gap-1 mb-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onClick={() => setReviewRating(star)}
-                className={`text-[18px] cursor-pointer transition-colors ${
-                  star <= reviewRating ? "opacity-100" : "opacity-25"
-                }`}
-                aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
-              >
-                {"\u2B50"}
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={reviewComment}
-            onChange={(e) => setReviewComment(e.target.value)}
-            placeholder="Write your review..."
-            rows={2}
-            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none resize-none mb-2"
-          />
-          <button
-            onClick={handleSendReview}
-            disabled={reviewRating === 0 || isSending}
-            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            Submit review
-          </button>
-        </div>
-      )}
-
       {/* Input area */}
       <div className="border-t border-border px-3 py-2.5 bg-background">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleAttach}
-            className="flex-shrink-0 p-1.5 text-text-muted hover:text-text-primary transition-colors duration-150 cursor-pointer rounded"
-            aria-label="Attach file"
-          >
-            <PaperclipIcon />
-          </button>
-          <input
-            ref={inputRef}
-            type="text"
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={textareaRef}
             value={inputValue}
             onChange={(e) => {
               if (e.target.value.length <= MAX_CHARS) {
                 setInputValue(e.target.value);
               }
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 text-[14px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none"
+            rows={1}
+            className="flex-1 text-[14px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[120px]"
+            style={{ minHeight: "24px" }}
           />
-          {charCount > 0 && (
-            <span
-              className={`text-[10px] font-mono flex-shrink-0 tabular-nums ${
-                charCount > MAX_CHARS * 0.9
-                  ? "text-negative"
-                  : "text-text-muted"
-              }`}
-            >
+          {charCount >= CHAR_WARN_THRESHOLD && (
+            <span className={`text-[10px] font-mono flex-shrink-0 tabular-nums pb-0.5 ${charCount > MAX_CHARS * 0.95 ? "text-negative" : "text-text-muted"}`}>
               {charCount}/{MAX_CHARS}
             </span>
           )}
-          <Button
-            variant="primary"
-            size="sm"
+          <button
             onClick={handleSend}
             disabled={!inputValue.trim() || isSending}
-            className="!px-2.5 !py-1.5"
+            className={`
+              flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer
+              ${inputValue.trim()
+                ? "bg-[#171717] text-white hover:bg-[#0a0a0a]"
+                : "bg-surface-muted text-text-muted cursor-not-allowed"
+              }
+            `}
+            aria-label="Send message"
           >
-            <SendIcon />
-          </Button>
+            <ArrowUpIcon />
+          </button>
         </div>
       </div>
     </div>

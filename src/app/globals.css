@@ -101,6 +101,18 @@ html {
   30% { opacity: 1; transform: translateY(-2px); }
 }
 
+/* Chat message entrance */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Chat inline form slide */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .pfp-static:hover::after {
   background: repeating-linear-gradient(
     0deg,

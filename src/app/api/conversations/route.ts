@@ -25,6 +25,7 @@ export async function GET() {
     .select({
       projectId: projects.id,
       projectName: projects.title,
+      projectStatus: projects.status,
       lastMessageContent: messages.content,
       lastMessageType: messages.messageType,
       lastMessageAt: messages.createdAt,
@@ -53,6 +54,7 @@ export async function GET() {
         : row.lastMessageContent || "",
     lastSenderName: row.lastSenderName || "System",
     lastMessageAt: row.lastMessageAt,
+    status: row.projectStatus,
   }));
 
   return Response.json(conversations);

@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { MockTask, TaskStatus, coders } from "@/lib/mock-data";
+
+type TaskStatus = "todo" | "in_progress" | "done";
+
+type Task = {
+  id: string;
+  title: string;
+  assigneeId: string;
+  status: TaskStatus;
+  dueDate: string;
+};
 
 interface TaskListProps {
-  tasks: MockTask[];
+  tasks: Task[];
+  onAddTask?: (title: string) => void;
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -16,9 +26,9 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 function StatusPill({ status }: { status: TaskStatus }) {
   const base = "text-[11px] font-mono px-2 py-0.5 rounded-md";
   const styles: Record<TaskStatus, string> = {
-    todo: "text-text-muted bg-surface-muted",
-    in_progress: "text-text-primary bg-surface-muted",
-    done: "text-text-muted bg-surface-muted",
+    todo: "text-neutral-500 bg-neutral-100",
+    in_progress: "text-[#0a0a0a] bg-neutral-100",
+    done: "text-neutral-500 bg-neutral-100",
   };
   return (
     <span className={`${base} ${styles[status]}`}>
@@ -27,11 +37,16 @@ function StatusPill({ status }: { status: TaskStatus }) {
   );
 }
 
-export default function TaskList({ tasks: initialTasks }: TaskListProps) {
+export default function TaskList({ tasks: initialTasks, onAddTask }: TaskListProps) {
   const [tasks, setTasks] = useState(initialTasks);
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync with parent when props change
+  useState(() => {
+    setTasks(initialTasks);
+  });
 
   const toggleTask = (id: string) => {
     setTasks((prev) =>
@@ -55,15 +70,20 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
       return;
     }
 
-    const newTask: MockTask = {
-      id: `t-new-${Date.now()}`,
-      title,
-      assigneeId: "",
-      status: "todo",
-      dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
-    };
+    if (onAddTask) {
+      onAddTask(title);
+    } else {
+      // Local-only fallback
+      const newTask: Task = {
+        id: `t-new-${Date.now()}`,
+        title,
+        assigneeId: "",
+        status: "todo",
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+      };
+      setTasks((prev) => [...prev, newTask]);
+    }
 
-    setTasks((prev) => [...prev, newTask]);
     setNewTitle("");
     setIsAdding(false);
   };
@@ -79,17 +99,27 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
     }
   };
 
+  // Use initialTasks if they changed (e.g. from API refetch)
+  const displayTasks = tasks.length > 0 || initialTasks.length === 0 ? tasks : initialTasks;
+
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      {tasks.map((task, i) => {
-        const assignee = coders.find((c) => c.id === task.assigneeId);
+    <div className="border border-[#e5e5e5] rounded-lg overflow-hidden">
+      {displayTasks.length === 0 && !isAdding && (
+        <div className="px-4 py-8 text-center">
+          <p className="text-[13px] text-neutral-500 font-body">
+            No tasks yet
+          </p>
+        </div>
+      )}
+
+      {displayTasks.map((task, i) => {
         const isDone = task.status === "done";
 
         return (
           <div
             key={task.id}
             className={`flex items-center gap-3 px-4 py-3 ${
-              i < tasks.length - 1 ? "border-b border-border" : ""
+              i < displayTasks.length - 1 ? "border-b border-[#e5e5e5]" : ""
             }`}
           >
             {/* Checkbox */}
@@ -97,8 +127,8 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
               onClick={() => toggleTask(task.id)}
               className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors duration-150 cursor-pointer ${
                 isDone
-                  ? "bg-text-primary border-text-primary"
-                  : "border-border-hover bg-background hover:border-text-muted"
+                  ? "bg-[#0a0a0a] border-[#0a0a0a]"
+                  : "border-neutral-300 bg-white hover:border-neutral-500"
               }`}
             >
               {isDone && (
@@ -121,44 +151,34 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
             <span
               className={`flex-1 text-[13px] transition-all duration-200 ${
                 isDone
-                  ? "text-text-muted line-through decoration-text-muted/50"
-                  : "text-text-primary"
+                  ? "text-neutral-400 line-through decoration-neutral-300"
+                  : "text-[#0a0a0a]"
               }`}
             >
               {task.title}
             </span>
 
-            {/* Assignee avatar */}
-            {assignee && (
-              <img
-                src={assignee.avatarUrl}
-                alt={assignee.displayName}
-                title={assignee.displayName}
-                className="w-5 h-5 rounded object-cover flex-shrink-0"
-              />
-            )}
-
             {/* Status pill */}
             <StatusPill status={task.status} />
 
             {/* Due date */}
-            <span className="text-[11px] font-mono text-text-muted flex-shrink-0 w-16 text-right">
-              {new Date(task.dueDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
+            {task.dueDate && (
+              <span className="text-[11px] font-mono text-neutral-500 flex-shrink-0 w-16 text-right">
+                {new Date(task.dueDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            )}
           </div>
         );
       })}
 
       {/* Add task row */}
-      <div
-        className="flex items-center gap-3 px-4 py-3 border-t border-border"
-      >
+      <div className="flex items-center gap-3 px-4 py-3 border-t border-[#e5e5e5]">
         {isAdding ? (
           <>
-            <div className="w-4 h-4 rounded border border-border-hover bg-background flex-shrink-0" />
+            <div className="w-4 h-4 rounded border border-neutral-300 bg-white flex-shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -167,9 +187,9 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
               onKeyDown={handleKeyDown}
               onBlur={handleAddSubmit}
               placeholder="Task title..."
-              className="flex-1 text-[13px] text-text-primary placeholder:text-text-muted bg-transparent outline-none"
+              className="flex-1 text-[13px] text-[#0a0a0a] placeholder:text-neutral-400 bg-transparent outline-none"
             />
-            <span className="text-[11px] font-mono text-text-muted">
+            <span className="text-[11px] font-mono text-neutral-400">
               Enter to add
             </span>
           </>
@@ -178,7 +198,7 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
             onClick={handleAddClick}
             className="flex items-center gap-3 w-full cursor-pointer hover:opacity-70 transition-opacity duration-150"
           >
-            <div className="w-4 h-4 flex items-center justify-center text-text-muted">
+            <div className="w-4 h-4 flex items-center justify-center text-neutral-400">
               <svg
                 width="14"
                 height="14"
@@ -193,7 +213,7 @@ export default function TaskList({ tasks: initialTasks }: TaskListProps) {
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
             </div>
-            <span className="text-[13px] text-text-muted">Add task</span>
+            <span className="text-[13px] text-neutral-400">Add task</span>
           </button>
         )}
       </div>

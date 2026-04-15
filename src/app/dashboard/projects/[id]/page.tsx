@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import ProjectChat from "@/components/projects/ProjectChat";
 import TaskList from "@/components/projects/TaskList";
 import DeliverablesList from "@/components/projects/DeliverablesList";
-import { mockProject } from "@/lib/mock-data";
 
 type Tab = "chat" | "tasks" | "deliverables" | "details";
 
@@ -34,12 +33,40 @@ type ProjectData = {
   }[];
 };
 
+type TaskData = {
+  id: string;
+  title: string;
+  description: string;
+  status: "todo" | "in_progress" | "done";
+  dueDate: string | null;
+  assigneeId: string;
+  assigneeName: string;
+  assigneeImage: string;
+};
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </svg>
+  );
+}
+
 export default function ProjectDashboardPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<TaskData[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -51,9 +78,88 @@ export default function ProjectDashboardPage() {
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  // Fallback to mock for demo project "1"
-  const title = project?.title || (projectId === "1" ? mockProject.title : "Project");
-  const description = project?.description || (projectId === "1" ? mockProject.description : "");
+  // Fetch tasks when switching to tasks tab
+  useEffect(() => {
+    if (activeTab === "tasks") {
+      setTasksLoading(true);
+      fetch(`/api/projects/${projectId}/tasks`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setTasks(data))
+        .catch(() => setTasks([]))
+        .finally(() => setTasksLoading(false));
+    }
+  }, [activeTab, projectId]);
+
+  // Close settings dropdown on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowSettings(false);
+      }
+    }
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [showSettings]);
+
+  const handleArchive = async () => {
+    setShowSettings(false);
+    await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    router.push("/dashboard/projects");
+  };
+
+  const handleDelete = async () => {
+    setShowSettings(false);
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      router.push("/dashboard/projects");
+    }
+  };
+
+  const handleEditTitle = () => {
+    setShowSettings(false);
+    setEditTitle(project?.title || "");
+    setIsEditing(true);
+  };
+
+  const handleSaveTitle = async () => {
+    const trimmed = editTitle.trim();
+    if (!trimmed || trimmed === project?.title) {
+      setIsEditing(false);
+      return;
+    }
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmed }),
+    });
+    if (res.ok) {
+      setProject((prev) => (prev ? { ...prev, title: trimmed } : prev));
+    }
+    setIsEditing(false);
+  };
+
+  const handleAddTask = async (title: string) => {
+    const res = await fetch(`/api/projects/${projectId}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (res.ok) {
+      const newTask = await res.json();
+      setTasks((prev) => [...prev, newTask]);
+    }
+  };
+
+  const title = project?.title || "Project";
+  const description = project?.description || "";
   const status = project?.status || "active";
   const members = project?.members || [];
   const createdAt = project?.createdAt || new Date().toISOString();
@@ -61,9 +167,9 @@ export default function ProjectDashboardPage() {
   if (loading) {
     return (
       <div className="max-w-3xl px-8 py-6">
-        <div className="h-6 w-48 bg-surface-muted rounded animate-pulse mb-2" />
-        <div className="h-4 w-96 bg-surface-muted rounded animate-pulse mb-6" />
-        <div className="h-[400px] bg-surface-muted rounded-[10px] animate-pulse" />
+        <div className="h-6 w-48 bg-neutral-100 rounded animate-pulse mb-2" />
+        <div className="h-4 w-96 bg-neutral-100 rounded animate-pulse mb-6" />
+        <div className="h-[400px] bg-neutral-100 rounded-[10px] animate-pulse" />
       </div>
     );
   }
@@ -73,18 +179,67 @@ export default function ProjectDashboardPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-1">
-          <h1 className="text-[20px] font-semibold text-text-primary leading-tight">
-            {title}
-          </h1>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-surface-muted text-text-muted">
+          {isEditing ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleSaveTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveTitle();
+                if (e.key === "Escape") setIsEditing(false);
+              }}
+              autoFocus
+              className="text-[20px] font-semibold text-[#0a0a0a] leading-tight bg-transparent border-b border-[#e5e5e5] outline-none px-0 py-0"
+            />
+          ) : (
+            <h1 className="text-[20px] font-semibold text-[#0a0a0a] leading-tight">
+              {title}
+            </h1>
+          )}
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-500">
             {status}
           </span>
+
+          {/* Settings dropdown */}
+          <div className="relative ml-auto" ref={settingsRef}>
+            <button
+              onClick={() => setShowSettings((v) => !v)}
+              className="p-1.5 rounded-md text-neutral-400 hover:text-[#0a0a0a] hover:bg-neutral-100 transition-colors duration-150 cursor-pointer"
+            >
+              <SettingsIcon />
+            </button>
+            {showSettings && (
+              <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#e5e5e5] rounded-lg shadow-sm py-1 z-50">
+                <button
+                  onClick={handleEditTitle}
+                  className="w-full text-left px-3 py-2 text-[13px] text-[#0a0a0a] hover:bg-neutral-50 transition-colors duration-150 cursor-pointer"
+                >
+                  Edit title
+                </button>
+                <button
+                  onClick={handleArchive}
+                  className="w-full text-left px-3 py-2 text-[13px] text-[#0a0a0a] hover:bg-neutral-50 transition-colors duration-150 cursor-pointer"
+                >
+                  Archive project
+                </button>
+                {status === "draft" && (
+                  <button
+                    onClick={handleDelete}
+                    className="w-full text-left px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer"
+                  >
+                    Delete project
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-        <p className="text-[13px] text-text-secondary mt-1 leading-relaxed">
+        <p className="text-[13px] text-neutral-600 mt-1 leading-relaxed">
           {description}
         </p>
         <div className="flex items-center gap-3 mt-2">
-          <span className="text-[11px] font-mono text-text-muted">
+          <span className="text-[11px] font-mono text-neutral-500">
             Created {new Date(createdAt).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
@@ -93,8 +248,8 @@ export default function ProjectDashboardPage() {
           </span>
           {members.length > 0 && (
             <>
-              <span className="text-[11px] text-border">|</span>
-              <span className="text-[11px] font-mono text-text-muted">
+              <span className="text-[11px] text-[#e5e5e5]">|</span>
+              <span className="text-[11px] font-mono text-neutral-500">
                 {members.length} member{members.length !== 1 ? "s" : ""}
               </span>
             </>
@@ -106,15 +261,15 @@ export default function ProjectDashboardPage() {
           <div className="flex items-center gap-3 mt-4">
             {members.map((m) => (
               <div key={m.userId} className="flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted overflow-hidden">
+                <div className="w-6 h-6 rounded-md bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-500 overflow-hidden">
                   {m.avatarUrl ? (
                     <img src={m.avatarUrl} alt={m.name} className="w-full h-full object-cover" />
                   ) : (
                     m.name.charAt(0)
                   )}
                 </div>
-                <span className="text-[12px] text-text-secondary">{m.name}</span>
-                <span className="text-[10px] font-mono text-text-muted">({m.role})</span>
+                <span className="text-[12px] text-neutral-600">{m.name}</span>
+                <span className="text-[10px] font-mono text-neutral-500">({m.role})</span>
               </div>
             ))}
           </div>
@@ -122,21 +277,21 @@ export default function ProjectDashboardPage() {
       </div>
 
       {/* Segmented Control */}
-      <div className="inline-flex bg-surface-muted rounded-lg p-0.5 mb-6">
+      <div className="inline-flex bg-neutral-100 rounded-lg p-0.5 mb-6">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`relative px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors duration-150 cursor-pointer ${
               activeTab === tab.key
-                ? "text-text-primary"
-                : "text-text-muted hover:text-text-secondary"
+                ? "text-[#0a0a0a]"
+                : "text-neutral-500 hover:text-neutral-600"
             }`}
           >
             {activeTab === tab.key && (
               <motion.div
                 layoutId="project-tab"
-                className="absolute inset-0 bg-background border border-border rounded-md"
+                className="absolute inset-0 bg-white border border-[#e5e5e5] rounded-md"
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
               />
             )}
@@ -147,26 +302,45 @@ export default function ProjectDashboardPage() {
 
       {/* Tab content */}
       {activeTab === "chat" && (
-        <div className="border border-border rounded-[10px] overflow-hidden h-[calc(100vh-320px)]">
+        <div className="border border-[#e5e5e5] rounded-[10px] overflow-hidden h-[calc(100vh-320px)]">
           <ProjectChat projectId={projectId} />
         </div>
       )}
       {activeTab === "tasks" && (
-        <TaskList tasks={projectId === "1" ? mockProject.tasks : []} />
+        tasksLoading ? (
+          <div className="border border-[#e5e5e5] rounded-lg p-6">
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 bg-neutral-100 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <TaskList
+            tasks={tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              assigneeId: t.assigneeId,
+              status: t.status,
+              dueDate: t.dueDate || "",
+            }))}
+            onAddTask={handleAddTask}
+          />
+        )
       )}
       {activeTab === "deliverables" && (
-        <DeliverablesList deliverables={projectId === "1" ? mockProject.deliverables : []} />
+        <DeliverablesList deliverables={[]} />
       )}
       {activeTab === "details" && (
-        <div className="border border-border rounded-[10px] p-5">
-          <p className="text-[14px] text-text-secondary leading-[1.6]">{description}</p>
+        <div className="border border-[#e5e5e5] rounded-[10px] p-5">
+          <p className="text-[14px] text-neutral-600 leading-[1.6]">{description}</p>
           {members.length > 0 && (
-            <div className="mt-5 border-t border-border pt-5">
-              <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Team</p>
+            <div className="mt-5 border-t border-[#e5e5e5] pt-5">
+              <p className="text-[11px] font-mono uppercase text-neutral-500 mb-3">Team</p>
               <div className="space-y-2">
                 {members.map((m) => (
                   <div key={m.userId} className="flex items-center gap-3 py-1.5">
-                    <div className="w-8 h-8 rounded-md bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted overflow-hidden">
+                    <div className="w-8 h-8 rounded-md bg-neutral-100 flex items-center justify-center text-[12px] font-medium text-neutral-500 overflow-hidden">
                       {m.avatarUrl ? (
                         <img src={m.avatarUrl} alt={m.name} className="w-full h-full object-cover" />
                       ) : (
@@ -174,8 +348,8 @@ export default function ProjectDashboardPage() {
                       )}
                     </div>
                     <div>
-                      <p className="text-[13px] font-medium text-text-primary">{m.name}</p>
-                      <p className="text-[11px] text-text-muted">{m.role}</p>
+                      <p className="text-[13px] font-medium text-[#0a0a0a]">{m.name}</p>
+                      <p className="text-[11px] text-neutral-500">{m.role}</p>
                     </div>
                   </div>
                 ))}
