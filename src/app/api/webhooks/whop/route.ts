@@ -2,10 +2,60 @@ import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { invoices, messages } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { createHmac, timingSafeEqual } from "crypto";
+
+// Standard Webhooks signature verification
+function verifySignature(body: string, headers: Headers): boolean {
+  const secret = process.env.WHOP_WEBHOOK_SECRET;
+  if (!secret) return true; // Skip verification if no secret configured
+
+  const sigHeader = headers.get("webhook-signature");
+  const msgId = headers.get("webhook-id");
+  const timestamp = headers.get("webhook-timestamp");
+
+  if (!sigHeader || !msgId || !timestamp) return false;
+
+  // Reject timestamps older than 5 minutes (replay protection)
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp, 10)) > 300) return false;
+
+  // Strip prefix (whsec_ or ws_) and decode base64 secret
+  const rawSecret = secret.replace(/^(whsec_|ws_)/, "");
+  const secretBytes = Buffer.from(rawSecret, "base64");
+
+  // Sign: msg_id.timestamp.body
+  const toSign = `${msgId}.${timestamp}.${body}`;
+  const computed = createHmac("sha256", secretBytes).update(toSign).digest("base64");
+
+  // Check against all signatures in the header (v1,<base64>)
+  const signatures = sigHeader.split(" ");
+  for (const sig of signatures) {
+    const parts = sig.split(",");
+    if (parts[0] !== "v1" || !parts[1]) continue;
+    try {
+      const expected = Buffer.from(parts[1], "base64");
+      const actual = Buffer.from(computed, "base64");
+      if (expected.length === actual.length && timingSafeEqual(expected, actual)) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = await request.json();
+    const body = await request.text();
+
+    if (!verifySignature(body, request.headers)) {
+      console.warn("Whop webhook: invalid signature");
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    const payload = JSON.parse(body);
     const eventType = payload.event || payload.type;
     const whopInvoiceId = payload.data?.id || payload.invoice_id;
 
