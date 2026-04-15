@@ -65,6 +65,76 @@ function getFileName(url: string): string {
 const MAX_CHARS = 500;
 const POLL_INTERVAL = 5000;
 
+// --- Invoice message parser ---
+
+interface ParsedInvoice {
+  icon: string;
+  title: string;
+  description: string | null;
+  amount: string | null;
+  due: string | null;
+  status: string;
+  invoiceId: string | null;
+  payUrl: string | null;
+}
+
+function parseInvoiceMessage(content: string): ParsedInvoice | null {
+  if (!content.includes("INVOICE")) return null;
+
+  const lines = content.split("\n");
+
+  // Determine type from first line
+  let icon = "\u{1F4B0}";
+  let title = "Invoice";
+  let status = "Sent";
+
+  const firstLine = lines[0] || "";
+  if (firstLine.includes("PAID")) {
+    icon = "\u2705";
+    title = "Invoice Paid";
+    status = "Paid";
+  } else if (firstLine.includes("VOIDED")) {
+    icon = "\u274C";
+    title = "Invoice Voided";
+    status = "Voided";
+  } else if (firstLine.includes("PAST DUE")) {
+    icon = "\u26A0\uFE0F";
+    title = "Invoice Past Due";
+    status = "Past Due";
+  } else if (firstLine.includes("SENT")) {
+    icon = "\u{1F4B0}";
+    title = "Invoice";
+    status = "Sent";
+  }
+
+  let description: string | null = null;
+  let amount: string | null = null;
+  let due: string | null = null;
+  let invoiceId: string | null = null;
+  let payUrl: string | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("Description:")) {
+      description = trimmed.replace("Description:", "").trim();
+    } else if (trimmed.startsWith("Amount:")) {
+      amount = trimmed.replace("Amount:", "").trim();
+    } else if (trimmed.startsWith("Due:")) {
+      due = trimmed.replace("Due:", "").trim();
+    } else if (trimmed.startsWith("Status:")) {
+      const s = trimmed.replace("Status:", "").trim();
+      if (s) status = s;
+    } else if (trimmed.startsWith("Invoice ID:") || trimmed.startsWith("Invoice ")) {
+      const idMatch = trimmed.match(/Invoice(?:\s+ID)?:?\s+(.+)/);
+      if (idMatch) invoiceId = idMatch[1].trim();
+    } else if (trimmed.startsWith("Pay:")) {
+      payUrl = trimmed.replace("Pay:", "").trim();
+    }
+  }
+
+  return { icon, title, description, amount, due, status, invoiceId, payUrl };
+}
+
 // --- Icons ---
 
 function PaperclipIcon() {
@@ -425,10 +495,52 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
     sendQuickMessage(content);
   }
 
-  function handleSendInvoice() {
+  async function handleSendInvoice() {
     if (!invoiceDesc.trim() || !invoiceAmount.trim()) return;
-    const content = `\u{1F4B0} INVOICE\nDescription: ${invoiceDesc.trim()}\nAmount: ${invoiceAmount.trim()}\nDue: ${invoiceDue || "Upon receipt"}`;
-    sendQuickMessage(content);
+    if (isSending) return;
+
+    setIsSending(true);
+
+    // Parse dollar amount to cents (strip $ and commas)
+    const rawAmount = invoiceAmount.trim().replace(/[$,]/g, "");
+    const parsedAmount = parseFloat(rawAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast("Enter a valid amount");
+      setIsSending(false);
+      return;
+    }
+    const amountCents = Math.round(parsedAmount * 100);
+
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          description: invoiceDesc.trim(),
+          amount: amountCents,
+          dueDate: invoiceDue || undefined,
+          customerEmail: "",
+          customerName: "",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to create invoice" }));
+        toast(err.error || "Failed to send invoice");
+        setIsSending(false);
+        return;
+      }
+
+      toast("Invoice sent via Whop");
+      // Refresh messages to pick up the system message
+      await fetchMessages();
+    } catch {
+      toast("Failed to send invoice");
+    }
+
+    setIsSending(false);
+    resetQuickActionForm();
   }
 
   function handleAssembleTeam() {
@@ -522,6 +634,75 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
             msg.messageType !== "system" &&
             prevMsg.senderId === msg.senderId;
           const isDifferentSender = prevMsg && !isSameSenderAsPrev;
+
+          // Invoice card rendering
+          if (msg.content && msg.content.includes("INVOICE")) {
+            const parsed = parseInvoiceMessage(msg.content);
+            if (parsed) {
+              return (
+                <div key={msg.id} className="flex justify-center py-3">
+                  <div className="w-full max-w-[320px] border border-border rounded-[10px] p-3 bg-background" style={{ borderLeft: "3px solid #0a0a0a" }}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-[13px]">{parsed.icon}</span>
+                      <span className="text-[13px] font-medium text-text-primary font-body">
+                        {parsed.title}
+                      </span>
+                    </div>
+                    {parsed.description && (
+                      <div className="text-[12px] text-text-secondary font-body mb-1">
+                        {parsed.description}
+                      </div>
+                    )}
+                    {parsed.amount && (
+                      <div className="text-[12px] text-text-primary font-body mb-1">
+                        Amount: <span className="font-medium">{parsed.amount}</span>
+                      </div>
+                    )}
+                    {parsed.due && (
+                      <div className="text-[12px] text-text-muted font-body mb-1">
+                        Due: {parsed.due}
+                      </div>
+                    )}
+                    {parsed.invoiceId && (
+                      <div className="text-[11px] text-text-muted font-mono mb-2">
+                        ID: {parsed.invoiceId}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{
+                            backgroundColor:
+                              parsed.status === "Paid"
+                                ? "#22c55e"
+                                : parsed.status === "Voided"
+                                ? "#ef4444"
+                                : parsed.status === "Past Due"
+                                ? "#f59e0b"
+                                : "#a3a3a3",
+                          }}
+                        />
+                        <span className="text-[11px] font-mono text-text-muted">
+                          {parsed.status}
+                        </span>
+                      </div>
+                      {parsed.payUrl && (
+                        <a
+                          href={parsed.payUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-medium text-text-primary bg-surface-muted border border-border rounded px-2 py-0.5 hover:bg-border/50 transition-colors no-underline"
+                        >
+                          Pay now
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+          }
 
           if (msg.messageType === "system") {
             return (
