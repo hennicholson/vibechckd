@@ -25,7 +25,7 @@ export async function uploadToBunny(
       AccessKey: storageKey,
       "Content-Type": contentType,
     },
-    body: new Uint8Array(file),
+    body: file,
   });
 
   if (!response.ok) {
