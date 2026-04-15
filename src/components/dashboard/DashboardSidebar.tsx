@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -99,8 +100,16 @@ const navItems: NavItem[] = [
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-
+  const [profileSlug, setProfileSlug] = useState<string | null>(null);
   const rawRole = (session?.user as any)?.role as string | undefined;
+
+  useEffect(() => {
+    if (!session?.user || rawRole === "client") return;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.slug) setProfileSlug(data.slug); })
+      .catch(() => {});
+  }, [session?.user, rawRole]);
   // Map DB roles to dashboard roles: coder/admin → creator view
   const role: "client" | "creator" | undefined =
     rawRole === "client" ? "client" :
@@ -227,6 +236,14 @@ export default function DashboardSidebar() {
               </span>
             </div>
           </div>
+          {profileSlug && (
+            <Link
+              href={`/coders/${profileSlug}`}
+              className="block px-2 py-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
+            >
+              View public profile
+            </Link>
+          )}
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"

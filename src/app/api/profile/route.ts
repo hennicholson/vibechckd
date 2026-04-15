@@ -26,6 +26,7 @@ export async function GET() {
 
     return NextResponse.json({
       displayName: user?.name ?? "",
+      slug: "",
       tagline: "",
       location: "",
       bio: "",
@@ -52,6 +53,7 @@ export async function GET() {
 
   return NextResponse.json({
     displayName: user?.name ?? "",
+    slug: profile.creatorSlug ?? "",
     tagline: profile.tagline ?? "",
     location: profile.location ?? "",
     bio: profile.bio ?? "",

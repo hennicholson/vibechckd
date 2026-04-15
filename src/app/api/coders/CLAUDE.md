@@ -7,5 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9250 | 10:48 PM | 🟣 | Public profile viewing and navigation for creators/admins | ~470 |
 | #9083 | 3:13 PM | 🟣 | Browse page redesigned to show coder cards instead of work items | ~517 |
 </claude-mem-context>

@@ -9,6 +9,7 @@ import { SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
 
 type ProfileData = {
   displayName: string;
+  slug?: string;
   tagline: string;
   location: string;
   bio: string;

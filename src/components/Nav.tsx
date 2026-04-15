@@ -7,6 +7,18 @@ import { useSession, signOut } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import VerifiedSeal from "@/components/VerifiedSeal";
 
+function useProfileSlug(isAuthenticated: boolean, role: string | undefined) {
+  const [slug, setSlug] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated || role === "client") return;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.slug) setSlug(data.slug); })
+      .catch(() => {});
+  }, [isAuthenticated, role]);
+  return slug;
+}
+
 const links = [
   { href: "/browse", label: "Browse" },
   { href: "/dashboard/teams/new", label: "Build a Team" },
@@ -19,6 +31,8 @@ export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const userRole = (session?.user as any)?.role as string | undefined;
+  const profileSlug = useProfileSlug(status === "authenticated", userRole);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -118,6 +132,11 @@ export default function Nav() {
                       <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} className="block px-3 py-1.5 text-[13px] text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors">
                         Profile
                       </Link>
+                      {profileSlug && (
+                        <Link href={`/coders/${profileSlug}`} onClick={() => setMenuOpen(false)} className="block px-3 py-1.5 text-[12px] text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors">
+                          View public profile
+                        </Link>
+                      )}
                       <Link href="/dashboard/portfolio" onClick={() => setMenuOpen(false)} className="block px-3 py-1.5 text-[13px] text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors">
                         Portfolio
                       </Link>
@@ -191,6 +210,9 @@ export default function Nav() {
                   <div className="border-t border-border pt-2 mt-2 space-y-1">
                     <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Dashboard</Link>
                     <Link href="/dashboard/profile" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Profile</Link>
+                    {profileSlug && (
+                      <Link href={`/coders/${profileSlug}`} onClick={() => setMobileOpen(false)} className="block py-2 text-[12px] text-text-muted">View public profile</Link>
+                    )}
                     <Link href="/dashboard/portfolio" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Portfolio</Link>
                     <Link href="/dashboard/projects" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Projects</Link>
                     <Link href="/dashboard/inbox" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Inbox</Link>

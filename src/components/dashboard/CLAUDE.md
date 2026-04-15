@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9250 | 10:48 PM | 🟣 | Public profile viewing and navigation for creators/admins | ~470 |
+| #9240 | 8:52 PM | 🔄 | ProfileForm comprehensively refactored with upload handlers, validation, and UX enhancements | ~790 |
 | #9131 | 3:46 PM | 🔄 | DashboardSidebar refactored to use VerifiedSeal component | ~309 |
 | #9109 | 3:21 PM | 🟣 | Thumbnail upload added to portfolio item editor | ~296 |
 | #9100 | 3:20 PM | 🟣 | Portfolio items now support custom thumbnail uploads | ~378 |
