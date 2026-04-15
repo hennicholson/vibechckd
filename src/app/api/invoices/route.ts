@@ -58,18 +58,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the invoice via Whop API
+    // Chat sends amount in cents (e.g. 2500 = $25.00)
+    // Whop API expects dollars in initial_price (e.g. 25 = $25.00)
+    const amountDollars = Math.round(amount / 100);
     const saveDraft = !email;
     const invoice = await createInvoice({
       customerEmail: email,
       customerName: name,
       description,
-      amount: Math.round(amount),
+      amount: amountDollars,
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      lineItems,
+      lineItems: lineItems?.map((li: any) => ({ ...li, unitPrice: Math.round(li.unitPrice / 100) })),
       saveDraft,
     });
 
-    // Format amount for display
+    // Format amount for display (amount comes in as cents from chat)
     const displayAmount = (amount / 100).toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,

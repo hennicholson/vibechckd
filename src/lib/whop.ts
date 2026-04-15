@@ -79,7 +79,13 @@ export async function createInvoice(
 
   if (!res.ok) {
     const errorText = await res.text();
-    throw new Error(`Whop API error (${res.status}): ${errorText}`);
+    try {
+      const errJson = JSON.parse(errorText);
+      throw new Error(errJson?.error?.message || `Invoice failed (${res.status})`);
+    } catch (e) {
+      if (e instanceof Error && !e.message.includes("Invoice failed")) throw e;
+      throw new Error(`Invoice failed (${res.status}): ${errorText}`);
+    }
   }
 
   const data = await res.json();
