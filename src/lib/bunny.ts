@@ -9,7 +9,7 @@ function getEnv(key: string): string {
  * Returns the public CDN URL for the uploaded file.
  */
 export async function uploadToBunny(
-  file: Buffer,
+  file: Buffer | Uint8Array,
   path: string,
   contentType: string
 ): Promise<string> {
@@ -25,7 +25,7 @@ export async function uploadToBunny(
       AccessKey: storageKey,
       "Content-Type": contentType,
     },
-    body: file,
+    body: new Uint8Array(file),
   });
 
   if (!response.ok) {
