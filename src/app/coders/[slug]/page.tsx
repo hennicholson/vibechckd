@@ -27,6 +27,28 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
   const [notFound, setNotFound] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
   const [inquiryToast, setInquiryToast] = useState(false);
+  const [initiating, setInitiating] = useState<string | null>(null);
+
+  const handleInquiry = async (type: "project" | "inquiry") => {
+    if (authStatus !== "authenticated" || !coder) {
+      window.location.href = "/register?role=client";
+      return;
+    }
+    setInitiating(type);
+    try {
+      const res = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coderId: coder.id, coderName: coder.displayName, type }),
+      });
+      const data = await res.json();
+      if (data.projectId) {
+        window.location.href = `/dashboard/projects/${data.projectId}`;
+      }
+    } catch {
+      setInitiating(null);
+    }
+  };
 
   // Set document title
   useEffect(() => {
@@ -205,31 +227,12 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
 
             {/* CTAs */}
             <div className="flex gap-2 mt-5">
-              {authStatus === "authenticated" ? (
-                <>
-                  <Link href="/dashboard/teams/new">
-                    <Button>Start project</Button>
-                  </Link>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setInquiryToast(true);
-                      setTimeout(() => setInquiryToast(false), 2500);
-                    }}
-                  >
-                    Send inquiry
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Link href="/register?role=client">
-                    <Button>Start project</Button>
-                  </Link>
-                  <Link href="/register?role=client">
-                    <Button variant="secondary">Send inquiry</Button>
-                  </Link>
-                </>
-              )}
+              <Button onClick={() => handleInquiry("project")} disabled={!!initiating}>
+                {initiating === "project" ? "Starting..." : "Start project"}
+              </Button>
+              <Button variant="secondary" onClick={() => handleInquiry("inquiry")} disabled={!!initiating}>
+                {initiating === "inquiry" ? "Sending..." : "Send inquiry"}
+              </Button>
             </div>
 
             {/* Inquiry toast */}
