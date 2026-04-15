@@ -12,7 +12,7 @@ const tocSections = [
   { id: "project-management", label: "Project Management" },
   { id: "portfolio", label: "Portfolio" },
   { id: "chat-communication", label: "Chat & Communication" },
-  { id: "billing", label: "Billing" },
+  { id: "billing", label: "Billing & Payments" },
   { id: "faq", label: "FAQ" },
 ];
 
@@ -409,40 +409,124 @@ export default function DocsPage() {
               In-platform messaging
             </h3>
             <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-6">
-              Every project includes a built-in chat for team communication. Messages are scoped to the project, keeping conversations organized and relevant.
+              Every project includes a built-in chat for team communication. Messages are scoped to the project, keeping conversations organized and relevant. The chat auto-polls for new messages so conversations stay up to date in real-time.
             </p>
 
             <h3 className="text-[15px] font-semibold text-text-primary mb-2">
-              AI assistant
+              Quick actions
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-3">
+              The chat includes quick action buttons that let you take action without leaving the conversation:
+            </p>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li><span className="font-medium text-text-primary">Invoice</span> -- create and send invoices with optional split billing and email delivery.</li>
+              <li><span className="font-medium text-text-primary">Proposal</span> -- send a structured project proposal with scope, budget, and timeline. The other party can accept directly from the chat.</li>
+              <li><span className="font-medium text-text-primary">Milestone</span> -- define project milestones with linked payments and tasks for structured delivery.</li>
+              <li><span className="font-medium text-text-primary">Task</span> -- create and assign tasks to team members without switching tabs.</li>
+              <li><span className="font-medium text-text-primary">Payment</span> -- send a direct one-time payment to a team member with a secure checkout link.</li>
+              <li><span className="font-medium text-text-primary">Files</span> -- upload and share files (images, PDFs, videos) directly in the conversation.</li>
+            </ul>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Structured messages
             </h3>
             <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-6">
-              The project chat includes an AI assistant that can suggest task breakdowns, help with delegation, and provide context-aware recommendations for your project workflow.
+              Invoices, proposals, milestones, and payments render as rich cards within the chat rather than plain text. These cards include actionable elements like "Pay now" buttons, "Accept proposal" confirmations, and real-time status indicators.
             </p>
 
             <h3 className="text-[15px] font-semibold text-text-primary mb-2">
               File sharing
             </h3>
             <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px]">
-              Share files directly within project conversations to keep all assets and references in one place.
+              Share files directly within project conversations. Images display inline thumbnails, and all files are hosted on a CDN for fast delivery.
             </p>
           </section>
 
           {/* Billing */}
           <section id="billing" className="border-t border-border pt-8 mt-8">
             <h2 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-4">
-              Billing
+              Billing & Payments
             </h2>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface-muted rounded text-[12px] font-medium text-text-muted mb-4">
-              Coming Soon
-            </div>
-            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-4">
-              Billing integration via Whop is coming soon. Planned features include:
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-6">
+              vibechckd uses Whop Payments to handle all financial transactions on the platform. Payments are secure, tracked in real-time, and support multiple payout methods.
             </p>
-            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px]">
-              <li>Project-based payments between clients and creators.</li>
-              <li>Automated invoicing and payment tracking.</li>
-              <li>Milestone-based billing tied to deliverable approvals.</li>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Invoices
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-3">
+              Creators can send invoices directly from the project chat using the Invoice quick action:
+            </p>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li><span className="font-medium text-text-primary">Create an invoice</span> with a description, amount, and optional due date.</li>
+              <li><span className="font-medium text-text-primary">Send to a specific email</span> using the advanced options, or let the platform auto-detect the recipient from project members.</li>
+              <li><span className="font-medium text-text-primary">Split invoices</span> between multiple team members for shared projects.</li>
+              <li><span className="font-medium text-text-primary">Check payment status</span> in real-time -- the platform polls Whop to verify if an invoice has been paid.</li>
+              <li><span className="font-medium text-text-primary">Resend invoice emails</span> directly from the chat if a client hasn't received the payment link.</li>
             </ul>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Direct payments
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-3">
+              Clients can send one-time payments to creators without creating a formal invoice:
+            </p>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li>Use the <span className="font-medium text-text-primary">Payment</span> quick action in the project chat.</li>
+              <li>Enter an amount and optional description -- a secure checkout link is generated instantly.</li>
+              <li>Payment status is tracked automatically and updates in the chat when completed.</li>
+            </ul>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Project balance
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-6">
+              Every project displays a live financial summary at the top of the chat, showing total invoiced, paid, pending, and overdue amounts. This gives both clients and creators a clear picture of the project's financial status at a glance.
+            </p>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Milestones
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-6">
+              Use the Milestone quick action to create project milestones with attached payment amounts. Each milestone automatically creates a linked task and invoice, tying deliverables to payment stages for structured project billing.
+            </p>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Earnings & withdrawals
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-3">
+              Creators have a dedicated <Code>Earnings</Code> page in the dashboard to manage their income:
+            </p>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li><span className="font-medium text-text-primary">Available balance</span> -- funds ready to withdraw from completed payments.</li>
+              <li><span className="font-medium text-text-primary">Pending balance</span> -- payments that have been initiated but not yet confirmed.</li>
+              <li><span className="font-medium text-text-primary">Transaction history</span> -- a full record of all income, payments, and withdrawals with filtering by type.</li>
+              <li><span className="font-medium text-text-primary">Withdraw</span> -- cash out your balance to your connected payout method at any time.</li>
+            </ul>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">
+              Payout methods
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-3">
+              Withdrawals are processed through Whop Payments, which supports:
+            </p>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li>ACH bank deposit (US)</li>
+              <li>International bank transfer (241+ territories)</li>
+              <li>Venmo</li>
+              <li>CashApp</li>
+              <li>Cryptocurrency</li>
+            </ul>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px]">
+              Processing time varies by method, typically 1-3 business days for bank transfers.
+            </p>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2 mt-6">
+              Payment security
+            </h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px]">
+              All payment processing is handled by Whop, which supports credit and debit cards, digital wallets, crypto, and Buy Now Pay Later options across 195 countries. Webhook events are verified using HMAC-SHA256 signature validation with replay protection.
+            </p>
           </section>
 
           {/* FAQ */}
@@ -485,10 +569,26 @@ export default function DocsPage() {
               </div>
               <div>
                 <h3 className="text-[14px] font-medium text-text-primary mb-1">
-                  Is there a fee?
+                  How do payments work?
                 </h3>
                 <p className="text-[14px] text-text-secondary leading-[1.7]">
-                  Platform fees will be announced alongside the billing launch. The current focus is on building the marketplace and creator community.
+                  All payments are processed through Whop Payments. Clients can pay via invoices or direct payments from the project chat. Creators receive funds in their platform balance and can withdraw to their bank account, Venmo, CashApp, or crypto at any time.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-[14px] font-medium text-text-primary mb-1">
+                  How do I withdraw my earnings?
+                </h3>
+                <p className="text-[14px] text-text-secondary leading-[1.7]">
+                  Navigate to <Code>Dashboard</Code> then <Code>Earnings</Code> and click the Withdraw button. Enter the amount you'd like to cash out and the funds will be sent to your connected payout method. Withdrawals typically process within 1-3 business days.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-[14px] font-medium text-text-primary mb-1">
+                  Is there a platform fee?
+                </h3>
+                <p className="text-[14px] text-text-secondary leading-[1.7]">
+                  Standard payment processing fees apply through Whop. There are no additional platform fees at this time.
                 </p>
               </div>
             </div>
