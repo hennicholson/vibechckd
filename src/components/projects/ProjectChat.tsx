@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import Button from "../Button";
 import { useToast } from "../Toast";
 
+type QuickAction = "proposal" | "invoice" | "terms" | "review" | null;
+
 // --- Types ---
 
 type MessageType = "text" | "file" | "system" | "ai";
@@ -187,6 +189,17 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [quickAction, setQuickAction] = useState<QuickAction>(null);
+
+  // Quick action form state
+  const [proposalScope, setProposalScope] = useState("");
+  const [proposalBudget, setProposalBudget] = useState("");
+  const [proposalTimeline, setProposalTimeline] = useState("");
+  const [invoiceDesc, setInvoiceDesc] = useState("");
+  const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [invoiceDue, setInvoiceDue] = useState("");
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -345,6 +358,104 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
       }, 2000);
     }
   }
+
+  function resetQuickActionForm() {
+    setQuickAction(null);
+    setProposalScope("");
+    setProposalBudget("");
+    setProposalTimeline("");
+    setInvoiceDesc("");
+    setInvoiceAmount("");
+    setInvoiceDue("");
+    setReviewRating(0);
+    setReviewComment("");
+  }
+
+  async function sendQuickMessage(content: string) {
+    if (isSending) return;
+    setIsSending(true);
+
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: optimisticId,
+      senderId: currentUserId || null,
+      senderName: currentUserName,
+      content,
+      messageType: "text",
+      fileUrl: null,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, content }),
+      });
+
+      if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        toast("Failed to send message");
+        setIsSending(false);
+        return;
+      }
+
+      const created: ChatMessage = await res.json();
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimisticId ? created : m))
+      );
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      toast("Failed to send message");
+    }
+
+    setIsSending(false);
+    resetQuickActionForm();
+
+    if (aiEnabled) {
+      setIsAiTyping(true);
+      setTimeout(() => setIsAiTyping(false), 2000);
+    }
+  }
+
+  function handleSendProposal() {
+    if (!proposalScope.trim()) return;
+    const content = `\u{1F4CB} PROPOSAL\nScope: ${proposalScope.trim()}\nBudget: ${proposalBudget.trim() || "TBD"}\nTimeline: ${proposalTimeline.trim() || "TBD"}`;
+    sendQuickMessage(content);
+  }
+
+  function handleSendInvoice() {
+    if (!invoiceDesc.trim() || !invoiceAmount.trim()) return;
+    const content = `\u{1F4B0} INVOICE\nDescription: ${invoiceDesc.trim()}\nAmount: ${invoiceAmount.trim()}\nDue: ${invoiceDue || "Upon receipt"}`;
+    sendQuickMessage(content);
+  }
+
+  function handleAssembleTeam() {
+    const content = `\u{1F465} I'd like to assemble a team for this project. Let's discuss roles and specialties needed.\n\u2192 Open Team Builder: /dashboard/teams/new`;
+    sendQuickMessage(content);
+  }
+
+  function handleAcceptTerms() {
+    const content = `\u2705 TERMS ACCEPTED\nBoth parties have agreed to proceed. Project is now active.`;
+    sendQuickMessage(content);
+  }
+
+  function handleSendReview() {
+    if (reviewRating === 0) return;
+    const stars = "\u2B50".repeat(reviewRating);
+    const content = `\u2B50 REVIEW (${reviewRating}/5) ${stars}\n${reviewComment.trim() || "No comment provided."}`;
+    sendQuickMessage(content);
+  }
+
+  const quickActions = [
+    { key: "proposal" as const, icon: "\u{1F4CB}", label: "Send Proposal" },
+    { key: "invoice" as const, icon: "\u{1F4B0}", label: "Send Invoice" },
+    { key: "team" as const, icon: "\u{1F465}", label: "Assemble Team" },
+    { key: "files" as const, icon: "\u{1F4CE}", label: "Share Files" },
+    { key: "terms" as const, icon: "\u2705", label: "Accept Terms" },
+    { key: "review" as const, icon: "\u2B50", label: "Leave Review" },
+  ];
 
   const charCount = inputValue.length;
 
@@ -542,6 +653,168 @@ export default function ProjectChat({ projectId }: ProjectChatProps) {
         className="hidden"
         onChange={handleFileChange}
       />
+
+      {/* Quick Actions toolbar */}
+      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-border overflow-x-auto scrollbar-hide">
+        {quickActions.map((action) => (
+          <button
+            key={action.key}
+            onClick={() => {
+              if (action.key === "team") {
+                handleAssembleTeam();
+              } else if (action.key === "files") {
+                handleAttach();
+              } else {
+                setQuickAction(
+                  quickAction === action.key ? null : (action.key as QuickAction)
+                );
+              }
+            }}
+            className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium border rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+              quickAction === action.key
+                ? "border-text-primary text-text-primary bg-surface-muted"
+                : "text-text-muted border-border hover:border-border-hover hover:text-text-primary"
+            }`}
+          >
+            <span>{action.icon}</span>
+            {action.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Quick Action inline forms */}
+      {quickAction === "proposal" && (
+        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-text-primary">Send Proposal</span>
+            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
+          </div>
+          <textarea
+            value={proposalScope}
+            onChange={(e) => setProposalScope(e.target.value)}
+            placeholder="Project scope..."
+            rows={3}
+            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none resize-none mb-2"
+          />
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={proposalBudget}
+              onChange={(e) => setProposalBudget(e.target.value)}
+              placeholder="$5,000"
+              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
+            />
+            <input
+              type="text"
+              value={proposalTimeline}
+              onChange={(e) => setProposalTimeline(e.target.value)}
+              placeholder="2 weeks"
+              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
+            />
+          </div>
+          <button
+            onClick={handleSendProposal}
+            disabled={!proposalScope.trim() || isSending}
+            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Send proposal
+          </button>
+        </div>
+      )}
+
+      {quickAction === "invoice" && (
+        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-text-primary">Send Invoice</span>
+            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
+          </div>
+          <input
+            type="text"
+            value={invoiceDesc}
+            onChange={(e) => setInvoiceDesc(e.target.value)}
+            placeholder="Description"
+            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none mb-2"
+          />
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={invoiceAmount}
+              onChange={(e) => setInvoiceAmount(e.target.value)}
+              placeholder="$2,500"
+              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
+            />
+            <input
+              type="date"
+              value={invoiceDue}
+              onChange={(e) => setInvoiceDue(e.target.value)}
+              className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none"
+            />
+          </div>
+          <button
+            onClick={handleSendInvoice}
+            disabled={!invoiceDesc.trim() || !invoiceAmount.trim() || isSending}
+            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Send invoice
+          </button>
+        </div>
+      )}
+
+      {quickAction === "terms" && (
+        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-text-primary">Accept Terms</span>
+            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
+          </div>
+          <p className="text-[12px] text-text-secondary font-body mb-3 leading-relaxed">
+            By accepting, both parties agree to the scope, budget, and timeline discussed.
+          </p>
+          <button
+            onClick={handleAcceptTerms}
+            disabled={isSending}
+            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Accept &amp; Start
+          </button>
+        </div>
+      )}
+
+      {quickAction === "review" && (
+        <div className="bg-surface-muted rounded-[10px] p-3 mx-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-text-primary">Leave Review</span>
+            <button onClick={resetQuickActionForm} className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">Cancel</button>
+          </div>
+          <div className="flex gap-1 mb-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => setReviewRating(star)}
+                className={`text-[18px] cursor-pointer transition-colors ${
+                  star <= reviewRating ? "opacity-100" : "opacity-25"
+                }`}
+                aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+              >
+                {"\u2B50"}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder="Write your review..."
+            rows={2}
+            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-background border border-border rounded-md px-2.5 py-1.5 outline-none resize-none mb-2"
+          />
+          <button
+            onClick={handleSendReview}
+            disabled={reviewRating === 0 || isSending}
+            className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-[#fafafa] rounded-md hover:bg-[#171717]/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Submit review
+          </button>
+        </div>
+      )}
 
       {/* Input area */}
       <div className="border-t border-border px-3 py-2.5 bg-background">

@@ -4,12 +4,16 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import ProjectChat from "@/components/projects/ProjectChat";
+import TaskList from "@/components/projects/TaskList";
+import DeliverablesList from "@/components/projects/DeliverablesList";
 import { mockProject } from "@/lib/mock-data";
 
-type Tab = "chat" | "details";
+type Tab = "chat" | "tasks" | "deliverables" | "details";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "chat", label: "Chat" },
+  { key: "tasks", label: "Tasks" },
+  { key: "deliverables", label: "Deliverables" },
   { key: "details", label: "Details" },
 ];
 
@@ -146,6 +150,12 @@ export default function ProjectDashboardPage() {
         <div className="border border-border rounded-[10px] overflow-hidden h-[calc(100vh-320px)]">
           <ProjectChat projectId={projectId} />
         </div>
+      )}
+      {activeTab === "tasks" && (
+        <TaskList tasks={projectId === "1" ? mockProject.tasks : []} />
+      )}
+      {activeTab === "deliverables" && (
+        <DeliverablesList deliverables={projectId === "1" ? mockProject.deliverables : []} />
       )}
       {activeTab === "details" && (
         <div className="border border-border rounded-[10px] p-5">
