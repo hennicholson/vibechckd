@@ -5,6 +5,7 @@ import {
   timestamp,
   integer,
   decimal,
+  boolean,
   pgEnum,
   primaryKey,
 } from "drizzle-orm/pg-core";
@@ -179,6 +180,35 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   messageType: messageTypeEnum("message_type").default("text"),
   fileUrl: text("file_url"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ── Invoices ──
+
+export const invoiceStatusEnum = pgEnum("invoice_status", ["draft", "sent", "paid", "voided", "past_due", "uncollectible"]);
+
+export const invoices = pgTable("invoices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  whopInvoiceId: text("whop_invoice_id").unique(),
+  senderId: uuid("sender_id").references(() => users.id),
+  recipientId: uuid("recipient_id").references(() => users.id),
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  status: invoiceStatusEnum("status").default("draft").notNull(),
+  dueDate: timestamp("due_date", { mode: "date" }),
+  paidAt: timestamp("paid_at", { mode: "date" }),
+  paymentUrl: text("payment_url"),
+  messageId: uuid("message_id").references(() => messages.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const invoiceSplits = pgTable("invoice_splits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  amountCents: integer("amount_cents").notNull(),
+  paid: boolean("paid").default(false).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

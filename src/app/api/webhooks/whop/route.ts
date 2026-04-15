@@ -1,60 +1,71 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
-import { messages } from "@/db/schema";
-import { like, asc } from "drizzle-orm";
+import { invoices, messages } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
     const eventType = payload.event || payload.type;
-    const invoiceId = payload.data?.id || payload.invoice_id;
+    const whopInvoiceId = payload.data?.id || payload.invoice_id;
 
-    if (!eventType || !invoiceId) {
+    if (!eventType || !whopInvoiceId) {
       return new Response("OK", { status: 200 });
     }
 
-    // Find the project that has a message containing this invoice ID
-    const allMessages = await db
+    // Look up the invoice in our table
+    const [invoice] = await db
       .select()
-      .from(messages)
-      .where(like(messages.content, `%${invoiceId}%`))
-      .orderBy(asc(messages.createdAt));
+      .from(invoices)
+      .where(eq(invoices.whopInvoiceId, whopInvoiceId))
+      .limit(1);
 
-    const matchingMessage = allMessages[0];
-
-    if (!matchingMessage) {
+    if (!invoice) {
       console.warn(
-        `Whop webhook: no matching message found for invoice ${invoiceId}`
+        `Whop webhook: no matching invoice found for ${whopInvoiceId}`
       );
       return new Response("OK", { status: 200 });
     }
 
-    const projectId = matchingMessage.projectId;
-
+    let newStatus: "paid" | "voided" | "past_due" | null = null;
     let systemContent: string | null = null;
 
     switch (eventType) {
       case "invoice.paid": {
-        systemContent = `\u2705 INVOICE PAID\nInvoice ${invoiceId} has been paid`;
+        newStatus = "paid";
+        systemContent = `INVOICE PAID\nInvoice ${whopInvoiceId} has been paid`;
         break;
       }
       case "invoice.voided": {
-        systemContent = `\u274C INVOICE VOIDED\nInvoice ${invoiceId} has been voided`;
+        newStatus = "voided";
+        systemContent = `INVOICE VOIDED\nInvoice ${whopInvoiceId} has been voided`;
         break;
       }
       case "invoice.past_due": {
-        systemContent = `\u26A0\uFE0F INVOICE PAST DUE\nInvoice ${invoiceId} is past due`;
+        newStatus = "past_due";
+        systemContent = `INVOICE PAST DUE\nInvoice ${whopInvoiceId} is past due`;
         break;
       }
       default: {
-        // Unknown event type — acknowledge but do nothing
         return new Response("OK", { status: 200 });
       }
     }
 
-    if (systemContent) {
+    // Update the invoice status
+    if (newStatus) {
+      await db
+        .update(invoices)
+        .set({
+          status: newStatus,
+          ...(newStatus === "paid" ? { paidAt: new Date() } : {}),
+        })
+        .where(eq(invoices.whopInvoiceId, whopInvoiceId));
+    }
+
+    // Post a system message to the project chat
+    if (systemContent && invoice.projectId) {
       await db.insert(messages).values({
-        projectId,
+        projectId: invoice.projectId,
         senderId: null,
         content: systemContent,
         messageType: "system",

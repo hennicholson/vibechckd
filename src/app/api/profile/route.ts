@@ -91,6 +91,8 @@ export async function PUT(request: Request) {
     specialties: body.specialties ?? [],
     hourlyRate: body.hourlyRate ?? null,
     availability: body.availability ?? "available",
+    pfpUrl: body.avatarUrl ?? null,
+    gifPreviewUrl: body.gifPreviewUrl ?? null,
     githubUrl: body.githubUrl ?? null,
     twitterUrl: body.twitterUrl ?? null,
     linkedinUrl: body.linkedinUrl ?? null,

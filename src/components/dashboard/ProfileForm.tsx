@@ -448,7 +448,9 @@ export default function ProfileForm({ initialData, onFormChange }: ProfileFormPr
             </div>
             {hasGif ? (
               <div className="relative w-[200px] aspect-video rounded-lg overflow-hidden border border-border group/gif">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
+                  key={form.gifPreviewUrl}
                   src={form.gifPreviewUrl}
                   alt="GIF preview"
                   className="w-full h-full object-cover"

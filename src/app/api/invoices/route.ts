@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { messages, projectMembers, users } from "@/db/schema";
-import { eq, asc, and, ne } from "drizzle-orm";
+import { invoices, invoiceSplits, messages, projectMembers, users } from "@/db/schema";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { createInvoice } from "@/lib/whop";
 
 export async function POST(request: NextRequest) {
@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
       dueDate,
       lineItems,
       projectId,
+      splits,
+      recipientEmail,
     } = body;
 
     if (!projectId || !description || !amount) {
@@ -30,14 +32,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Look up the other project member's email if not provided
-    let email = customerEmail || "";
+    // Look up the other project member's email and ID if not provided
+    let email = recipientEmail || customerEmail || "";
     let name = customerName || "";
+    let recipientId: string | null = null;
 
-    if (!email && projectId) {
+    if (projectId) {
       try {
         const members = await db
-          .select({ email: users.email, name: users.name })
+          .select({ id: users.id, email: users.email, name: users.name })
           .from(projectMembers)
           .innerJoin(users, eq(projectMembers.userId, users.id))
           .where(
@@ -49,7 +52,8 @@ export async function POST(request: NextRequest) {
           .limit(1);
 
         if (members.length > 0) {
-          email = members[0].email;
+          recipientId = members[0].id;
+          email = email || members[0].email;
           name = name || members[0].name || "";
         }
       } catch {
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Whop API expects dollars in initial_price (e.g. 25 = $25.00)
     const amountDollars = Math.round(amount / 100);
     const saveDraft = !email;
-    const invoice = await createInvoice({
+    const whopInvoice = await createInvoice({
       customerEmail: email,
       customerName: name,
       description,
@@ -80,14 +84,14 @@ export async function POST(request: NextRequest) {
     const displayDue = dueDate || "Upon receipt";
 
     // Build the system message content
-    let messageContent = `\u{1F4B0} INVOICE SENT\nDescription: ${description}\nAmount: $${displayAmount}\nDue: ${displayDue}\nStatus: Sent\nInvoice ID: ${invoice.id}`;
+    let messageContent = `INVOICE SENT\nDescription: ${description}\nAmount: $${displayAmount}\nDue: ${displayDue}\nStatus: Sent\nInvoice ID: ${whopInvoice.id}`;
 
-    if (invoice.paymentUrl) {
-      messageContent += `\nPay: ${invoice.paymentUrl}`;
+    if (whopInvoice.paymentUrl) {
+      messageContent += `\nPay: ${whopInvoice.paymentUrl}`;
     }
 
     // Insert system message into the project chat
-    const [created] = await db
+    const [chatMessage] = await db
       .insert(messages)
       .values({
         projectId,
@@ -98,11 +102,45 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    // Persist invoice to the invoices table
+    const [invoice] = await db
+      .insert(invoices)
+      .values({
+        projectId,
+        whopInvoiceId: whopInvoice.id,
+        senderId: session.user.id,
+        recipientId,
+        description,
+        amountCents: amount,
+        status: saveDraft ? "draft" : "sent",
+        dueDate: dueDate ? new Date(dueDate) : null,
+        paymentUrl: whopInvoice.paymentUrl || null,
+        messageId: chatMessage.id,
+      })
+      .returning();
+
+    // Insert splits if provided
+    let insertedSplits: typeof invoiceSplits.$inferSelect[] = [];
+    if (splits && Array.isArray(splits) && splits.length > 0) {
+      insertedSplits = await db
+        .insert(invoiceSplits)
+        .values(
+          splits.map((s: { userId: string; amountCents: number }) => ({
+            invoiceId: invoice.id,
+            userId: s.userId,
+            amountCents: s.amountCents,
+          }))
+        )
+        .returning();
+    }
+
     return Response.json({
       success: true,
-      invoiceId: invoice.id,
-      paymentUrl: invoice.paymentUrl,
-      messageId: created.id,
+      invoiceId: whopInvoice.id,
+      paymentUrl: whopInvoice.paymentUrl,
+      messageId: chatMessage.id,
+      invoice,
+      splits: insertedSplits,
     });
   } catch (error) {
     console.error("Invoice creation failed:", error);
@@ -128,16 +166,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Query messages that contain "INVOICE" in content
   const rows = await db
     .select()
-    .from(messages)
-    .where(eq(messages.projectId, projectId))
-    .orderBy(asc(messages.createdAt));
+    .from(invoices)
+    .where(eq(invoices.projectId, projectId))
+    .orderBy(desc(invoices.createdAt));
 
-  const invoiceMessages = rows.filter(
-    (row) => row.content && row.content.includes("INVOICE")
-  );
-
-  return Response.json(invoiceMessages);
+  return Response.json(rows);
 }

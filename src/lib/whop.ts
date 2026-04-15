@@ -129,6 +129,27 @@ export async function listInvoices(): Promise<Record<string, unknown>[]> {
   return data.data || data;
 }
 
+export async function sendInvoice(
+  invoiceId: string,
+  email?: string
+): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (email) {
+    body.email_address = email;
+  }
+
+  const res = await fetch(`${WHOP_BASE_URL}/invoices/${invoiceId}/send`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Whop API error (${res.status}): ${errorText}`);
+  }
+}
+
 export async function voidInvoice(invoiceId: string): Promise<void> {
   const res = await fetch(`${WHOP_BASE_URL}/invoices/${invoiceId}/void`, {
     method: "POST",

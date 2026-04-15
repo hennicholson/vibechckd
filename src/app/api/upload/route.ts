@@ -90,7 +90,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: `CDN upload failed (${uploadRes.status}): ${text}` }, { status: 502 });
     }
 
-    const url = `${cdnUrl}/${path}`;
+    // Append cache-bust for static paths (pfp/preview use fixed filenames)
+    const cacheBust = (type === "pfp" || type === "preview") ? `?v=${Date.now()}` : "";
+    const url = `${cdnUrl}/${path}${cacheBust}`;
 
     // Update database in the background — don't block the response
     const dbUpdatePromise = (async () => {

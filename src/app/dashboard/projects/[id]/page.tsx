@@ -303,7 +303,7 @@ export default function ProjectDashboardPage() {
       {/* Tab content */}
       {activeTab === "chat" && (
         <div className="border border-[#e5e5e5] rounded-[10px] overflow-hidden h-[calc(100vh-320px)]">
-          <ProjectChat projectId={projectId} />
+          <ProjectChat projectId={projectId} members={members.map((m) => ({ userId: m.userId, name: m.name, role: m.role }))} />
         </div>
       )}
       {activeTab === "tasks" && (
