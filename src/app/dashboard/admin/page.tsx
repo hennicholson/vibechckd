@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Badge from "@/components/Badge";
 import Button from "@/components/Button";
 import Modal from "@/components/Modal";
-import { coders } from "@/lib/mock-data";
 
 // ── Types ──
 
@@ -12,6 +11,7 @@ type ApplicationStatus = "applied" | "under_review" | "interview" | "approved" |
 
 type Application = {
   id: string;
+  userId: string | null;
   name: string;
   email: string;
   specialties: string[];
@@ -22,11 +22,12 @@ type Application = {
   createdAt: string;
 };
 
-// ── Mock Data ──
+// ── Mock Data (fallback) ──
 
-const initialApplications: Application[] = [
+const fallbackApplications: Application[] = [
   {
     id: "app-1",
+    userId: null,
     name: "Alex Rivera",
     email: "alex@example.com",
     specialties: ["frontend", "full-stack"],
@@ -38,6 +39,7 @@ const initialApplications: Application[] = [
   },
   {
     id: "app-2",
+    userId: null,
     name: "Jordan Lee",
     email: "jordan@example.com",
     specialties: ["backend", "automation"],
@@ -49,6 +51,7 @@ const initialApplications: Application[] = [
   },
   {
     id: "app-3",
+    userId: null,
     name: "Morgan Taylor",
     email: "morgan@example.com",
     specialties: ["security"],
@@ -87,37 +90,89 @@ function formatDate(dateStr: string): string {
 // ── Component ──
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"applications" | "coders">("applications");
-  const [applications, setApplications] = useState<Application[]>(initialApplications);
+  const [tab, setTab] = useState<"applications">("applications");
+  const [applications, setApplications] = useState<Application[]>([]);
   const [reviewingApp, setReviewingApp] = useState<Application | null>(null);
-  const [suspendedIds, setSuspendedIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const verifiedCoders = coders.filter((c) => c.verified);
-
-  function handleApprove(id: string) {
-    setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "approved" as ApplicationStatus } : a))
-    );
-    setReviewingApp(null);
-  }
-
-  function handleReject(id: string) {
-    setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "rejected" as ApplicationStatus } : a))
-    );
-    setReviewingApp(null);
-  }
-
-  function toggleSuspend(coderId: string) {
-    setSuspendedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(coderId)) {
-        next.delete(coderId);
-      } else {
-        next.add(coderId);
+  // Fetch applications from the database on mount
+  useEffect(() => {
+    async function fetchApplications() {
+      try {
+        const res = await fetch("/api/admin/applications");
+        if (!res.ok) {
+          throw new Error(`Failed to fetch: ${res.status}`);
+        }
+        const data = await res.json();
+        if (data.applications && data.applications.length > 0) {
+          setApplications(data.applications);
+        } else {
+          // Fall back to mock data if no DB applications exist
+          setApplications(fallbackApplications);
+        }
+      } catch (err) {
+        console.error("Failed to fetch applications:", err);
+        // Fall back to mock data on error
+        setApplications(fallbackApplications);
+      } finally {
+        setLoading(false);
       }
-      return next;
-    });
+    }
+    fetchApplications();
+  }, []);
+
+  async function handleApprove(id: string) {
+    setActionLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/applications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "approved" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to approve application");
+        setActionLoading(false);
+        return;
+      }
+      setApplications((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "approved" as ApplicationStatus } : a))
+      );
+      setReviewingApp(null);
+    } catch {
+      setError("Failed to approve application. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleReject(id: string) {
+    setActionLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/applications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "rejected" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to reject application");
+        setActionLoading(false);
+        return;
+      }
+      setApplications((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "rejected" as ApplicationStatus } : a))
+      );
+      setReviewingApp(null);
+    } catch {
+      setError("Failed to reject application. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   return (
@@ -145,21 +200,17 @@ export default function AdminPage() {
             {applications.filter((a) => a.status !== "approved" && a.status !== "rejected").length}
           </span>
         </button>
-        <button
-          onClick={() => setTab("coders")}
-          className={`pb-2.5 text-[13px] font-medium transition-colors cursor-pointer ${
-            tab === "coders"
-              ? "text-text-primary border-b-[2px] border-text-primary"
-              : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          Coders
-          <span className="ml-1.5 text-[11px] font-mono text-text-muted">{verifiedCoders.length}</span>
-        </button>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="px-3 py-12 text-center text-[13px] text-text-muted">
+          Loading applications...
+        </div>
+      )}
+
       {/* Applications Tab */}
-      {tab === "applications" && (
+      {!loading && tab === "applications" && (
         <div className="space-y-0">
           {/* Table header */}
           <div className="grid grid-cols-[1fr_1fr_1fr_100px_80px_80px] gap-3 px-3 py-2 text-[11px] font-mono text-text-muted uppercase tracking-wide">
@@ -178,7 +229,7 @@ export default function AdminPage() {
               <span className="text-[13px] text-text-primary font-medium truncate">{app.name}</span>
               <span className="text-[12px] text-text-muted font-mono truncate">{app.email}</span>
               <div className="flex gap-1.5 flex-wrap">
-                {app.specialties.map((s) => (
+                {(app.specialties || []).map((s) => (
                   <span
                     key={s}
                     className="px-2 py-0.5 text-[11px] font-mono text-text-secondary bg-surface-muted rounded-md"
@@ -206,54 +257,10 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Coders Tab */}
-      {tab === "coders" && (
-        <div className="space-y-0">
-          {/* Table header */}
-          <div className="grid grid-cols-[1fr_1fr_100px_120px_100px] gap-3 px-3 py-2 text-[11px] font-mono text-text-muted uppercase tracking-wide">
-            <span>Name</span>
-            <span>Specialty</span>
-            <span>Status</span>
-            <span>Verified</span>
-            <span></span>
-          </div>
-          {verifiedCoders.map((coder) => {
-            const isSuspended = suspendedIds.has(coder.id);
-            return (
-              <div
-                key={coder.id}
-                className="grid grid-cols-[1fr_1fr_100px_120px_100px] gap-3 items-center px-3 py-3 border-t border-border"
-              >
-                <span className="text-[13px] text-text-primary font-medium truncate">{coder.displayName}</span>
-                <div className="flex gap-1.5 flex-wrap">
-                  {coder.specialties.map((s) => (
-                    <span
-                      key={s}
-                      className="px-2 py-0.5 text-[11px] font-mono text-text-secondary bg-surface-muted rounded-md"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-                <Badge variant={isSuspended ? "rejected" : "approved"} />
-                <span className="text-[12px] text-text-muted">{formatDate(coder.joinedAt)}</span>
-                <Button
-                  variant={isSuspended ? "primary" : "ghost"}
-                  size="sm"
-                  onClick={() => toggleSuspend(coder.id)}
-                >
-                  {isSuspended ? "Activate" : "Suspend"}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* Review Modal */}
       <Modal
         open={!!reviewingApp}
-        onClose={() => setReviewingApp(null)}
+        onClose={() => { setReviewingApp(null); setError(""); }}
         title="Review Application"
         size="md"
       >
@@ -272,7 +279,7 @@ export default function AdminPage() {
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Specialties</div>
                 <div className="flex gap-1.5 flex-wrap">
-                  {reviewingApp.specialties.map((s) => (
+                  {(reviewingApp.specialties || []).map((s) => (
                     <span
                       key={s}
                       className="px-2 py-0.5 text-[11px] font-mono text-text-secondary bg-surface-muted rounded-md"
@@ -285,7 +292,7 @@ export default function AdminPage() {
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Portfolio</div>
                 <div className="space-y-1">
-                  {reviewingApp.portfolioLinks.map((link) => (
+                  {(reviewingApp.portfolioLinks || []).map((link) => (
                     <a
                       key={link}
                       href={link}
@@ -296,15 +303,18 @@ export default function AdminPage() {
                       {link}
                     </a>
                   ))}
+                  {(!reviewingApp.portfolioLinks || reviewingApp.portfolioLinks.length === 0) && (
+                    <span className="text-[13px] text-text-muted italic">No links provided</span>
+                  )}
                 </div>
               </div>
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Rate</div>
-                <div className="text-[13px] text-text-primary font-mono">{reviewingApp.rateExpectation}</div>
+                <div className="text-[13px] text-text-primary font-mono">{reviewingApp.rateExpectation || "Not specified"}</div>
               </div>
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Pitch</div>
-                <div className="text-[13px] text-text-secondary leading-relaxed">{reviewingApp.pitch}</div>
+                <div className="text-[13px] text-text-secondary leading-relaxed">{reviewingApp.pitch || "Not provided"}</div>
               </div>
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Current Status</div>
@@ -315,21 +325,26 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* Error display */}
+            {error && (
+              <p className="text-[12px] text-negative">{error}</p>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3 pt-2 border-t border-border">
               <Button
                 variant="primary"
                 size="md"
                 onClick={() => handleApprove(reviewingApp.id)}
-                disabled={reviewingApp.status === "approved"}
+                disabled={reviewingApp.status === "approved" || actionLoading}
               >
-                Approve
+                {actionLoading ? "Processing..." : "Approve"}
               </Button>
               <Button
                 variant="secondary"
                 size="md"
                 onClick={() => handleReject(reviewingApp.id)}
-                disabled={reviewingApp.status === "rejected"}
+                disabled={reviewingApp.status === "rejected" || actionLoading}
                 className="text-negative hover:text-negative"
               >
                 Reject

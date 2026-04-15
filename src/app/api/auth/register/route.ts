@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, role: requestedRole } = await req.json();
+    const { name, email, password, role: requestedRole, onboarding } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -44,11 +44,41 @@ export async function POST(req: Request) {
 
     // Create coder profile only for coders
     if (role === "coder") {
-      const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      // Generate slug from name, handling edge cases
+      let baseSlug = (name || "coder")
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      if (!baseSlug) {
+        baseSlug = "coder";
+      }
+
+      // Check for duplicate slugs and append random suffix if needed
+      let slug = baseSlug;
+      const [existingSlug] = await db
+        .select()
+        .from(coderProfiles)
+        .where(eq(coderProfiles.creatorSlug, slug))
+        .limit(1);
+
+      if (existingSlug) {
+        const suffix = Math.random().toString(36).substring(2, 6);
+        slug = `${baseSlug}-${suffix}`;
+      }
+
+      // Extract onboarding data for coder profile
+      const specialties = onboarding?.specialties || [];
+      const websiteUrl = onboarding?.portfolioUrl || null;
+
       await db.insert(coderProfiles).values({
         userId: user.id,
         creatorSlug: slug,
         status: "draft",
+        specialties: specialties.length > 0 ? specialties : null,
+        websiteUrl,
       });
     }
 

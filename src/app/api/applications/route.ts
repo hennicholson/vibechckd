@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
+import { desc } from "drizzle-orm";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, email, specialties, portfolioLinks, rateExpectation, pitch } = body;
+    const { userId, name, email, specialties, portfolioLinks, rateExpectation, pitch } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
     const [application] = await db
       .insert(applications)
       .values({
+        userId: userId || null,
         name,
         email,
         specialties: specialties || [],
@@ -31,7 +33,24 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Application submission error:", error);
     return NextResponse.json(
-      { error: "Failed to submit application" },
+      { error: "Failed to submit application. Please try again." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const allApplications = await db
+      .select()
+      .from(applications)
+      .orderBy(desc(applications.createdAt));
+
+    return NextResponse.json({ applications: allApplications });
+  } catch (error) {
+    console.error("Failed to fetch applications:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch applications" },
       { status: 500 }
     );
   }

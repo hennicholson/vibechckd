@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import Input from "./Input";
 import Textarea from "./Textarea";
@@ -33,9 +34,14 @@ const initialFormData: FormData = {
   pitch: "",
 };
 
-export default function ApplicationForm() {
+export default function ApplicationForm({ initialName, initialEmail }: { initialName?: string; initialEmail?: string } = {}) {
+  const { data: session } = useSession();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<FormData>(initialFormData);
+  const [form, setForm] = useState<FormData>({
+    ...initialFormData,
+    name: initialName || "",
+    email: initialEmail || "",
+  });
   const [submitted, setSubmitted] = useState(false);
   const [direction, setDirection] = useState(1);
 
@@ -77,6 +83,7 @@ export default function ApplicationForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: session?.user?.id || null,
           name: form.name,
           email: form.email,
           specialties: form.specialties,

@@ -1,10 +1,14 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import PageShell from "@/components/PageShell";
 import ApplicationForm from "@/components/ApplicationForm";
 
 export default function ApplyPage() {
+  const { data: session } = useSession();
+
   return (
     <PageShell>
       <div className="max-w-2xl mx-auto px-6 py-12">
@@ -26,7 +30,17 @@ export default function ApplyPage() {
           </p>
         </motion.div>
 
-        <ApplicationForm />
+        <ApplicationForm
+          initialName={session?.user?.name || ""}
+          initialEmail={session?.user?.email || ""}
+        />
+
+        <p className="text-[12px] text-text-muted text-center mt-8">
+          Already applied?{" "}
+          <Link href="/dashboard" className="text-text-secondary hover:text-text-primary transition-colors underline underline-offset-2">
+            Check your application status
+          </Link>
+        </p>
       </div>
     </PageShell>
   );

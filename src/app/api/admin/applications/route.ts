@@ -1,50 +1,119 @@
-import { NextRequest } from "next/server";
-
-const mockApplications = [
-  {
-    id: "app-1",
-    name: "Alex Rivera",
-    email: "alex@example.com",
-    specialties: ["frontend", "full-stack"],
-    portfolioLinks: ["https://alexrivera.dev"],
-    rateExpectation: "$120-180/hr",
-    pitch: "I build interfaces that feel alive. 5 years at startups, shipped 20+ products.",
-    status: "applied",
-    createdAt: "2026-04-12",
-  },
-  {
-    id: "app-2",
-    name: "Jordan Lee",
-    email: "jordan@example.com",
-    specialties: ["backend", "automation"],
-    portfolioLinks: ["https://github.com/jordanlee"],
-    rateExpectation: "$100-160/hr",
-    pitch: "Backend specialist with expertise in event-driven architectures and DevOps.",
-    status: "under_review",
-    createdAt: "2026-04-10",
-  },
-  {
-    id: "app-3",
-    name: "Morgan Taylor",
-    email: "morgan@example.com",
-    specialties: ["security"],
-    portfolioLinks: ["https://morgansec.io"],
-    rateExpectation: "$180-280/hr",
-    pitch: "Former pentester turned builder. I audit and harden codebases.",
-    status: "applied",
-    createdAt: "2026-04-13",
-  },
-];
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import { applications, coderProfiles } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export async function GET() {
-  return Response.json({ applications: mockApplications });
+  try {
+    // Verify admin access
+    const session = await auth();
+    if (!session?.user || (session.user as any).role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const allApplications = await db
+      .select()
+      .from(applications)
+      .orderBy(desc(applications.createdAt));
+
+    return NextResponse.json({ applications: allApplications });
+  } catch (error) {
+    console.error("Failed to fetch applications:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch applications" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PUT(request: NextRequest) {
-  const body = await request.json();
-  const { id, status } = body as { id: string; status: "approved" | "rejected" };
+  try {
+    // Verify admin access
+    const session = await auth();
+    if (!session?.user || (session.user as any).role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
 
-  console.log(`[Admin] Application ${id} updated to: ${status}`);
+    const body = await request.json();
+    const { id, status } = body as { id: string; status: string };
 
-  return Response.json({ success: true, id, status });
+    if (!id || !status) {
+      return NextResponse.json(
+        { error: "Application ID and status are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!["applied", "under_review", "interview", "approved", "rejected"].includes(status)) {
+      return NextResponse.json(
+        { error: "Invalid status value" },
+        { status: 400 }
+      );
+    }
+
+    // Update the application status
+    const [updatedApp] = await db
+      .update(applications)
+      .set({
+        status: status as "applied" | "under_review" | "interview" | "approved" | "rejected",
+        reviewedAt: (status === "approved" || status === "rejected") ? new Date() : undefined,
+      })
+      .where(eq(applications.id, id))
+      .returning();
+
+    if (!updatedApp) {
+      return NextResponse.json(
+        { error: "Application not found" },
+        { status: 404 }
+      );
+    }
+
+    // When approved, activate the coder profile
+    if (status === "approved" && updatedApp.userId) {
+      const [profile] = await db
+        .select()
+        .from(coderProfiles)
+        .where(eq(coderProfiles.userId, updatedApp.userId))
+        .limit(1);
+
+      if (profile) {
+        await db
+          .update(coderProfiles)
+          .set({
+            status: "active",
+            verifiedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(coderProfiles.id, profile.id));
+      }
+    }
+
+    // When rejected, suspend the coder profile
+    if (status === "rejected" && updatedApp.userId) {
+      const [profile] = await db
+        .select()
+        .from(coderProfiles)
+        .where(eq(coderProfiles.userId, updatedApp.userId))
+        .limit(1);
+
+      if (profile) {
+        await db
+          .update(coderProfiles)
+          .set({
+            status: "suspended",
+            updatedAt: new Date(),
+          })
+          .where(eq(coderProfiles.id, profile.id));
+      }
+    }
+
+    return NextResponse.json({ success: true, application: updatedApp });
+  } catch (error) {
+    console.error("Failed to update application:", error);
+    return NextResponse.json(
+      { error: "Failed to update application" },
+      { status: 500 }
+    );
+  }
 }
