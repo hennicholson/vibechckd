@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
 import { desc } from "drizzle-orm";
@@ -41,6 +42,12 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
+    // SECURITY: Require admin role to list all applications
+    const session = await auth();
+    if (!session?.user || (session.user as any).role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
     const allApplications = await db
       .select()
       .from(applications)

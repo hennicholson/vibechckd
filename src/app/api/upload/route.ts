@@ -130,3 +130,55 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: err?.message || "Upload failed" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get("type");
+
+    if (type !== "pfp" && type !== "preview") {
+      return Response.json({ error: "Invalid type parameter" }, { status: 400 });
+    }
+
+    // Clear the URL in the database
+    if (type === "pfp") {
+      await db
+        .update(coderProfiles)
+        .set({ pfpUrl: null, updatedAt: new Date() })
+        .where(eq(coderProfiles.userId, session.user.id));
+    } else if (type === "preview") {
+      await db
+        .update(coderProfiles)
+        .set({ gifPreviewUrl: null, updatedAt: new Date() })
+        .where(eq(coderProfiles.userId, session.user.id));
+    }
+
+    // Optionally delete from CDN storage
+    const storageKey = process.env.BUNNY_STORAGE_KEY;
+    const storageZone = process.env.BUNNY_STORAGE_ZONE || "vibechckd";
+    const storageHost = process.env.BUNNY_STORAGE_HOST || "ny.storage.bunnycdn.com";
+
+    if (storageKey) {
+      const ext = type === "preview" ? "gif" : "webp";
+      const folder = type === "preview" ? "previews" : "pfp";
+      const path = `${folder}/${session.user.id}.${ext}`;
+      const deleteUrl = `https://${storageHost}/${storageZone}/${path}`;
+
+      // Best-effort CDN deletion -- do not block response on failure
+      fetch(deleteUrl, {
+        method: "DELETE",
+        headers: { AccessKey: storageKey },
+      }).catch(() => {});
+    }
+
+    return Response.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete upload error:", err);
+    return Response.json({ error: err?.message || "Delete failed" }, { status: 500 });
+  }
+}

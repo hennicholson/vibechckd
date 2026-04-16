@@ -236,7 +236,7 @@ export default function ProfileForm({ initialData, onFormChange }: ProfileFormPr
   const handleRemovePfp = async () => {
     setRemovingPfp(true);
     try {
-      const res = await fetch("/api/upload/_?type=pfp", { method: "DELETE" });
+      const res = await fetch("/api/upload?type=pfp", { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to remove photo");
       update("avatarUrl", "");
       toast("Photo removed", "success");
@@ -268,7 +268,7 @@ export default function ProfileForm({ initialData, onFormChange }: ProfileFormPr
   const handleRemoveGif = async () => {
     setRemovingGif(true);
     try {
-      const res = await fetch("/api/upload/_?type=preview", { method: "DELETE" });
+      const res = await fetch("/api/upload?type=preview", { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to remove GIF preview");
       update("gifPreviewUrl", "");
       toast("GIF preview removed", "success");

@@ -32,6 +32,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Validate amount is a positive integer (cents)
+    if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+      return Response.json(
+        { error: "amount must be a positive integer (cents)" },
+        { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify the user is a member of this project
+    const [senderMembership] = await db
+      .select()
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (!senderMembership) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // Look up the other project member's email and ID if not provided
     let email = recipientEmail || customerEmail || "";
     let name = customerName || "";
@@ -64,7 +88,7 @@ export async function POST(request: NextRequest) {
     // Create the invoice via Whop API
     // Chat sends amount in cents (e.g. 2500 = $25.00)
     // Whop API expects dollars in initial_price (e.g. 25 = $25.00)
-    const amountDollars = Math.round(amount / 100);
+    const amountDollars = amount / 100;
     const saveDraft = !email;
     const whopInvoice = await createInvoice({
       customerEmail: email,
@@ -72,7 +96,7 @@ export async function POST(request: NextRequest) {
       description,
       amount: amountDollars,
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      lineItems: lineItems?.map((li: any) => ({ ...li, unitPrice: Math.round(li.unitPrice / 100) })),
+      lineItems: lineItems?.map((li: any) => ({ ...li, unitPrice: li.unitPrice / 100 })),
       saveDraft,
     });
 
@@ -173,6 +197,22 @@ export async function GET(request: NextRequest) {
       { error: "projectId is required" },
       { status: 400 }
     );
+  }
+
+  // SECURITY: Verify the requesting user is a member of this project
+  const [membership] = await db
+    .select()
+    .from(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.projectId, projectId),
+        eq(projectMembers.userId, session.user.id)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const rows = await db

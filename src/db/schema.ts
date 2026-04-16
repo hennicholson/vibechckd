@@ -98,6 +98,25 @@ export const coderProfiles = pgTable("coder_profiles", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// ── Client Profiles ──
+
+export const companyStageEnum = pgEnum("company_stage", ["idea", "startup", "growing", "established", "enterprise"]);
+
+export const clientProfiles = pgTable("client_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  companyName: text("company_name"),
+  companyStage: companyStageEnum("company_stage"),
+  industry: text("industry"),
+  website: text("website"),
+  description: text("description"),
+  projectTypes: text("project_types").array(),
+  budgetRange: text("budget_range"),
+  teamSize: text("team_size"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // ── Portfolio ──
 
 export const portfolioItems = pgTable("portfolio_items", {

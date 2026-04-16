@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { tasks, projectMembers, users } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 
 export async function GET(
   _req: Request,
@@ -16,11 +16,16 @@ export async function GET(
 
     const { id: projectId } = await params;
 
-    // Verify user is a project member
+    // SECURITY: Verify requesting user is a member of this project
     const [membership] = await db
       .select()
       .from(projectMembers)
-      .where(eq(projectMembers.projectId, projectId))
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, session.user.id)
+        )
+      )
       .limit(1);
 
     if (!membership) {
@@ -85,6 +90,22 @@ export async function POST(
         { error: "Title is required" },
         { status: 400 }
       );
+    }
+
+    // SECURITY: Verify requesting user is a member of this project
+    const [taskMembership] = await db
+      .select()
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (!taskMembership) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const [newTask] = await db

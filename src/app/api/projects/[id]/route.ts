@@ -27,6 +27,22 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    // SECURITY: Verify the requesting user is a member of this project
+    const [membership] = await db
+      .select()
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, id),
+          eq(projectMembers.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (!membership) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     // Get project members with user details
     const members = await db
       .select({

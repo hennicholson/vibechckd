@@ -1775,8 +1775,8 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 }
                 const paySentByMe = msg.senderId === currentUserId;
                 const payContextLine = paySentByMe
-                  ? `You sent ${payTo ? `to ${payTo}` : "a payment"}`
-                  : `${payFrom || "Someone"} sent ${paySentByMe ? "" : "you"} a payment`;
+                  ? `You sent this${payTo ? ` to ${payTo}` : ""}`
+                  : `${payFrom || "Someone"} sent you a payment`;
 
                 return (
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${paySentByMe ? "justify-end" : "justify-start"}`}>
@@ -1841,7 +1841,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                           <div className="flex items-center gap-1.5">
                             <span className="text-positive"><IconCheck size={12} /></span>
                             <span className="text-[11px] font-medium text-positive">
-                              {paySentByMe ? "Payment completed" : "Payment received -- added to balance"}
+                              {paySentByMe ? "Payment completed" : "Payment received -- added to your balance"}
                             </span>
                           </div>
                         </div>

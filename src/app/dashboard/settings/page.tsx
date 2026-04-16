@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 import Modal from "@/components/Modal";
@@ -15,6 +16,9 @@ const availabilityOptions = [
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const role = (session?.user as any)?.role;
+  const isCreator = role !== "client";
 
   // Password section
   const [showPassword, setShowPassword] = useState(false);
@@ -101,6 +105,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Availability */}
+      {isCreator && (
       <div className="border border-border rounded-[10px] p-5 mb-4">
         <h2 className="text-[14px] font-medium text-text-primary mb-1">Availability</h2>
         <p className="text-[12px] text-text-muted mb-4">Control how you appear to clients</p>
@@ -134,8 +139,10 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Profile Visibility */}
+      {isCreator && (
       <div className="border border-border rounded-[10px] p-5 mb-4">
         <h2 className="text-[14px] font-medium text-text-primary mb-4">Profile</h2>
         <ToggleRow
@@ -144,8 +151,10 @@ export default function SettingsPage() {
           onChange={setProfileVisible}
         />
       </div>
+      )}
 
       {/* Connected Accounts */}
+      {isCreator && (
       <div className="border border-border rounded-[10px] p-5 mb-4">
         <h2 className="text-[14px] font-medium text-text-primary mb-4">Connected accounts</h2>
 
@@ -175,6 +184,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Notifications */}
       <div className="border border-border rounded-[10px] p-5 mb-4">

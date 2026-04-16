@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { coderProfiles, portfolioAssets } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { coderProfiles, portfolioAssets, portfolioItems } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { deleteFromBunny } from "@/lib/bunny";
 
 /**
@@ -74,11 +74,28 @@ export async function DELETE(
           .where(eq(coderProfiles.userId, userId));
       }
     } else if (type === "asset") {
-      // id is the portfolio asset id
+      // SECURITY: Verify the asset belongs to the requesting user's portfolio
+      const [profile] = await db
+        .select({ id: coderProfiles.id })
+        .from(coderProfiles)
+        .where(eq(coderProfiles.userId, userId))
+        .limit(1);
+
+      if (!profile) {
+        return Response.json({ error: "Profile not found" }, { status: 404 });
+      }
+
+      // id is the portfolio asset id -- verify ownership through portfolioItems
       const [asset] = await db
         .select({ fileUrl: portfolioAssets.fileUrl })
         .from(portfolioAssets)
-        .where(eq(portfolioAssets.id, id))
+        .innerJoin(portfolioItems, eq(portfolioAssets.portfolioItemId, portfolioItems.id))
+        .where(
+          and(
+            eq(portfolioAssets.id, id),
+            eq(portfolioItems.coderProfileId, profile.id)
+          )
+        )
         .limit(1);
 
       if (asset?.fileUrl) {

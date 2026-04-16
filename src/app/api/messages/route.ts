@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { messages, users } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { messages, users, projectMembers } from "@/db/schema";
+import { eq, and, asc } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -18,6 +18,22 @@ export async function GET(request: NextRequest) {
       { error: "projectId is required" },
       { status: 400 }
     );
+  }
+
+  // SECURITY: Verify the requesting user is a member of this project
+  const [membership] = await db
+    .select()
+    .from(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.projectId, projectId),
+        eq(projectMembers.userId, session.user.id)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const rows = await db
@@ -53,6 +69,22 @@ export async function POST(request: NextRequest) {
       { error: "projectId and content are required" },
       { status: 400 }
     );
+  }
+
+  // SECURITY: Verify the requesting user is a member of this project
+  const [postMembership] = await db
+    .select()
+    .from(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.projectId, projectId),
+        eq(projectMembers.userId, session.user.id)
+      )
+    )
+    .limit(1);
+
+  if (!postMembership) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const [created] = await db

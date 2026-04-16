@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { invoices, invoiceSplits, users, messages } from "@/db/schema";
+import { invoices, invoiceSplits, users, messages, projectMembers } from "@/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -43,6 +43,30 @@ export async function GET(
 
     const row = rows[0];
 
+    // SECURITY: Verify the requesting user is the sender, recipient, or a project member
+    const inv = row.invoice;
+    const isSender = inv.senderId === session.user.id;
+    const isRecipient = inv.recipientId === session.user.id;
+    if (!isSender && !isRecipient) {
+      if (inv.projectId) {
+        const [membership] = await db
+          .select()
+          .from(projectMembers)
+          .where(
+            and(
+              eq(projectMembers.projectId, inv.projectId),
+              eq(projectMembers.userId, session.user.id)
+            )
+          )
+          .limit(1);
+        if (!membership) {
+          return Response.json({ error: "Forbidden" }, { status: 403 });
+        }
+      } else {
+        return Response.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     // Fetch splits with user names
     const splits = await db
       .select({
@@ -56,7 +80,7 @@ export async function GET(
       })
       .from(invoiceSplits)
       .leftJoin(users, eq(invoiceSplits.userId, users.id))
-      .where(eq(invoiceSplits.invoiceId, id));
+      .where(eq(invoiceSplits.invoiceId, row.invoice.id));
 
     return Response.json({
       ...row.invoice,

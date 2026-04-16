@@ -7,17 +7,22 @@ import { createHmac, timingSafeEqual } from "crypto";
 // Standard Webhooks signature verification
 function verifySignature(body: string, headers: Headers): boolean {
   const secret = process.env.WHOP_WEBHOOK_SECRET;
-  if (!secret) return true; // Skip verification if no secret configured
+  if (!secret) {
+    // SECURITY: Reject webhooks when no secret is configured rather than skipping verification.
+    // In production, WHOP_WEBHOOK_SECRET must always be set.
+    console.error("WHOP_WEBHOOK_SECRET is not configured — rejecting webhook");
+    return false;
+  }
 
   const sigHeader = headers.get("webhook-signature");
   const msgId = headers.get("webhook-id");
   const timestamp = headers.get("webhook-timestamp");
 
-  // If Whop doesn't send standard webhook headers, skip verification
-  // (some Whop webhook implementations don't use standard-webhooks)
+  // SECURITY: Reject webhooks missing required signature headers.
+  // All Whop standard-webhook calls must include these headers.
   if (!sigHeader || !msgId || !timestamp) {
-    console.log("Webhook: no standard-webhook headers, skipping signature check");
-    return true;
+    console.warn("Webhook: missing required standard-webhook headers — rejecting");
+    return false;
   }
 
   // Reject timestamps older than 5 minutes (replay protection)

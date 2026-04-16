@@ -372,23 +372,38 @@ function CreatorOverview() {
       {/* Quick stats row */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { label: "Projects", value: String(projects.length) },
-          { label: "Portfolio items", value: String(portfolioCount) },
-          { label: "Profile views", value: "\u2014" },
-          { label: "Earnings", value: earningsCents > 0 ? `$${(earningsCents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}` : "\u2014" },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="border border-border rounded-[10px] p-4"
-          >
-            <p className="text-[11px] font-mono uppercase text-text-muted mb-1">
-              {stat.label}
-            </p>
-            <p className="text-[24px] font-semibold text-text-primary">
-              {stat.value}
-            </p>
-          </div>
-        ))}
+          { label: "Projects", value: String(projects.length), href: "/dashboard/projects" },
+          { label: "Portfolio items", value: String(portfolioCount), href: "/dashboard/portfolio" },
+          { label: "Profile views", value: "\u2014", href: null },
+          { label: "Earnings", value: earningsCents > 0 ? `$${(earningsCents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}` : "\u2014", href: "/dashboard/earnings" },
+        ].map((stat) => {
+          const content = (
+            <>
+              <p className="text-[11px] font-mono uppercase text-text-muted mb-1">
+                {stat.label}
+              </p>
+              <p className="text-[24px] font-semibold text-text-primary">
+                {stat.value}
+              </p>
+            </>
+          );
+          return stat.href ? (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors"
+            >
+              {content}
+            </Link>
+          ) : (
+            <div
+              key={stat.label}
+              className="border border-border rounded-[10px] p-4"
+            >
+              {content}
+            </div>
+          );
+        })}
       </div>
 
       {/* Getting started checklist for new/incomplete profiles */}
@@ -494,6 +509,13 @@ function CreatorOverview() {
             className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
           >
             Manage portfolio
+          </Link>
+          <span className="text-border">|</span>
+          <Link
+            href="/dashboard/earnings"
+            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
+          >
+            Earnings
           </Link>
           <span className="text-border">|</span>
           <Link

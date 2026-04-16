@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/db";
-import { users, coderProfiles } from "@/db/schema";
+import { users, coderProfiles, clientProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
@@ -79,6 +79,16 @@ export async function POST(req: Request) {
         status: "draft",
         specialties: specialties.length > 0 ? specialties : null,
         websiteUrl,
+      });
+    }
+
+    // Create client profile for clients
+    if (role === "client") {
+      await db.insert(clientProfiles).values({
+        userId: user.id,
+        companyName: onboarding?.companyName || null,
+        projectTypes: onboarding?.projectType ? [onboarding.projectType] : null,
+        budgetRange: onboarding?.budget || null,
       });
     }
 

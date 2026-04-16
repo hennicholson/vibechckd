@@ -27,7 +27,7 @@ export interface CreateInvoiceParams {
   customerEmail: string;
   customerName: string;
   description: string;
-  amount: number; // in cents
+  amount: number; // in dollars (Whop expects dollars)
   dueDate: string; // ISO date
   lineItems?: { label: string; unitPrice: number; quantity: number }[];
   saveDraft?: boolean;

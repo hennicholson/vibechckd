@@ -24,6 +24,14 @@ export async function POST(request: NextRequest) {
 
     const userId = session.user.id;
 
+    // SECURITY WARNING: Race condition risk. The balance check and withdrawal insert
+    // are NOT atomic. Two concurrent withdrawal requests could both pass the balance
+    // check and drain more than the available balance. With neon-http (serverless),
+    // wrapping in a DB transaction is not straightforward. Mitigations:
+    // 1. Use a neon-serverless (websocket) driver for real transactions, OR
+    // 2. Add a unique pending-withdrawal constraint, OR
+    // 3. Use SELECT ... FOR UPDATE in a transaction to lock the balance rows.
+
     // Compute available balance
     const [balance] = await db
       .select({
