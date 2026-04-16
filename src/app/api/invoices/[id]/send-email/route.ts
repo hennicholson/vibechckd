@@ -22,7 +22,7 @@ export async function POST(
     const [invoice] = await db
       .select()
       .from(invoices)
-      .where(eq(invoices.id, id))
+      .where(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? eq(invoices.id, id) : eq(invoices.whopInvoiceId, id))
       .limit(1);
 
     if (!invoice) {
@@ -64,7 +64,7 @@ export async function POST(
       await db
         .update(invoices)
         .set({ status: "sent" })
-        .where(eq(invoices.id, id));
+        .where(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? eq(invoices.id, id) : eq(invoices.whopInvoiceId, id));
     }
 
     return Response.json({ success: true, sentTo: recipientEmail });

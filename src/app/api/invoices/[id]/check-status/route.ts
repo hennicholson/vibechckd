@@ -16,12 +16,17 @@ export async function POST(
 
     const { id } = await params;
 
-    // Try lookup by internal UUID first, then by Whop invoice ID
-    let [invoice] = await db
-      .select()
-      .from(invoices)
-      .where(eq(invoices.id, id))
-      .limit(1);
+    // Detect if ID is a UUID or a Whop ID (inv_...) and query accordingly
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+    let invoice;
+    if (isUuid) {
+      [invoice] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, id))
+        .limit(1);
+    }
 
     if (!invoice) {
       [invoice] = await db

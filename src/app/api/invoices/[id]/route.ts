@@ -30,7 +30,11 @@ export async function GET(
       .from(invoices)
       .leftJoin(senderUser, eq(invoices.senderId, senderUser.id))
       .leftJoin(recipientUser, eq(invoices.recipientId, recipientUser.id))
-      .where(eq(invoices.id, id))
+      .where(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)
+          ? eq(invoices.id, id)
+          : eq(invoices.whopInvoiceId, id)
+      )
       .limit(1);
 
     if (rows.length === 0) {
@@ -90,7 +94,7 @@ export async function PATCH(
     const [invoice] = await db
       .select()
       .from(invoices)
-      .where(eq(invoices.id, id))
+      .where(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? eq(invoices.id, id) : eq(invoices.whopInvoiceId, id))
       .limit(1);
 
     if (!invoice) {
@@ -122,7 +126,7 @@ export async function PATCH(
     const [updated] = await db
       .update(invoices)
       .set({ status })
-      .where(eq(invoices.id, id))
+      .where(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? eq(invoices.id, id) : eq(invoices.whopInvoiceId, id))
       .returning();
 
     // Post system message to project chat
