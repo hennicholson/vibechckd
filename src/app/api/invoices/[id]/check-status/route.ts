@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { invoices, messages } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { invoices, messages, transactions } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getInvoice } from "@/lib/whop";
 
 export async function POST(
@@ -16,15 +16,28 @@ export async function POST(
 
     const { id } = await params;
 
-    // Fetch the invoice
-    const [invoice] = await db
+    // Try lookup by internal UUID first, then by Whop invoice ID
+    let [invoice] = await db
       .select()
       .from(invoices)
       .where(eq(invoices.id, id))
       .limit(1);
 
     if (!invoice) {
+      [invoice] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.whopInvoiceId, id))
+        .limit(1);
+    }
+
+    if (!invoice) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    // If already paid, return immediately
+    if (invoice.status === "paid") {
+      return Response.json({ status: "paid", statusChanged: false });
     }
 
     if (!invoice.whopInvoiceId) {
@@ -33,20 +46,21 @@ export async function POST(
 
     // Check with Whop
     const whopData = await getInvoice(invoice.whopInvoiceId);
-    const whopStatus = whopData.status as string;
+    const whopStatus = (whopData.status as string || "").toLowerCase();
 
     let statusChanged = false;
 
-    // If Whop says paid but our DB says sent, update our DB
-    if (whopStatus === "paid" && invoice.status === "sent") {
+    // If Whop says paid/succeeded but our DB doesn't, update
+    const currentStatus = invoice.status as string;
+    if ((whopStatus === "paid" || whopStatus === "succeeded" || whopStatus === "completed") && currentStatus !== "paid") {
       await db
         .update(invoices)
         .set({ status: "paid", paidAt: new Date() })
-        .where(eq(invoices.id, id));
+        .where(eq(invoices.id, invoice.id));
 
       statusChanged = true;
 
-      // Post system message about payment
+      // Post system message
       if (invoice.projectId) {
         const displayAmount = (invoice.amountCents / 100).toLocaleString("en-US", {
           minimumFractionDigits: 2,
@@ -59,6 +73,33 @@ export async function POST(
           content: `INVOICE PAID\nInvoice for $${displayAmount} has been paid.\nDescription: ${invoice.description}`,
           messageType: "system",
         });
+      }
+
+      // Create transaction record for the creator's balance (idempotent)
+      if (invoice.senderId) {
+        const [existing] = await db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.invoiceId, invoice.id),
+              eq(transactions.type, "invoice_payment")
+            )
+          )
+          .limit(1);
+
+        if (!existing) {
+          await db.insert(transactions).values({
+            userId: invoice.senderId,
+            projectId: invoice.projectId,
+            invoiceId: invoice.id,
+            type: "invoice_payment",
+            status: "completed",
+            amountCents: invoice.amountCents,
+            description: `Invoice payment: ${invoice.description}`,
+            completedAt: new Date(),
+          });
+        }
       }
     }
 
