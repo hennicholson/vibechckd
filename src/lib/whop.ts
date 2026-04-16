@@ -180,16 +180,18 @@ export async function createCheckoutSession(params: {
   metadata?: Record<string, string>;
 }): Promise<{ id: string; purchaseUrl: string }> {
   const body = {
-    company_id: getCompanyId(),
+    mode: "payment",
     plan: {
+      company_id: getCompanyId(),
+      currency: "usd",
       plan_type: "one_time",
       initial_price: params.amount,
+      product: { title: params.description },
     },
-    product: { title: params.description },
     metadata: params.metadata || {},
   };
 
-  const res = await fetch(`${WHOP_BASE_URL}/checkout_sessions`, {
+  const res = await fetch(`${WHOP_BASE_URL}/checkout_configurations`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(body),
@@ -203,7 +205,7 @@ export async function createCheckoutSession(params: {
   const data = await res.json();
   return {
     id: data.id,
-    purchaseUrl: data.purchase_url || data.url || "",
+    purchaseUrl: data.purchase_url || "",
   };
 }
 
