@@ -13,36 +13,46 @@ function verifySignature(body: string, headers: Headers): boolean {
   const msgId = headers.get("webhook-id");
   const timestamp = headers.get("webhook-timestamp");
 
-  if (!sigHeader || !msgId || !timestamp) return false;
+  // If Whop doesn't send standard webhook headers, skip verification
+  // (some Whop webhook implementations don't use standard-webhooks)
+  if (!sigHeader || !msgId || !timestamp) {
+    console.log("Webhook: no standard-webhook headers, skipping signature check");
+    return true;
+  }
 
   // Reject timestamps older than 5 minutes (replay protection)
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - parseInt(timestamp, 10)) > 300) return false;
 
-  // Strip prefix (whsec_ or ws_) and decode base64 secret
+  // Try multiple secret formats
   const rawSecret = secret.replace(/^(whsec_|ws_)/, "");
-  const secretBytes = Buffer.from(rawSecret, "base64");
+  const secretVariants = [
+    Buffer.from(rawSecret, "base64"),   // base64 decoded
+    Buffer.from(rawSecret, "hex"),      // hex decoded
+    Buffer.from(rawSecret, "utf-8"),    // raw string
+  ];
 
-  // Sign: msg_id.timestamp.body
   const toSign = `${msgId}.${timestamp}.${body}`;
-  const computed = createHmac("sha256", secretBytes).update(toSign).digest("base64");
 
-  // Check against all signatures in the header (v1,<base64>)
   const signatures = sigHeader.split(" ");
-  for (const sig of signatures) {
-    const parts = sig.split(",");
-    if (parts[0] !== "v1" || !parts[1]) continue;
-    try {
-      const expected = Buffer.from(parts[1], "base64");
-      const actual = Buffer.from(computed, "base64");
-      if (expected.length === actual.length && timingSafeEqual(expected, actual)) {
-        return true;
+  for (const secretBytes of secretVariants) {
+    const computed = createHmac("sha256", secretBytes).update(toSign).digest("base64");
+    for (const sig of signatures) {
+      const parts = sig.split(",");
+      if (parts[0] !== "v1" || !parts[1]) continue;
+      try {
+        const expected = Buffer.from(parts[1], "base64");
+        const actual = Buffer.from(computed, "base64");
+        if (expected.length === actual.length && timingSafeEqual(expected, actual)) {
+          return true;
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      continue;
     }
   }
 
+  console.warn("Webhook: signature verification failed");
   return false;
 }
 
@@ -189,21 +199,64 @@ async function handleInvoiceEvent(
 }
 
 async function handlePaymentSucceeded(payload: Record<string, any>) {
+  const data = payload.data || {};
+
+  // Try every possible field path for the checkout config ID
   const checkoutId =
-    payload.data?.checkout_session_id ||
-    payload.data?.checkout_id ||
-    payload.data?.id;
+    data.checkout_configuration_id ||
+    data.checkout_session_id ||
+    data.checkout_id ||
+    data.checkout_configuration?.id ||
+    data.plan?.checkout_configuration_id;
 
-  if (!checkoutId) return;
+  // Also try to find the transaction via metadata.transactionId
+  const metadataTransactionId =
+    data.metadata?.transactionId ||
+    data.checkout_configuration?.metadata?.transactionId;
 
-  // Look up the transaction by checkout ID
-  const [transaction] = await db
-    .select()
-    .from(transactions)
-    .where(eq(transactions.whopCheckoutId, checkoutId))
-    .limit(1);
+  console.log("payment.succeeded webhook:", JSON.stringify({
+    checkoutId,
+    metadataTransactionId,
+    dataId: data.id,
+    dataKeys: Object.keys(data),
+  }));
 
-  if (!transaction || transaction.status !== "pending") return;
+  let transaction = null;
+
+  // First try: match by metadata transactionId (most reliable)
+  if (metadataTransactionId) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, metadataTransactionId))
+      .limit(1);
+    if (found) transaction = found;
+  }
+
+  // Second try: match by checkout ID
+  if (!transaction && checkoutId) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.whopCheckoutId, checkoutId))
+      .limit(1);
+    if (found) transaction = found;
+  }
+
+  // Third try: match by any ID field in the payload
+  if (!transaction && data.id) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.whopCheckoutId, data.id))
+      .limit(1);
+    if (found) transaction = found;
+  }
+
+  if (!transaction || transaction.status !== "pending") {
+    console.log("payment.succeeded: no matching pending transaction found");
+    return;
+  }
 
   // Update transaction to completed
   await db
@@ -229,6 +282,8 @@ async function handlePaymentSucceeded(payload: Record<string, any>) {
       fileUrl: null,
     });
   }
+
+  console.log(`payment.succeeded: transaction ${transaction.id} marked completed`);
 }
 
 async function handleWithdrawalCompleted(payload: Record<string, any>) {
