@@ -1737,11 +1737,13 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 let payAmount = "";
                 let payDesc = "";
                 let payUrl = "";
+                let payTxId = "";
                 for (const line of lines) {
                   const t = line.trim();
                   if (t.startsWith("Amount:")) payAmount = t.slice(7).trim();
                   else if (t.startsWith("Description:")) payDesc = t.slice(12).trim();
                   else if (t.startsWith("Pay:")) payUrl = t.slice(4).trim();
+                  else if (t.startsWith("Transaction ID:")) payTxId = t.slice(15).trim();
                 }
                 return (
                   <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
@@ -1762,13 +1764,40 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                         {payDesc && <p className="text-[13px] text-text-secondary leading-snug mb-2">{payDesc}</p>}
                         {payAmount && <p className="text-[22px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
                       </div>
-                      {payUrl && !isPaid && (
-                        <div className="px-4 py-2.5 border-t border-border">
-                          <a href={payUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline w-fit">
-                            <IconWallet size={12} />
-                            Pay now
-                          </a>
+                      {!isPaid && (
+                        <div className="px-4 py-2.5 border-t border-border flex items-center gap-2">
+                          {payUrl && (
+                            <a href={payUrl} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline">
+                              <IconWallet size={12} />
+                              Pay now
+                            </a>
+                          )}
+                          {payTxId && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`/api/payments/${payTxId}/check-status`, { method: "POST" });
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    if (data.changed) {
+                                      toast("Payment confirmed");
+                                      await fetchMessages();
+                                      await fetchBalance();
+                                    } else {
+                                      toast(`Status: ${data.status}`);
+                                    }
+                                  }
+                                } catch {
+                                  toast("Could not check status");
+                                }
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
+                            >
+                              <IconRefresh size={11} />
+                              Check status
+                            </button>
+                          )}
                         </div>
                       )}
                       {isPaid && (

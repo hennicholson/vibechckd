@@ -7,5 +7,20 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9250 | 10:48 PM | 🟣 | Public profile viewing and navigation for creators/admins | ~470 |
+| #9173 | 5:09 PM | 🔴 | Fixed Bunny CDN upload to explicitly convert Buffer to Uint8Array | ~284 |
+| #9066 | 3:10 PM | 🟣 | Bunny CDN Storage Integration Library | ~374 |
+| #8922 | 1:17 PM | 🟣 | Database successfully seeded with 12 coder profiles | ~388 |
+| #8914 | 1:11 PM | 🟣 | Database data layer and seed script implementation completed | ~504 |
+| #8886 | 12:28 PM | 🟣 | Drizzle ORM configuration added for database integration | ~238 |
+| #8861 | 2:23 AM | 🟣 | Project dashboard page with team roster and tabbed content | ~351 |
 | #8851 | 2:03 AM | 🔵 | Four unverified coders identified in mock data | ~208 |
+| #8827 | 12:48 AM | 🔵 | Complete VibeCheck Codebase Inventory | ~733 |
+
+### Apr 15, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #9299 | 12:29 AM | 🔴 | Fixed Whop listInvoices company ID reference | ~254 |
+| #9296 | 12:28 AM | ✅ | Added saveDraft parameter extraction in Whop invoice creation | ~224 |
 </claude-mem-context>

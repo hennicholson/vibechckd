@@ -47,10 +47,13 @@ export async function POST(request: NextRequest) {
     const tempId = crypto.randomUUID();
 
     // Create checkout session via Whop
+    const baseUrl = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+    const redirectPath = projectId ? `/dashboard/projects/${projectId}` : "/dashboard/earnings";
     const checkout = await createCheckoutSession({
       amount: amountDollars,
       description,
       metadata: { transactionId: tempId },
+      redirectUrl: `${baseUrl}${redirectPath}`,
     });
 
     // Insert transaction record
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
         maximumFractionDigits: 2,
       });
 
-      let messageContent = `DIRECT PAYMENT\nAmount: $${displayAmount}\nDescription: ${description}\nStatus: Pending`;
+      let messageContent = `DIRECT PAYMENT\nAmount: $${displayAmount}\nDescription: ${description}\nStatus: Pending\nTransaction ID: ${tempId}`;
       if (checkout.purchaseUrl) {
         messageContent += `\nPay: ${checkout.purchaseUrl}`;
       }

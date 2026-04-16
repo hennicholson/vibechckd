@@ -178,8 +178,9 @@ export async function createCheckoutSession(params: {
   amount: number; // dollars
   description: string;
   metadata?: Record<string, string>;
+  redirectUrl?: string;
 }): Promise<{ id: string; purchaseUrl: string }> {
-  const body = {
+  const body: Record<string, unknown> = {
     mode: "payment",
     plan: {
       company_id: getCompanyId(),
@@ -193,6 +194,7 @@ export async function createCheckoutSession(params: {
     },
     metadata: params.metadata || {},
   };
+  if (params.redirectUrl) body.redirect_url = params.redirectUrl;
 
   const res = await fetch(`${WHOP_BASE_URL}/checkout_configurations`, {
     method: "POST",
