@@ -83,8 +83,17 @@ export async function POST(request: NextRequest) {
     });
     const displayDue = dueDate || "Upon receipt";
 
+    // Get sender name for the message
+    const [senderUser] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    const senderName = senderUser?.name || "Someone";
+    const recipientName = name || "the client";
+
     // Build the system message content
-    let messageContent = `INVOICE SENT\nDescription: ${description}\nAmount: $${displayAmount}\nDue: ${displayDue}\nStatus: Sent\nInvoice ID: ${whopInvoice.id}`;
+    let messageContent = `INVOICE SENT\nFrom: ${senderName}\nTo: ${recipientName}\nDescription: ${description}\nAmount: $${displayAmount}\nDue: ${displayDue}\nStatus: Sent\nInvoice ID: ${whopInvoice.id}`;
 
     if (whopInvoice.paymentUrl) {
       messageContent += `\nPay: ${whopInvoice.paymentUrl}`;

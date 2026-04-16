@@ -81,14 +81,23 @@ export async function POST(request: NextRequest) {
         maximumFractionDigits: 2,
       });
 
-      let messageContent = `DIRECT PAYMENT\nAmount: $${displayAmount}\nDescription: ${description}\nStatus: Pending\nTransaction ID: ${tempId}`;
+      // Get sender name
+      const [senderUser] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, session.user.id))
+        .limit(1);
+      const senderName = senderUser?.name || "Someone";
+      const recipientName = recipient.name || "a team member";
+
+      let messageContent = `DIRECT PAYMENT\nFrom: ${senderName}\nTo: ${recipientName}\nAmount: $${displayAmount}\nDescription: ${description}\nStatus: Pending\nTransaction ID: ${tempId}`;
       if (checkout.purchaseUrl) {
         messageContent += `\nPay: ${checkout.purchaseUrl}`;
       }
 
       await db.insert(messages).values({
         projectId,
-        senderId: null,
+        senderId: session.user.id,
         content: messageContent,
         messageType: "system",
         fileUrl: null,

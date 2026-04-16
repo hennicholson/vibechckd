@@ -44,6 +44,8 @@ interface ParsedInvoice {
   status: string;
   invoiceId: string | null;
   payUrl: string | null;
+  from: string | null;
+  to: string | null;
 }
 
 interface ParsedProposal {
@@ -131,12 +133,16 @@ function parseInvoiceContent(content: string): ParsedInvoice | null {
   let due: string | null = null;
   let invoiceId: string | null = null;
   let payUrl: string | null = null;
+  let from: string | null = null;
+  let to: string | null = null;
 
   for (const line of lines) {
     const t = line.trim();
     if (t.startsWith("Description:")) description = t.slice(12).trim();
     else if (t.startsWith("Amount:")) amount = t.slice(7).trim();
     else if (t.startsWith("Due:")) due = t.slice(4).trim();
+    else if (t.startsWith("From:")) from = t.slice(5).trim();
+    else if (t.startsWith("To:")) to = t.slice(3).trim();
     else if (t.startsWith("Status:")) {
       const s = t.slice(7).trim();
       if (s) status = s;
@@ -146,7 +152,7 @@ function parseInvoiceContent(content: string): ParsedInvoice | null {
     } else if (t.startsWith("Pay:")) payUrl = t.slice(4).trim();
   }
 
-  return { description, amount, due, status, invoiceId, payUrl };
+  return { description, amount, due, status, invoiceId, payUrl, from, to };
 }
 
 function parseProposalContent(content: string): ParsedProposal | null {
@@ -414,13 +420,15 @@ function SystemMessage({ content }: { content: string }) {
 
 function InvoiceCard({
   invoice,
-  currentUserId,
+  currentUserName,
+  isSender,
   onCheckStatus,
   onSendEmail,
   checking,
 }: {
   invoice: ParsedInvoice;
-  currentUserId?: string;
+  currentUserName?: string;
+  isSender: boolean;
   onCheckStatus?: (invoiceId: string) => void;
   onSendEmail?: (invoiceId: string) => void;
   checking?: boolean;
@@ -430,10 +438,17 @@ function InvoiceCard({
   const isPaid = invoice.status.toLowerCase() === "paid";
   const isVoided = invoice.status.toLowerCase() === "voided";
 
+  // Perspective-aware labels
+  const fromName = invoice.from || "Creator";
+  const toName = invoice.to || "Client";
+  const contextLine = isSender
+    ? `You sent this to ${toName}`
+    : `${fromName} sent this to you`;
+
   return (
-    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[380px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
       {/* Header */}
-      <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : "bg-surface-muted"}`}>
+      <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
         <div className="flex items-center gap-2">
           <span className="text-text-secondary"><IconInvoice size={14} /></span>
           <span className="text-[13px] font-medium text-text-primary">Invoice</span>
@@ -444,19 +459,22 @@ function InvoiceCard({
         </div>
       </div>
 
+      {/* From / To context */}
+      <div className="px-4 py-2 border-t border-border/50">
+        <p className="text-[11px] text-text-muted">{contextLine}</p>
+      </div>
+
       {/* Body */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-3 border-t border-border/50">
         {invoice.description && (
           <p className="text-[13px] text-text-secondary leading-snug mb-2">{invoice.description}</p>
         )}
 
-        <div className="flex items-baseline justify-between mb-1">
-          {invoice.amount && (
-            <p className="text-[22px] font-semibold text-text-primary tabular-nums tracking-tight">{invoice.amount}</p>
-          )}
-        </div>
+        {invoice.amount && (
+          <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight mb-2">{invoice.amount}</p>
+        )}
 
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-3">
           {invoice.due && (
             <div className="flex items-center gap-1 text-text-muted">
               <IconClock />
@@ -471,8 +489,9 @@ function InvoiceCard({
 
       {/* Actions footer */}
       {(!isPaid && !isVoided) && (
-        <div className="px-4 py-2.5 border-t border-border flex items-center gap-2">
-          {invoice.payUrl && (
+        <div className="px-4 py-2.5 border-t border-border flex items-center gap-2 flex-wrap">
+          {/* Show Pay button only to the recipient */}
+          {!isSender && invoice.payUrl && (
             <a
               href={invoice.payUrl}
               target="_blank"
@@ -490,26 +509,29 @@ function InvoiceCard({
               className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40"
             >
               <IconRefresh size={11} />
-              {checking ? "Checking..." : "Check status"}
+              {checking ? "Checking..." : "Verify payment"}
             </button>
           )}
-          {invoice.invoiceId && onSendEmail && (
+          {/* Show Email button only to the sender */}
+          {isSender && invoice.invoiceId && onSendEmail && (
             <button
               onClick={() => onSendEmail(invoice.invoiceId!)}
               className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
             >
               <IconMail size={11} />
-              Email
+              Resend
             </button>
           )}
         </div>
       )}
 
       {isPaid && (
-        <div className="px-4 py-2 border-t border-positive/10 bg-positive/5">
+        <div className="px-4 py-2.5 border-t border-positive/10 bg-positive/5">
           <div className="flex items-center gap-1.5">
-            <IconCheck size={12} />
-            <span className="text-[11px] font-medium text-positive">Payment received</span>
+            <span className="text-positive"><IconCheck size={12} /></span>
+            <span className="text-[11px] font-medium text-positive">
+              {isSender ? "Payment received -- added to your balance" : "You paid this invoice"}
+            </span>
           </div>
         </div>
       )}
@@ -1696,11 +1718,13 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
               // Invoice message
               const invoice = parseInvoiceContent(msg.content);
               if (invoice) {
+                const invoiceSentByMe = msg.senderId === currentUserId;
                 return (
-                  <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
+                  <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${invoiceSentByMe ? "justify-end" : "justify-start"}`}>
                     <InvoiceCard
                       invoice={invoice}
-                      currentUserId={currentUserId}
+                      currentUserName={currentUserName}
+                      isSender={invoiceSentByMe}
                       onCheckStatus={handleCheckInvoiceStatus}
                       onSendEmail={handleSendInvoiceEmail}
                       checking={checkingInvoice === invoice.invoiceId}
@@ -1738,20 +1762,29 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 let payDesc = "";
                 let payUrl = "";
                 let payTxId = "";
+                let payFrom = "";
+                let payTo = "";
                 for (const line of lines) {
                   const t = line.trim();
                   if (t.startsWith("Amount:")) payAmount = t.slice(7).trim();
                   else if (t.startsWith("Description:")) payDesc = t.slice(12).trim();
                   else if (t.startsWith("Pay:")) payUrl = t.slice(4).trim();
                   else if (t.startsWith("Transaction ID:")) payTxId = t.slice(15).trim();
+                  else if (t.startsWith("From:")) payFrom = t.slice(5).trim();
+                  else if (t.startsWith("To:")) payTo = t.slice(3).trim();
                 }
+                const paySentByMe = msg.senderId === currentUserId;
+                const payContextLine = paySentByMe
+                  ? `You sent ${payTo ? `to ${payTo}` : "a payment"}`
+                  : `${payFrom || "Someone"} sent ${paySentByMe ? "" : "you"} a payment`;
+
                 return (
-                  <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
-                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[380px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+                  <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${paySentByMe ? "justify-end" : "justify-start"}`}>
+                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
                       <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-text-secondary"><IconDollar size={14} /></span>
-                          <span className="text-[13px] font-medium text-text-primary">{isPaid ? "Payment received" : "Payment"}</span>
+                          <span className="text-[13px] font-medium text-text-primary">Payment</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`w-[6px] h-[6px] rounded-full ${isPaid ? "bg-positive" : "bg-warning"}`} />
@@ -1760,13 +1793,16 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                           </span>
                         </div>
                       </div>
-                      <div className="px-4 py-3">
+                      <div className="px-4 py-2 border-t border-border/50">
+                        <p className="text-[11px] text-text-muted">{payContextLine}</p>
+                      </div>
+                      <div className="px-4 py-3 border-t border-border/50">
                         {payDesc && <p className="text-[13px] text-text-secondary leading-snug mb-2">{payDesc}</p>}
-                        {payAmount && <p className="text-[22px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
+                        {payAmount && <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
                       </div>
                       {!isPaid && (
                         <div className="px-4 py-2.5 border-t border-border flex items-center gap-2">
-                          {payUrl && (
+                          {!paySentByMe && payUrl && (
                             <a href={payUrl} target="_blank" rel="noopener noreferrer"
                               className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline">
                               <IconWallet size={12} />
@@ -1795,16 +1831,18 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                               className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
                             >
                               <IconRefresh size={11} />
-                              Check status
+                              Verify payment
                             </button>
                           )}
                         </div>
                       )}
                       {isPaid && (
-                        <div className="px-4 py-2 border-t border-positive/10 bg-positive/5">
+                        <div className="px-4 py-2.5 border-t border-positive/10 bg-positive/5">
                           <div className="flex items-center gap-1.5">
-                            <IconCheck size={12} />
-                            <span className="text-[11px] font-medium text-positive">Payment complete</span>
+                            <span className="text-positive"><IconCheck size={12} /></span>
+                            <span className="text-[11px] font-medium text-positive">
+                              {paySentByMe ? "Payment completed" : "Payment received -- added to balance"}
+                            </span>
                           </div>
                         </div>
                       )}
