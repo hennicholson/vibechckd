@@ -186,7 +186,10 @@ export async function createCheckoutSession(params: {
       currency: "usd",
       plan_type: "one_time",
       initial_price: params.amount,
-      product: { title: params.description },
+      product: {
+        title: params.description,
+        external_identifier: params.metadata?.transactionId || crypto.randomUUID(),
+      },
     },
     metadata: params.metadata || {},
   };
