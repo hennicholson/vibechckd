@@ -40,8 +40,33 @@ export async function POST(
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    // If already paid, return immediately
-    if (invoice.status === "paid") {
+    // If already paid, ensure transaction exists then return
+    if ((invoice.status as string) === "paid") {
+      if (invoice.senderId) {
+        const [existing] = await db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.invoiceId, invoice.id),
+              eq(transactions.type, "invoice_payment")
+            )
+          )
+          .limit(1);
+
+        if (!existing) {
+          await db.insert(transactions).values({
+            userId: invoice.senderId,
+            projectId: invoice.projectId,
+            invoiceId: invoice.id,
+            type: "invoice_payment",
+            status: "completed",
+            amountCents: invoice.amountCents,
+            description: `Invoice payment: ${invoice.description}`,
+            completedAt: new Date(),
+          });
+        }
+      }
       return Response.json({ status: "paid", statusChanged: false });
     }
 

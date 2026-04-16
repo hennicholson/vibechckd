@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,8 @@ interface Transaction {
   description: string;
   createdAt: string;
   completedAt: string | null;
+  projectId: string | null;
+  invoiceId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +257,7 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 
 export default function EarningsPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const { toast } = useToast();
 
   const [balance, setBalance] = useState<BalanceData | null>(null);
@@ -474,8 +478,17 @@ export default function EarningsPage() {
           <div className="divide-y divide-border">
             {transactions.map((tx) => {
               const isCredit = tx.amountCents > 0;
+              const hasProject = !!tx.projectId;
               return (
-                <div key={tx.id} className="px-5 py-3.5 flex items-center gap-4 hover:bg-surface-muted/50 transition-colors">
+                <div
+                  key={tx.id}
+                  onClick={() => {
+                    if (hasProject) router.push(`/dashboard/projects/${tx.projectId}`);
+                  }}
+                  className={`px-5 py-3.5 flex items-center gap-4 transition-colors ${
+                    hasProject ? "hover:bg-surface-muted/50 cursor-pointer" : ""
+                  }`}
+                >
                   {/* Icon */}
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                     isCredit ? "bg-positive/10 text-positive" : "bg-surface-muted text-text-muted"
@@ -491,6 +504,16 @@ export default function EarningsPage() {
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-muted text-text-muted font-medium">
                         {typeLabel(tx.type)}
                       </span>
+                      {hasProject && (
+                        <span className="text-[10px] text-text-muted flex items-center gap-0.5">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                          View in chat
+                        </span>
+                      )}
                     </div>
                   </div>
 
