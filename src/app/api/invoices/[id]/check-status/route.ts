@@ -44,9 +44,35 @@ export async function POST(
       return Response.json({ error: "Invoice has no Whop ID" }, { status: 400 });
     }
 
-    // Check with Whop
-    const whopData = await getInvoice(invoice.whopInvoiceId);
-    const whopStatus = (whopData.status as string || "").toLowerCase();
+    // Check with Whop -- try direct lookup, fall back to listing payments
+    let whopStatus = "";
+    try {
+      const whopData = await getInvoice(invoice.whopInvoiceId);
+      whopStatus = ((whopData.status as string) || "").toLowerCase();
+    } catch (err) {
+      console.error("Whop getInvoice failed:", err);
+      // Try listing recent payments to find a match
+      try {
+        const apiKey = process.env.WHOP_API_KEY;
+        const companyId = process.env.WHOP_COMPANY_ID || "";
+        const res = await fetch(
+          `https://api.whop.com/api/v1/payments?company_id=${companyId}&limit=20`,
+          { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const payments = data.data || data || [];
+          for (const p of payments) {
+            if (p.invoice_id === invoice.whopInvoiceId && p.status === "succeeded") {
+              whopStatus = "paid";
+              break;
+            }
+          }
+        }
+      } catch {
+        // Silent fallback failure
+      }
+    }
 
     let statusChanged = false;
 
