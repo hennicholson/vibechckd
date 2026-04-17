@@ -119,6 +119,9 @@ function isImageUrl(url: string): boolean {
 
 function parseInvoiceContent(content: string): ParsedInvoice | null {
   if (!content.includes("INVOICE")) return null;
+  // Only render as a card for INVOICE SENT messages (with Amount/Description fields)
+  // INVOICE PAID / INVOICE VOIDED / INVOICE PAST DUE are status updates -> render as system messages
+  if (!content.includes("Amount:") && !content.includes("Description:")) return null;
   const lines = content.split("\n");
 
   let status = "Pending";
@@ -1718,7 +1721,14 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
               // Invoice message
               const invoice = parseInvoiceContent(msg.content);
               if (invoice) {
-                const invoiceSentByMe = msg.senderId === currentUserId;
+                // Determine if current user is the invoice sender (creator) using multiple signals:
+                // 1. msg.senderId matches (most reliable for INVOICE SENT messages)
+                // 2. From: field matches current user name (works for INVOICE PAID messages where senderId is null)
+                // 3. Fall back to checking if current user name appears in From field
+                const invoiceSentByMe =
+                  msg.senderId === currentUserId ||
+                  (invoice.from && currentUserName && invoice.from.toLowerCase() === currentUserName.toLowerCase()) ||
+                  false;
                 return (
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${invoiceSentByMe ? "justify-end" : "justify-start"}`}>
                     <InvoiceCard
@@ -1756,6 +1766,10 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
               // Direct payment / payment received message
               if (msg.content?.includes("DIRECT PAYMENT") || msg.content?.includes("PAYMENT RECEIVED")) {
+                // PAYMENT RECEIVED without Amount: field is a status update -> system message
+                if (msg.content?.includes("PAYMENT RECEIVED") && !msg.content?.includes("Amount:")) {
+                  return <SystemMessage key={msg.id} content={msg.content.split("\n")[0]} />;
+                }
                 const lines = msg.content.split("\n");
                 const isPaid = msg.content.includes("PAYMENT RECEIVED") || msg.content.includes("Status: Completed");
                 let payAmount = "";
@@ -1773,7 +1787,11 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                   else if (t.startsWith("From:")) payFrom = t.slice(5).trim();
                   else if (t.startsWith("To:")) payTo = t.slice(3).trim();
                 }
-                const paySentByMe = msg.senderId === currentUserId;
+                // Determine perspective using senderId + From/To name matching
+                const paySentByMe =
+                  msg.senderId === currentUserId ||
+                  (payFrom && currentUserName && payFrom.toLowerCase() === currentUserName.toLowerCase()) ||
+                  false;
                 const payContextLine = paySentByMe
                   ? `You sent this${payTo ? ` to ${payTo}` : ""}`
                   : `${payFrom || "Someone"} sent you a payment`;
