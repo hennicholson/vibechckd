@@ -407,6 +407,13 @@ export default function EarningsPage() {
         </div>
       </div>
 
+      {/* Settlement note */}
+      {(earned > 0 || pending > 0) && (
+        <p className="text-[11px] text-text-muted mb-6 -mt-4">
+          Payments typically settle within 2-3 business days before they can be withdrawn.
+        </p>
+      )}
+
       {/* Whop Wallet - native balance & withdrawal */}
       <WhopWallet availableCents={avail} onWithdrawalComplete={() => { fetchBalance(); fetchTransactions(); }} />
 

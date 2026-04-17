@@ -207,13 +207,17 @@ export async function POST(request: NextRequest) {
     if (rawMessage.includes("under review")) {
       userMessage = "Your payment account is currently under review by Whop. Withdrawals will be available once verification is complete. This usually takes 1-2 business days.";
       statusCode = 503;
-    } else if (rawMessage.includes("insufficient") || rawMessage.includes("Insufficient")) {
-      userMessage = "Insufficient funds in the platform account. Please contact support.";
+    } else if (rawMessage.includes("insufficient") || rawMessage.includes("Insufficient") || rawMessage.includes("not enough")) {
+      userMessage = "Your funds are still processing. Payments typically settle within 2-3 business days before they can be withdrawn. Please try again later.";
       statusCode = 400;
     } else if (rawMessage.includes("Transfer failed")) {
-      // Extract the actual Whop error from the message
       const match = rawMessage.match(/"message":"([^"]+)"/);
-      userMessage = match ? match[1] : "Transfer could not be completed. Please try again later.";
+      const whopMsg = match ? match[1] : "";
+      if (whopMsg.includes("insufficient") || whopMsg.includes("not enough") || whopMsg.includes("balance")) {
+        userMessage = "Your funds are still processing. Payments typically settle within 2-3 business days before they can be withdrawn.";
+      } else {
+        userMessage = whopMsg || "Transfer could not be completed. Please try again later.";
+      }
       statusCode = 400;
     }
 
