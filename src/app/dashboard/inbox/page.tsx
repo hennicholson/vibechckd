@@ -207,9 +207,9 @@ export default function InboxPage() {
     : conversations;
 
   return (
-    <div className="flex h-screen">
-      {/* Conversation list */}
-      <div className="w-[280px] border-r border-[#e5e5e5] flex-shrink-0 flex flex-col h-full bg-white">
+    <div className="flex h-[calc(100vh-48px)] md:h-screen">
+      {/* Conversation list -- full width on mobile, fixed sidebar on desktop */}
+      <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-[280px] border-r-0 md:border-r border-[#e5e5e5] flex-shrink-0 flex-col h-full bg-white`}>
         {/* Header */}
         <div className="px-4 h-[48px] flex items-center border-b border-[#e5e5e5]">
           <span className="text-[14px] font-medium text-[#0a0a0a] font-body">
@@ -329,11 +329,28 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* Chat panel */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      {/* Chat panel -- full screen on mobile when selected, side panel on desktop */}
+      <div className={`${selected ? "flex" : "hidden md:flex"} flex-1 min-w-0 flex-col`}>
         {selectedConv ? (
-          <div className="flex-1 min-h-0">
-            <ProjectChat projectId={selectedConv.projectId} />
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* Mobile back button */}
+            <div className="md:hidden flex items-center gap-2 px-4 h-[44px] border-b border-[#e5e5e5] flex-shrink-0">
+              <button
+                onClick={() => setSelected(null)}
+                className="flex items-center gap-1 text-[13px] text-neutral-500 hover:text-[#0a0a0a] transition-colors cursor-pointer min-h-[44px]"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+                Back
+              </button>
+              <span className="text-[13px] font-medium text-[#0a0a0a] truncate flex-1 text-center pr-8">
+                {selectedConv.projectName}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0">
+              <ProjectChat projectId={selectedConv.projectId} />
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-white">

@@ -50,7 +50,7 @@ export default function DocsPage() {
 
   return (
     <PageShell>
-      <div className="max-w-[960px] mx-auto px-6 py-12 flex gap-16">
+      <div className="max-w-[960px] mx-auto px-4 md:px-6 py-8 md:py-12 flex gap-16">
         {/* Mobile TOC */}
         <div className="lg:hidden fixed bottom-4 right-4 z-40">
           <button

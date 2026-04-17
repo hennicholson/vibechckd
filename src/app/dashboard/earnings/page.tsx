@@ -452,14 +452,14 @@ export default function EarningsPage() {
 
       {/* Transaction history */}
       <div className="border border-border rounded-[10px] overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-4 md:px-5 py-4 border-b border-border">
           <div className="flex items-center justify-between">
             <h3 className="text-[14px] font-medium text-text-primary">Transaction history</h3>
             <span className="text-[11px] font-mono text-text-muted">{totalTx} total</span>
           </div>
 
           {/* Filter tabs */}
-          <div className="flex items-center gap-1 mt-3">
+          <div className="flex items-center gap-1 mt-3 overflow-x-auto">
             {filterTabs.map((tab) => (
               <button
                 key={tab.key}
@@ -497,7 +497,7 @@ export default function EarningsPage() {
                   onClick={() => {
                     if (hasProject) router.push(`/dashboard/projects/${tx.projectId}`);
                   }}
-                  className={`px-5 py-3.5 flex items-center gap-4 transition-colors ${
+                  className={`px-4 md:px-5 py-3.5 flex items-center gap-3 md:gap-4 transition-colors ${
                     hasProject ? "hover:bg-surface-muted/50 cursor-pointer" : ""
                   }`}
                 >
@@ -517,7 +517,7 @@ export default function EarningsPage() {
                         {typeLabel(tx.type)}
                       </span>
                       {hasProject && (
-                        <span className="text-[10px] text-text-muted flex items-center gap-0.5">
+                        <span className="text-[10px] text-text-muted hidden sm:flex items-center gap-0.5">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
                             <polyline points="15 3 21 3 21 9" />

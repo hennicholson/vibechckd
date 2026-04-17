@@ -171,7 +171,7 @@ export default function ProjectDashboardPage() {
     return (
       <div className="max-w-3xl px-4 md:px-8 py-6">
         <div className="h-6 w-48 bg-neutral-100 rounded animate-pulse mb-2" />
-        <div className="h-4 w-96 bg-neutral-100 rounded animate-pulse mb-6" />
+        <div className="h-4 w-full max-w-[384px] bg-neutral-100 rounded animate-pulse mb-6" />
         <div className="h-[400px] bg-neutral-100 rounded-[10px] animate-pulse" />
       </div>
     );
@@ -261,7 +261,7 @@ export default function ProjectDashboardPage() {
 
         {/* Members row */}
         {members.length > 0 && (
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex flex-wrap items-center gap-3 mt-4">
             {members.map((m) => (
               <div key={m.userId} className="flex items-center gap-1.5">
                 <div className="w-6 h-6 rounded-md bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-500 overflow-hidden">
@@ -280,7 +280,7 @@ export default function ProjectDashboardPage() {
       </div>
 
       {/* Segmented Control */}
-      <div className="inline-flex bg-neutral-100 rounded-lg p-0.5 mb-6">
+      <div className="inline-flex bg-neutral-100 rounded-lg p-0.5 mb-6 max-w-full overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -305,7 +305,7 @@ export default function ProjectDashboardPage() {
 
       {/* Tab content */}
       {activeTab === "chat" && (
-        <div className="border border-[#e5e5e5] rounded-[10px] overflow-hidden h-[calc(100vh-320px)]">
+        <div className="border border-[#e5e5e5] rounded-[10px] overflow-hidden h-[calc(100vh-380px)] md:h-[calc(100vh-320px)]">
           <ProjectChat projectId={projectId} members={members.map((m) => ({ userId: m.userId, name: m.name, role: m.role }))} />
         </div>
       )}

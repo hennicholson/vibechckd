@@ -117,7 +117,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
   if (loading) {
     return (
       <PageShell>
-        <div className="max-w-[960px] mx-auto px-6 py-12">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6 py-8 md:py-12">
           <div className="flex flex-col md:flex-row gap-10 animate-pulse">
             <div className="w-full md:w-[320px] flex-shrink-0">
               <div className="w-[120px] h-[120px] rounded-[10px] bg-[#f5f5f5]" />
@@ -143,7 +143,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
   if (notFound || !coder) {
     return (
       <PageShell>
-        <div className="max-w-[960px] mx-auto px-6 py-24 text-center">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6 py-16 md:py-24 text-center">
           <div className="w-12 h-12 rounded-full bg-[#f5f5f5] flex items-center justify-center mx-auto mb-4">
             <svg className="w-5 h-5 text-[#a3a3a3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -165,7 +165,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
 
   return (
     <PageShell>
-      <div className="max-w-[960px] mx-auto px-6 py-12">
+      <div className="max-w-[960px] mx-auto px-4 md:px-6 py-8 md:py-12">
         <motion.div
           className="flex flex-col md:flex-row gap-10"
           initial={{ opacity: 0, y: 8 }}
@@ -217,9 +217,9 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
             )}
 
             {/* Tags */}
-            {coder.skills.length > 0 && (
+            {(coder.skills || []).length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-4">
-                {coder.skills.map((skill) => (
+                {(coder.skills || []).map((skill) => (
                   <Tag key={skill}>{skill}</Tag>
                 ))}
               </div>
@@ -300,18 +300,18 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
 
           {/* Right column -- Work */}
           <div className="flex-1 min-w-0">
-            {coder.portfolio.length > 0 && (
+            {(coder.portfolio || []).length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
               >
                 <p className="text-[11px] font-mono text-[#a3a3a3] uppercase tracking-[0.08em] mb-4">Work</p>
-                <PortfolioGrid items={coder.portfolio} onItemClick={setSelectedItem} layout="list" />
+                <PortfolioGrid items={coder.portfolio || []} onItemClick={setSelectedItem} layout="list" />
               </motion.div>
             )}
 
-            {coder.portfolio.length === 0 && (
+            {(coder.portfolio || []).length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-10 h-10 rounded-full bg-[#f5f5f5] flex items-center justify-center mb-3">
                   <svg className="w-4 h-4 text-[#a3a3a3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

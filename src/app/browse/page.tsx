@@ -240,7 +240,7 @@ function CoderCard({ coder, onClick, index }: { coder: Coder; onClick: () => voi
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className={`w-[6px] h-[6px] rounded-full ${availabilityColor} flex-shrink-0`} />
-            <span className="text-[11px] font-mono text-text-muted">{coder.hourlyRate}</span>
+            <span className="text-[11px] font-mono text-text-muted">{coder.hourlyRate || ""}</span>
           </div>
         </div>
         {/* Skills preview */}
@@ -256,6 +256,11 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
   const { status: authStatus } = useSession();
   const isLoggedIn = authStatus === "authenticated";
   const [initiating, setInitiating] = useState<string | null>(null);
+
+  const portfolio = coder.portfolio || [];
+  const skills = coder.skills || [];
+  const location = coder.location || "Remote";
+  const hourlyRate = coder.hourlyRate || "";
 
   const handleInquiry = async (type: "project" | "inquiry") => {
     if (!isLoggedIn) {
@@ -279,8 +284,8 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
       setInitiating(null);
     }
   };
-  const livePreviewAsset = coder.portfolio
-    .flatMap((p) => p.assets)
+  const livePreviewAsset = portfolio
+    .flatMap((p) => p.assets || [])
     .find((a) => a.type === "live_preview");
 
   const [expandedPortfolioId, setExpandedPortfolioId] = useState<string | null>(null);
@@ -414,7 +419,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
 
               {/* Skills */}
               <div className="flex flex-wrap gap-1.5 mt-4">
-                {coder.skills.map((skill) => (
+                {skills.map((skill) => (
                   <Tag key={skill}>{skill}</Tag>
                 ))}
               </div>
@@ -430,20 +435,20 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
               </div>
 
               {/* Portfolio items -- compact list with accordion */}
-              {coder.portfolio.length > 0 && (
+              {portfolio.length > 0 && (
                 <div className="mt-6 sm:mt-8">
                   <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.06em] mb-3">
-                    Portfolio ({coder.portfolio.length})
+                    Portfolio ({portfolio.length})
                   </p>
                   <div className="border border-border rounded-[10px] overflow-hidden">
-                    {coder.portfolio.map((item, i) => {
+                    {portfolio.map((item, i) => {
                       const isExpanded = expandedPortfolioId === item.id;
                       return (
                         <div key={item.id}>
                           <button
                             onClick={() => setExpandedPortfolioId(isExpanded ? null : item.id)}
                             className={`w-full flex items-center gap-3 px-3 sm:px-4 py-3 text-left hover:bg-surface-muted/50 transition-colors cursor-pointer ${
-                              i < coder.portfolio.length - 1 && !isExpanded ? "border-b border-border" : ""
+                              i < portfolio.length - 1 && !isExpanded ? "border-b border-border" : ""
                             }`}
                           >
                             <div className="w-[48px] h-[48px] rounded-md bg-surface-muted overflow-hidden flex-shrink-0">
@@ -476,7 +481,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
                                 transition={{ duration: 0.2, ease: "easeInOut" }}
                                 className="overflow-hidden"
                               >
-                                <div className={`px-3 sm:px-4 pb-3 pt-1 space-y-2 ${i < coder.portfolio.length - 1 ? "border-b border-border" : ""}`}>
+                                <div className={`px-3 sm:px-4 pb-3 pt-1 space-y-2 ${i < portfolio.length - 1 ? "border-b border-border" : ""}`}>
                                   {item.assets.map((asset) => (
                                     <div key={asset.id} className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-surface-muted/50">
                                       <div className="w-2 h-2 rounded-full bg-border-hover flex-shrink-0" />
@@ -525,7 +530,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
                   <div className="mt-4 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-text-muted">Rate</span>
-                      <span className="text-[12px] font-medium text-text-primary">{coder.hourlyRate}</span>
+                      <span className="text-[12px] font-medium text-text-primary">{hourlyRate || "N/A"}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-text-muted">Availability</span>
@@ -533,7 +538,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-text-muted">Location</span>
-                      <span className="text-[12px] text-text-primary">{coder.location}</span>
+                      <span className="text-[12px] text-text-primary">{location}</span>
                     </div>
                   </div>
 
@@ -617,16 +622,16 @@ export default function BrowsePage() {
   const filteredCoders = useMemo(() => {
     let list = coders;
     if (filter !== "all") {
-      list = list.filter((c) => c.specialties.includes(filter as Specialty));
+      list = list.filter((c) => (c.specialties || []).includes(filter as Specialty));
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (c) =>
           c.displayName.toLowerCase().includes(q) ||
-          c.title.toLowerCase().includes(q) ||
-          c.specialties.some((s) => SPECIALTY_LABELS[s].toLowerCase().includes(q)) ||
-          c.skills.some((s) => s.toLowerCase().includes(q))
+          (c.title || "").toLowerCase().includes(q) ||
+          (c.specialties || []).some((s) => (SPECIALTY_LABELS[s] || "").toLowerCase().includes(q)) ||
+          (c.skills || []).some((s) => s.toLowerCase().includes(q))
       );
     }
     return list;
@@ -640,14 +645,14 @@ export default function BrowsePage() {
       base = base.filter(
         (c) =>
           c.displayName.toLowerCase().includes(q) ||
-          c.title.toLowerCase().includes(q) ||
-          c.specialties.some((s) => SPECIALTY_LABELS[s].toLowerCase().includes(q)) ||
-          c.skills.some((s) => s.toLowerCase().includes(q))
+          (c.title || "").toLowerCase().includes(q) ||
+          (c.specialties || []).some((s) => (SPECIALTY_LABELS[s] || "").toLowerCase().includes(q)) ||
+          (c.skills || []).some((s) => s.toLowerCase().includes(q))
       );
     }
     const counts: Record<string, number> = {};
     SPECIALTIES.forEach((s) => {
-      counts[s] = base.filter((c) => c.specialties.includes(s)).length;
+      counts[s] = base.filter((c) => (c.specialties || []).includes(s)).length;
     });
     return counts;
   }, [coders, searchQuery]);

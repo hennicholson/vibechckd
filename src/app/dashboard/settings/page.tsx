@@ -28,7 +28,6 @@ export default function SettingsPage() {
 
   // Availability
   const [availability, setAvailability] = useState<string>("Available");
-  const [availabilityLoading, setAvailabilityLoading] = useState(isCreator);
 
   // Load current availability from profile
   useEffect(() => {
@@ -41,8 +40,7 @@ export default function SettingsPage() {
           setAvailability(label);
         }
       })
-      .catch(() => {})
-      .finally(() => setAvailabilityLoading(false));
+      .catch(() => {});
   }, [isCreator]);
 
   // Notifications
@@ -126,7 +124,7 @@ export default function SettingsPage() {
         <h2 className="text-[14px] font-medium text-text-primary mb-1">Availability</h2>
         <p className="text-[12px] text-text-muted mb-4">Control how you appear to clients</p>
 
-        <div className="inline-flex bg-surface-muted rounded-lg p-1">
+        <div className="inline-flex bg-surface-muted rounded-lg p-1 max-w-full overflow-x-auto">
           {availabilityOptions.map((option) => (
             <button
               key={option.label}

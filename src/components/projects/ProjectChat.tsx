@@ -449,7 +449,7 @@ function InvoiceCard({
     : `${fromName} sent this to you`;
 
   return (
-    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
       {/* Header */}
       <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
         <div className="flex items-center gap-2">
@@ -546,7 +546,7 @@ function InvoiceCard({
 
 function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: ParsedProposal; onAccept?: () => void; isOwn: boolean; senderName?: string | null }) {
   return (
-    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[380px] w-full">
+    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[380px] w-full">
       <div className="px-4 py-2.5 flex items-center gap-2">
         <span className="text-text-secondary"><IconProposal size={14} /></span>
         <span className="text-[13px] font-medium text-text-primary">Project Proposal</span>
@@ -605,7 +605,7 @@ function FileCard({ content, fileUrl }: { content: string; fileUrl: string | nul
   const showThumbnail = fileUrl && isImageUrl(fileUrl);
 
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="block no-underline max-w-[280px] w-full">
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block no-underline max-w-[calc(100vw-48px)] sm:max-w-[280px] w-full">
       <div className="border border-border rounded-lg overflow-hidden hover:border-border-hover transition-colors">
         {showThumbnail && (
           <div className="bg-surface-muted">
@@ -628,7 +628,7 @@ function FileCard({ content, fileUrl }: { content: string; fileUrl: string | nul
 function MilestoneCard({ title, amount, status }: { title: string; amount?: string; status: string }) {
   const isPaid = status.toLowerCase() === "completed" || status.toLowerCase() === "paid";
   return (
-    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[380px] w-full">
+    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[380px] w-full">
       <div className="px-4 py-2.5 flex items-center gap-2">
         <span className="text-text-secondary"><IconMilestone size={14} /></span>
         <span className="text-[13px] font-medium text-text-primary">Milestone</span>
@@ -1833,7 +1833,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
                 return (
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${paySentByMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
                       <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-text-secondary"><IconDollar size={14} /></span>

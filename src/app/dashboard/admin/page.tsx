@@ -176,7 +176,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-6 max-w-[960px]">
+    <div className="px-4 md:px-8 py-6 max-w-[960px]">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
         <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,9 +211,9 @@ export default function AdminPage() {
 
       {/* Applications Tab */}
       {!loading && tab === "applications" && (
-        <div className="space-y-0">
-          {/* Table header */}
-          <div className="grid grid-cols-[1fr_1fr_1fr_100px_80px_80px] gap-3 px-3 py-2 text-[11px] font-mono text-text-muted uppercase tracking-wide">
+        <div className="space-y-0 overflow-x-auto">
+          {/* Table header -- hidden on mobile, cards used instead */}
+          <div className="hidden md:grid grid-cols-[1fr_1fr_1fr_100px_80px_80px] gap-3 px-3 py-2 text-[11px] font-mono text-text-muted uppercase tracking-wide">
             <span>Name</span>
             <span>Email</span>
             <span>Specialties</span>
@@ -224,7 +224,7 @@ export default function AdminPage() {
           {applications.map((app) => (
             <div
               key={app.id}
-              className="grid grid-cols-[1fr_1fr_1fr_100px_80px_80px] gap-3 items-center px-3 py-3 border-t border-border"
+              className="hidden md:grid grid-cols-[1fr_1fr_1fr_100px_80px_80px] gap-3 items-center px-3 py-3 border-t border-border"
             >
               <span className="text-[13px] text-text-primary font-medium truncate">{app.name}</span>
               <span className="text-[12px] text-text-muted font-mono truncate">{app.email}</span>
@@ -247,6 +247,39 @@ export default function AdminPage() {
               >
                 Review
               </Button>
+            </div>
+          ))}
+          {/* Mobile card layout */}
+          {applications.map((app) => (
+            <div
+              key={`mobile-${app.id}`}
+              className="md:hidden border-t border-border px-3 py-3 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-text-primary font-medium truncate">{app.name}</span>
+                <Badge variant={statusToBadgeVariant(app.status)} />
+              </div>
+              <span className="text-[12px] text-text-muted font-mono block truncate">{app.email}</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {(app.specialties || []).map((s) => (
+                  <span
+                    key={s}
+                    className="px-2 py-0.5 text-[11px] font-mono text-text-secondary bg-surface-muted rounded-md"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-text-muted">{formatDate(app.createdAt)}</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setReviewingApp(app)}
+                >
+                  Review
+                </Button>
+              </div>
             </div>
           ))}
           {applications.length === 0 && (

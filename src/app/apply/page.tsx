@@ -11,14 +11,14 @@ export default function ApplyPage() {
 
   return (
     <PageShell>
-      <div className="max-w-2xl mx-auto px-6 py-12">
+      <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 md:py-12">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="text-center mb-10"
         >
-          <h1 className="text-[30px] font-semibold text-text-primary tracking-[-0.03em]">
+          <h1 className="text-[24px] md:text-[30px] font-semibold text-text-primary tracking-[-0.03em]">
             Apply to become a verified coder
           </h1>
           <p className="text-[14px] text-text-muted mt-2 max-w-md mx-auto">

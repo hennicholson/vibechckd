@@ -303,7 +303,7 @@ export default function DeliverablesList({
               />
 
               {/* File upload + Live URL */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -413,9 +413,9 @@ export default function DeliverablesList({
             i < deliverables.length - 1 ? "border-b border-[#e5e5e5]" : ""
           }`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-start md:items-center gap-3 flex-wrap md:flex-nowrap">
             {/* File icon */}
-            <div className="w-4 h-4 text-neutral-400 flex-shrink-0">
+            <div className="w-4 h-4 text-neutral-400 flex-shrink-0 mt-0.5 md:mt-0">
               <FileIcon />
             </div>
 
@@ -434,33 +434,65 @@ export default function DeliverablesList({
               </span>
             </div>
 
-            {/* Links */}
-            {d.fileUrl && (
-              <a
-                href={d.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
-              >
-                <FileIcon />
-                View file
-              </a>
-            )}
-            {d.liveUrl && (
-              <a
-                href={d.liveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
-              >
-                <LinkIcon />
-                Live preview
-              </a>
-            )}
-
-            {/* Status badge */}
+            {/* Status badge -- shown inline on mobile */}
             <StatusBadge status={d.status} />
+
+            {/* Links -- wrap to next line on mobile */}
+            {(d.fileUrl || d.liveUrl) && (
+              <div className="flex items-center gap-2 w-full md:w-auto pl-7 md:pl-0 -order-none md:order-none">
+                {d.fileUrl && (
+                  <a
+                    href={d.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden md:flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
+                  >
+                    <FileIcon />
+                    View file
+                  </a>
+                )}
+                {d.liveUrl && (
+                  <a
+                    href={d.liveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden md:flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
+                  >
+                    <LinkIcon />
+                    Live preview
+                  </a>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Mobile-only links row */}
+          {(d.fileUrl || d.liveUrl) && (
+            <div className="flex items-center gap-2 mt-2 ml-7 md:hidden">
+              {d.fileUrl && (
+                <a
+                  href={d.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
+                >
+                  <FileIcon />
+                  File
+                </a>
+              )}
+              {d.liveUrl && (
+                <a
+                  href={d.liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
+                >
+                  <LinkIcon />
+                  Preview
+                </a>
+              )}
+            </div>
+          )}
 
           {/* Review actions for non-creators on submitted deliverables */}
           {!isCreator && d.status === "submitted" && (

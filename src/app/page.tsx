@@ -51,14 +51,14 @@ export default function LandingPage() {
     <PageShell>
       {/* Hero */}
       <section>
-        <div className="max-w-[960px] mx-auto px-6 pt-16 pb-0">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6 pt-12 md:pt-16 pb-0">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-[32px] font-semibold text-text-primary tracking-[-0.04em] leading-[1.15]">
-              The most vetted vibe coders<br />in the game.
+            <h1 className="text-[24px] md:text-[32px] font-semibold text-text-primary tracking-[-0.04em] leading-[1.15]">
+              The most vetted vibe coders<br className="hidden sm:inline" /> in the game.
             </h1>
             <p className="text-[14px] text-text-secondary mt-4 max-w-[400px] leading-[1.55]">
               Every coder on vibechckd has been heavily vetted. Clients don&apos;t gamble on talent. The verified badge means something.
@@ -86,7 +86,7 @@ export default function LandingPage() {
 
       {/* Stats row */}
       <section>
-        <div className="max-w-[960px] mx-auto px-6 py-6">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6 py-6">
           <p className="text-[12px] font-mono text-text-muted text-center tracking-[0.02em]">
             12 verified coders &middot; 30+ portfolio pieces &middot; 5 specialties
           </p>
@@ -95,7 +95,7 @@ export default function LandingPage() {
 
       {/* For Clients */}
       <section className="py-20 border-t border-border mt-12">
-        <div className="max-w-[960px] mx-auto px-6">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -103,8 +103,8 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
           >
             <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.08em] mb-2">For clients</p>
-            <h2 className="text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
-              From browse to shipped<br />in record time.
+            <h2 className="text-[20px] md:text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
+              From browse to shipped<br className="hidden sm:inline" /> in record time.
             </h2>
             <p className="text-[14px] text-text-muted mt-3 max-w-[480px] leading-[1.55]">
               Stop scrolling through unvetted freelancers. Every developer on vibechckd has been verified for craft, speed, and reliability.
@@ -162,7 +162,7 @@ export default function LandingPage() {
 
       {/* For Coders */}
       <section className="py-20 border-t border-border bg-background-alt">
-        <div className="max-w-[960px] mx-auto px-6">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -170,7 +170,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
           >
             <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.08em] mb-2">For coders</p>
-            <h2 className="text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
+            <h2 className="text-[20px] md:text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
               The badge that opens doors.
             </h2>
             <p className="text-[14px] text-text-muted mt-3 max-w-[480px] leading-[1.55]">
@@ -218,14 +218,14 @@ export default function LandingPage() {
 
       {/* Closing CTA */}
       <section className="py-20 border-t border-border">
-        <div className="max-w-[960px] mx-auto px-6 text-center">
+        <div className="max-w-[960px] mx-auto px-4 md:px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
+            <h2 className="text-[20px] md:text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
               Ready to work with the best?
             </h2>
             <p className="text-[14px] text-text-muted mt-3 max-w-[400px] mx-auto leading-[1.55]">
