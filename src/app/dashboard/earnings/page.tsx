@@ -358,19 +358,9 @@ export default function EarningsPage() {
   return (
     <div className="max-w-3xl px-4 md:px-8 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Earnings</h1>
-          <p className="text-[12px] text-text-muted mt-0.5">Track your income and manage withdrawals</p>
-        </div>
-        <button
-          onClick={() => setShowWithdraw(true)}
-          disabled={avail <= 0}
-          className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#171717] text-white rounded-lg hover:bg-[#0a0a0a] transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-        >
-          <IconArrowDown />
-          Withdraw
-        </button>
+      <div className="mb-6">
+        <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Earnings</h1>
+        <p className="text-[12px] text-text-muted mt-0.5">Track your income and cash out through Whop Payments</p>
       </div>
 
       {/* Balance cards */}
@@ -574,15 +564,6 @@ export default function EarningsPage() {
         )}
       </div>
 
-      {/* Withdraw modal */}
-      {showWithdraw && (
-        <WithdrawModal
-          availableCents={avail}
-          onClose={() => setShowWithdraw(false)}
-          onSubmit={handleWithdraw}
-          submitting={withdrawing}
-        />
-      )}
     </div>
   );
 }
