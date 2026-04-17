@@ -55,8 +55,15 @@ export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   return (
-    <div className="max-w-2xl px-4 md:px-8 py-6">
-      <h1 className="text-[20px] font-semibold text-text-primary mb-6">Settings</h1>
+    <div className="max-w-2xl h-full flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <h1 className="text-[20px] font-semibold text-text-primary">Settings</h1>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
 
       {/* Account */}
       <div className="border border-border rounded-[10px] p-5 mb-4">
@@ -241,6 +248,8 @@ export default function SettingsPage() {
         >
           Delete account
         </button>
+      </div>
+
       </div>
 
       {/* Delete Confirmation Modal */}

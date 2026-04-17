@@ -171,14 +171,20 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-8 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-[20px] font-semibold text-text-primary">Portfolio</h1>
-        <Button variant="secondary" size="md" onClick={() => openEditor(null)}>
-          Add project
-        </Button>
+    <div className="max-w-3xl mx-auto h-full flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-[20px] font-semibold text-text-primary">Portfolio</h1>
+          <Button variant="secondary" size="md" onClick={() => openEditor(null)}>
+            Add project
+          </Button>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
 
       {/* Items list */}
       {items.length === 0 && (
@@ -308,6 +314,8 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
             </div>
           );
         })}
+      </div>
+
       </div>
 
       {/* Editor modal */}

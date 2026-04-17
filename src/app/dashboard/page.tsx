@@ -115,26 +115,25 @@ function ClientOverview({ name }: { name: string }) {
   }, []);
 
   return (
-    <div className="max-w-3xl px-4 md:px-8 py-6">
-      {/* Client label */}
-      <div className="mb-6">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-          Client
-        </span>
-      </div>
-
-      {/* Greeting */}
-      <div className="mb-8">
-        <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
-          {getGreeting()}, {name.split(" ")[0]}
-        </h1>
-        <p className="text-[12px] font-mono text-text-muted mt-1">
+    <div className="max-w-3xl h-full flex flex-col">
+      {/* Fixed header */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <div className="flex items-center gap-2">
+          <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
+            {getGreeting()}, {name.split(" ")[0]}
+          </h1>
+          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-muted px-1.5 py-0.5 rounded">
+            Client
+          </span>
+        </div>
+        <p className="text-[11px] font-mono text-text-muted mt-1">
           {formatDate()}
         </p>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
 
       {/* Quick actions */}
       <div className="mb-8">
@@ -255,6 +254,7 @@ function ClientOverview({ name }: { name: string }) {
           </div>
         </div>
       )}
+      </div>{/* end scrollable content */}
     </div>
   );
 }
@@ -308,38 +308,42 @@ function CreatorOverview() {
   }
 
   return (
-    <div className="max-w-3xl px-4 md:px-8 py-6">
-      {/* Creator label */}
-      <div className="mb-6">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
-          <VerifiedSeal size="xs" />
-          Creator
-        </span>
+    <div className="max-w-3xl h-full flex flex-col">
+      {/* Fixed header */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
+                {getGreeting()}, {userName.split(" ")[0]}
+              </h1>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-muted px-1.5 py-0.5 rounded">
+                <VerifiedSeal size="xs" />
+                Creator
+              </span>
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-[11px] font-mono text-text-muted">
+                {formatDate()}
+              </p>
+              <Link
+                href={profile?.slug ? `/coders/${profile.slug}` : "/dashboard/profile"}
+                className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-primary transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Public profile
+              </Link>
+            </div>
+          </div>
+        </div>
+        {/* Fade shadow at bottom of header */}
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
-      {/* Greeting */}
-      <div className="mb-2">
-        <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
-          {getGreeting()}, {userName.split(" ")[0]}
-        </h1>
-        <p className="text-[12px] font-mono text-text-muted mt-1">
-          {formatDate()}
-        </p>
-      </div>
-
-      {/* Public profile link */}
-      <div className="mb-8">
-        <Link
-          href={profile?.slug ? `/coders/${profile.slug}` : "/dashboard/profile"}
-          className="inline-flex items-center gap-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors group"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          View public profile
-          <span className="inline-block transition-transform group-hover:translate-x-0.5">&rarr;</span>
-        </Link>
-      </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
 
       {/* Profile completion card */}
       {isProfileIncomplete && (
@@ -525,6 +529,7 @@ function CreatorOverview() {
           </Link>
         </div>
       </div>
+      </div>{/* end scrollable content */}
     </div>
   );
 }

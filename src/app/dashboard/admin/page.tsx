@@ -176,31 +176,37 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="px-4 md:px-8 py-6 max-w-[960px]">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-6">
-        <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-        <h1 className="text-[20px] font-semibold text-text-primary">Admin Panel</h1>
+    <div className="max-w-[960px] h-full flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <div className="flex items-center gap-2 mb-4">
+          <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <h1 className="text-[20px] font-semibold text-text-primary">Admin Panel</h1>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-6 border-b border-border">
+          <button
+            onClick={() => setTab("applications")}
+            className={`pb-2.5 text-[13px] font-medium transition-colors cursor-pointer ${
+              tab === "applications"
+                ? "text-text-primary border-b-[2px] border-text-primary"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            Applications
+            <span className="ml-1.5 text-[11px] font-mono text-text-muted">
+              {applications.filter((a) => a.status !== "approved" && a.status !== "rejected").length}
+            </span>
+          </button>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-6 border-b border-border mb-6">
-        <button
-          onClick={() => setTab("applications")}
-          className={`pb-2.5 text-[13px] font-medium transition-colors cursor-pointer ${
-            tab === "applications"
-              ? "text-text-primary border-b-[2px] border-text-primary"
-              : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          Applications
-          <span className="ml-1.5 text-[11px] font-mono text-text-muted">
-            {applications.filter((a) => a.status !== "approved" && a.status !== "rejected").length}
-          </span>
-        </button>
-      </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
 
       {/* Loading state */}
       {loading && (
@@ -289,6 +295,8 @@ export default function AdminPage() {
           )}
         </div>
       )}
+
+      </div>
 
       {/* Review Modal */}
       <Modal

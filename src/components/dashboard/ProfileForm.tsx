@@ -55,9 +55,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-border rounded-[10px] p-5">
+    <div className="border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors">
       <div className="mb-4">
-        <h3 className="text-[14px] font-medium text-text-primary">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-text-primary uppercase tracking-wider">{title}</h3>
         {description && (
           <p className="text-[12px] text-text-muted mt-0.5">{description}</p>
         )}
@@ -92,31 +92,25 @@ function ProfileCompleteness({ form }: { form: ProfileData }) {
   const pct = (completed / total) * 100;
   const isComplete = completed === total;
 
+  // Don't show when profile is complete
+  if (isComplete) return null;
+
+  const remaining = checks.filter((c) => !c.done);
+
   return (
     <div className="border border-border rounded-[10px] px-5 py-3.5">
       <div className="flex items-center justify-between mb-2">
-        <span className={`text-[13px] font-medium ${isComplete ? "text-text-primary" : "text-text-muted"}`}>
-          Profile {completed}/{total} complete
+        <span className="text-[13px] font-medium text-text-primary">
+          {completed}/{total} complete
         </span>
-        <div className="flex items-center gap-2">
-          {checks.map((c) => (
-            <span
-              key={c.label}
-              title={c.label}
-              className={`text-[11px] font-mono ${c.done ? "text-text-primary" : "text-text-muted/40"}`}
-            >
-              {c.done ? "\u2713" : "\u2717"}
-            </span>
-          ))}
-        </div>
+        <span className="text-[11px] text-text-muted">
+          {remaining.map((c) => c.label).join(", ")} needed
+        </span>
       </div>
       <div className="h-[3px] bg-surface-muted rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-500 ease-out"
-          style={{
-            width: `${pct}%`,
-            backgroundColor: isComplete ? "#0a0a0a" : "#a3a3a3",
-          }}
+          className="h-full rounded-full transition-all duration-500 ease-out bg-text-primary"
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
@@ -680,26 +674,29 @@ export default function ProfileForm({ initialData, onFormChange }: ProfileFormPr
           </div>
         </SectionCard>
 
-        {/* SAVE BAR */}
-        <div className={`border rounded-[10px] px-5 py-4 flex items-center justify-between transition-colors duration-200 ${
-          isDirty ? "border-amber-300 bg-amber-50/50" : "border-border"
-        }`}>
-          <div>
-            {isDirty && (
-              <span className="text-[12px] font-medium text-amber-600">
-                You have unsaved changes
-              </span>
-            )}
+        {/* SAVE BAR -- sticky at bottom, only when dirty */}
+        {isDirty && (
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border border-border rounded-[10px] px-5 py-3 flex items-center justify-between shadow-sm">
+            <span className="text-[12px] font-medium text-text-secondary">
+              Unsaved changes
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDiscard}
+                className="px-3 py-1.5 text-[12px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer disabled:opacity-40"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={handleDiscard} disabled={!isDirty}>
-              Discard
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !isDirty}>
-              {saving ? "Saving..." : "Save changes"}
-            </Button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* RIGHT COLUMN: Browse feed preview */}

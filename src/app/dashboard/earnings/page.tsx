@@ -338,14 +338,19 @@ export default function EarningsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl px-4 md:px-8 py-6">
-        <div className="h-6 w-32 bg-surface-muted rounded animate-pulse mb-6" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-surface-muted rounded-[10px] animate-pulse" />
-          ))}
+      <div className="max-w-3xl h-full flex flex-col">
+        <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+          <div className="h-6 w-32 bg-surface-muted rounded animate-pulse" />
+          <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
         </div>
-        <div className="h-64 bg-surface-muted rounded-[10px] animate-pulse" />
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-surface-muted rounded-[10px] animate-pulse" />
+            ))}
+          </div>
+          <div className="h-64 bg-surface-muted rounded-[10px] animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -356,12 +361,16 @@ export default function EarningsPage() {
   const withdrawn = balance?.totalWithdrawnCents || 0;
 
   return (
-    <div className="max-w-3xl px-4 md:px-8 py-6">
-      {/* Header */}
-      <div className="mb-6">
+    <div className="max-w-3xl h-full flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Earnings</h1>
         <p className="text-[12px] text-text-muted mt-0.5">Track your income and cash out through Whop Payments</p>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
 
       {/* Balance cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -571,6 +580,7 @@ export default function EarningsPage() {
         )}
       </div>
 
+      </div>
     </div>
   );
 }
