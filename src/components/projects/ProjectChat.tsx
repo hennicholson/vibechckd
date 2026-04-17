@@ -449,9 +449,9 @@ function InvoiceCard({
     : `${fromName} sent this to you`;
 
   return (
-    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
       {/* Header */}
-      <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
+      <div className={`px-3 py-2 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
         <div className="flex items-center gap-2">
           <span className="text-text-secondary"><IconInvoice size={14} /></span>
           <span className="text-[13px] font-medium text-text-primary">Invoice</span>
@@ -468,13 +468,13 @@ function InvoiceCard({
       </div>
 
       {/* Body */}
-      <div className="px-4 py-3 border-t border-border/50">
+      <div className="px-3 py-2 border-t border-border/50">
         {invoice.description && (
           <p className="text-[13px] text-text-secondary leading-snug mb-2">{invoice.description}</p>
         )}
 
         {invoice.amount && (
-          <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight mb-2">{invoice.amount}</p>
+          <p className="text-[20px] font-semibold text-text-primary tabular-nums tracking-tight mb-2">{invoice.amount}</p>
         )}
 
         <div className="flex items-center gap-3">
@@ -492,7 +492,7 @@ function InvoiceCard({
 
       {/* Actions footer */}
       {(!isPaid && !isVoided) && (
-        <div className="px-4 py-2.5 border-t border-border flex items-center gap-2 flex-wrap">
+        <div className="px-3 py-2 border-t border-border flex items-center gap-2 flex-wrap">
           {/* Show Pay button only to the recipient */}
           {!isSender && invoice.payUrl && (
             <a
@@ -529,7 +529,7 @@ function InvoiceCard({
       )}
 
       {isPaid && (
-        <div className="px-4 py-2.5 border-t border-positive/10 bg-positive/5">
+        <div className="px-3 py-2 border-t border-positive/10 bg-positive/5">
           <div className="flex items-center gap-1.5">
             <span className="text-positive"><IconCheck size={12} /></span>
             <span className="text-[11px] font-medium text-positive">
@@ -546,8 +546,8 @@ function InvoiceCard({
 
 function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: ParsedProposal; onAccept?: () => void; isOwn: boolean; senderName?: string | null }) {
   return (
-    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[380px] w-full">
-      <div className="px-4 py-2.5 flex items-center gap-2">
+    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[320px] w-full">
+      <div className="px-3 py-2 flex items-center gap-2">
         <span className="text-text-secondary"><IconProposal size={14} /></span>
         <span className="text-[13px] font-medium text-text-primary">Project Proposal</span>
       </div>
@@ -559,7 +559,7 @@ function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: Par
         </p>
       </div>
 
-      <div className="px-4 py-3 border-t border-border">
+      <div className="px-3 py-2 border-t border-border">
         {proposal.scope && (
           <div className="mb-3">
             <span className="text-[10px] uppercase tracking-widest text-text-muted font-medium">Scope of Work</span>
@@ -583,7 +583,7 @@ function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: Par
       </div>
 
       {!isOwn && onAccept && (
-        <div className="px-4 py-2.5 border-t border-border">
+        <div className="px-3 py-2 border-t border-border">
           <button
             onClick={onAccept}
             className="w-full py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
@@ -628,12 +628,12 @@ function FileCard({ content, fileUrl }: { content: string; fileUrl: string | nul
 function MilestoneCard({ title, amount, status }: { title: string; amount?: string; status: string }) {
   const isPaid = status.toLowerCase() === "completed" || status.toLowerCase() === "paid";
   return (
-    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[380px] w-full">
-      <div className="px-4 py-2.5 flex items-center gap-2">
+    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[320px] w-full">
+      <div className="px-3 py-2 flex items-center gap-2">
         <span className="text-text-secondary"><IconMilestone size={14} /></span>
         <span className="text-[13px] font-medium text-text-primary">Milestone</span>
       </div>
-      <div className="px-4 py-3 border-t border-border">
+      <div className="px-3 py-2 border-t border-border">
         <p className="text-[14px] font-medium text-text-primary mb-1">{title}</p>
         {amount && (
           <p className="text-[18px] font-semibold text-text-primary tabular-nums tracking-tight">{amount}</p>
@@ -651,55 +651,24 @@ function MilestoneCard({ title, amount, status }: { title: string; amount?: stri
 
 // --- Balance Bar ---
 
-function BalanceBar({ balance, onToggle, expanded }: { balance: ProjectBalance; onToggle: () => void; expanded: boolean }) {
+function BalanceBar({ balance }: { balance: ProjectBalance }) {
   const paid = balance.totalPaid;
   const total = balance.totalInvoiced;
   const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
 
   return (
-    <div className="border-b border-border bg-background">
-      <button
-        onClick={onToggle}
-        className="w-full px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-surface-muted/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <IconWallet size={14} />
-          <span className="text-[12px] font-medium text-text-primary">Project Balance</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[13px] font-semibold text-text-primary tabular-nums">{formatCurrency(paid)}</span>
-          <span className="text-[11px] text-text-muted">/ {formatCurrency(total)}</span>
-          <span className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}>
-            <IconChevronDown size={12} />
-          </span>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-3 animate-[slideDown_0.15s_ease-out]">
-          {/* Progress bar */}
-          <div className="h-1.5 bg-border rounded-full overflow-hidden mb-3">
-            <div
-              className="h-full bg-positive rounded-full transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-text-muted font-medium">Paid</span>
-              <p className="text-[14px] font-semibold text-positive tabular-nums mt-0.5">{formatCurrency(balance.totalPaid)}</p>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-text-muted font-medium">Pending</span>
-              <p className="text-[14px] font-semibold text-warning tabular-nums mt-0.5">{formatCurrency(balance.totalPending)}</p>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-text-muted font-medium">Overdue</span>
-              <p className="text-[14px] font-semibold text-negative tabular-nums mt-0.5">{formatCurrency(balance.totalOverdue)}</p>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border bg-surface-muted/30">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <IconWallet size={12} />
+        <span className="text-[11px] font-medium text-text-secondary">Balance</span>
+      </div>
+      <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+        <div className="h-full bg-positive rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-[11px] font-semibold text-text-primary tabular-nums">{formatCurrency(paid)}</span>
+        <span className="text-[10px] text-text-muted">/ {formatCurrency(total)}</span>
+      </div>
     </div>
   );
 }
@@ -1680,20 +1649,16 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
-      {/* Balance bar */}
+      {/* Balance bar -- compact inline */}
       {balance && balance.totalInvoiced > 0 && (
-        <BalanceBar
-          balance={balance}
-          expanded={showBalance}
-          onToggle={() => setShowBalance(!showBalance)}
-        />
+        <BalanceBar balance={balance} />
       )}
 
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-3"
+        className="flex-1 overflow-y-auto px-3 py-2"
       >
         {isLoading && <LoadingSkeleton />}
 
@@ -1833,8 +1798,8 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
                 return (
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${paySentByMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[400px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
-                      <div className={`px-4 py-2.5 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
+                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+                      <div className={`px-3 py-2 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-text-secondary"><IconDollar size={14} /></span>
                           <span className="text-[13px] font-medium text-text-primary">Payment</span>
@@ -1849,12 +1814,12 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                       <div className="px-4 py-2 border-t border-border/50">
                         <p className="text-[11px] text-text-muted">{payContextLine}</p>
                       </div>
-                      <div className="px-4 py-3 border-t border-border/50">
+                      <div className="px-3 py-2 border-t border-border/50">
                         {payDesc && <p className="text-[13px] text-text-secondary leading-snug mb-2">{payDesc}</p>}
-                        {payAmount && <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
+                        {payAmount && <p className="text-[20px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
                       </div>
                       {!isPaid && (
-                        <div className="px-4 py-2.5 border-t border-border flex items-center gap-2">
+                        <div className="px-3 py-2 border-t border-border flex items-center gap-2">
                           {!paySentByMe && payUrl && (
                             <a href={payUrl} target="_blank" rel="noopener noreferrer"
                               className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline">
@@ -1890,7 +1855,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                         </div>
                       )}
                       {isPaid && (
-                        <div className="px-4 py-2.5 border-t border-positive/10 bg-positive/5">
+                        <div className="px-3 py-2 border-t border-positive/10 bg-positive/5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-positive"><IconCheck size={12} /></span>
                             <span className="text-[11px] font-medium text-positive">
@@ -1952,7 +1917,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                   ) : (
                     <div
                       className={`
-                        max-w-[75%] px-3.5 py-2 text-[14px] font-body leading-relaxed whitespace-pre-wrap break-words
+                        max-w-[70%] px-3 py-1.5 text-[13px] font-body leading-snug whitespace-pre-wrap break-words
                         ${isOwn
                           ? "bg-[#171717] text-white rounded-[16px] rounded-br-[4px]"
                           : "bg-surface-muted text-text-primary rounded-[16px] rounded-bl-[4px]"
@@ -2020,35 +1985,36 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
         />
       )}
 
-      {/* Quick actions bar */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-border overflow-x-auto">
-        {actions.map((action) => (
-          <button
-            key={action.key}
-            onClick={() => {
-              if (action.key === "files") {
-                fileInputRef.current?.click();
-              } else {
-                setActiveAction(activeAction === action.key ? null : action.key);
-              }
-            }}
-            className={`
-              flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium border rounded-full transition-all duration-150 whitespace-nowrap cursor-pointer flex-shrink-0
-              ${activeAction === action.key
-                ? "border-[#171717] text-text-primary bg-surface-muted"
-                : "text-text-muted border-border hover:border-border-hover hover:text-text-secondary"
-              }
-            `}
-          >
-            {action.icon}
-            {action.label}
-          </button>
-        ))}
-      </div>
+      {/* Combined input + actions */}
+      <div className="border-t border-border bg-background">
+        {/* Quick actions */}
+        <div className="flex items-center gap-1 px-2 pt-1.5 pb-0.5 overflow-x-auto scrollbar-none">
+          {actions.map((action) => (
+            <button
+              key={action.key}
+              onClick={() => {
+                if (action.key === "files") {
+                  fileInputRef.current?.click();
+                } else {
+                  setActiveAction(activeAction === action.key ? null : action.key);
+                }
+              }}
+              className={`
+                flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all whitespace-nowrap cursor-pointer flex-shrink-0
+                ${activeAction === action.key
+                  ? "text-text-primary bg-surface-muted"
+                  : "text-text-muted hover:text-text-secondary hover:bg-surface-muted/50"
+                }
+              `}
+            >
+              {action.icon}
+              <span className="hidden sm:inline">{action.label}</span>
+            </button>
+          ))}
+        </div>
 
-      {/* Input area */}
-      <div className="border-t border-border px-3 py-2.5 bg-background">
-        <div className="flex items-end gap-2">
+        {/* Input row */}
+        <div className="flex items-end gap-2 px-3 pb-2 pt-0.5">
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -2060,8 +2026,8 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 text-[14px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[120px]"
-            style={{ minHeight: "24px" }}
+            className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
+            style={{ minHeight: "22px" }}
           />
           {charCount >= CHAR_WARN_THRESHOLD && (
             <span className={`text-[10px] font-mono flex-shrink-0 tabular-nums pb-0.5 ${charCount > MAX_CHARS * 0.95 ? "text-negative" : "text-text-muted"}`}>
@@ -2072,7 +2038,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
             onClick={handleSend}
             disabled={!inputValue.trim() || isSending}
             className={`
-              flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer
+              flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer
               ${inputValue.trim()
                 ? "bg-[#171717] text-white hover:bg-[#0a0a0a]"
                 : "bg-surface-muted text-text-muted cursor-not-allowed"
@@ -2080,7 +2046,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
             `}
             aria-label="Send message"
           >
-            <IconSend />
+            <IconSend size={14} />
           </button>
         </div>
       </div>
