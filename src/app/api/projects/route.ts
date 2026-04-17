@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { projects, projectMembers, messages } from "@/db/schema";
+import { projects, projectMembers, messages, users } from "@/db/schema";
 import { eq, desc, sql, and, ne } from "drizzle-orm";
 
 export async function GET(req: Request) {
@@ -79,6 +79,72 @@ export async function GET(req: Request) {
     console.error("Projects list error:", error);
     return NextResponse.json(
       { error: "Failed to load projects" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { title, description, members } = body as {
+      title: string;
+      description?: string;
+      members?: { userId: string; roleLabel: string }[];
+    };
+
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return NextResponse.json(
+        { error: "Title is required" },
+        { status: 400 }
+      );
+    }
+
+    // Create the project
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title: title.trim(),
+        description: description?.trim() || null,
+        status: "active",
+      })
+      .returning();
+
+    // Add the current user as "client"
+    await db.insert(projectMembers).values({
+      projectId: project.id,
+      userId: session.user.id,
+      roleLabel: "Client",
+    });
+
+    // Add additional members if provided
+    if (members && Array.isArray(members)) {
+      const memberInserts = members
+        .filter((m) => m.userId && m.userId !== session.user.id)
+        .map((m) => ({
+          projectId: project.id,
+          userId: m.userId,
+          roleLabel: m.roleLabel || "Member",
+        }));
+
+      if (memberInserts.length > 0) {
+        await db.insert(projectMembers).values(memberInserts);
+      }
+    }
+
+    return NextResponse.json({
+      id: project.id,
+      title: project.title,
+    });
+  } catch (error) {
+    console.error("Project create error:", error);
+    return NextResponse.json(
+      { error: "Failed to create project" },
       { status: 500 }
     );
   }

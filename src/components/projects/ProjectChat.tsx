@@ -533,7 +533,7 @@ function InvoiceCard({
           <div className="flex items-center gap-1.5">
             <span className="text-positive"><IconCheck size={12} /></span>
             <span className="text-[11px] font-medium text-positive">
-              {isSender ? "Payment received -- added to your balance" : "You paid this invoice"}
+              {isSender ? "Payment received -- credited to your balance" : "Payment complete"}
             </span>
           </div>
         </div>
@@ -544,12 +544,19 @@ function InvoiceCard({
 
 // --- Proposal Card ---
 
-function ProposalCard({ proposal, onAccept, isOwn }: { proposal: ParsedProposal; onAccept?: () => void; isOwn: boolean }) {
+function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: ParsedProposal; onAccept?: () => void; isOwn: boolean; senderName?: string | null }) {
   return (
     <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[380px] w-full">
       <div className="px-4 py-2.5 flex items-center gap-2">
         <span className="text-text-secondary"><IconProposal size={14} /></span>
         <span className="text-[13px] font-medium text-text-primary">Project Proposal</span>
+      </div>
+
+      {/* Context line */}
+      <div className="px-4 py-2 border-t border-border/50">
+        <p className="text-[11px] text-text-muted">
+          {isOwn ? "You sent this proposal" : `from ${senderName || "Creator"}`}
+        </p>
       </div>
 
       <div className="px-4 py-3 border-t border-border">
@@ -1163,6 +1170,10 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
   const currentUserId = session?.user?.id;
   const currentUserName = session?.user?.name || "You";
 
+  // Determine role from project membership
+  const currentMember = members.find((m) => m.userId === currentUserId);
+  const isClient = currentMember?.role?.toLowerCase() === "client";
+
   // ---- Data fetching ----
 
   const fetchMessages = useCallback(async () => {
@@ -1632,16 +1643,20 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     }
   }
 
-  // ---- Quick action definitions ----
+  // ---- Quick action definitions (role-gated) ----
 
-  const actions: { key: ActiveAction; icon: React.ReactNode; label: string; immediate?: boolean }[] = [
-    { key: "invoice", icon: <IconInvoice size={13} />, label: "Invoice" },
-    { key: "proposal", icon: <IconProposal size={13} />, label: "Proposal" },
-    { key: "milestone", icon: <IconMilestone size={13} />, label: "Milestone" },
-    { key: "task", icon: <IconTask size={13} />, label: "Task" },
-    { key: "payment", icon: <IconDollar size={13} />, label: "Payment" },
-    { key: "files", icon: <IconPaperclip size={13} />, label: "Files", immediate: true },
+  const allActions: { key: ActiveAction; icon: React.ReactNode; label: string; roles: ("client" | "creator" | "both")[]; immediate?: boolean }[] = [
+    { key: "invoice", icon: <IconInvoice size={13} />, label: "Invoice", roles: ["creator"] },
+    { key: "proposal", icon: <IconProposal size={13} />, label: "Proposal", roles: ["creator"] },
+    { key: "milestone", icon: <IconMilestone size={13} />, label: "Milestone", roles: ["creator"] },
+    { key: "task", icon: <IconTask size={13} />, label: "Task", roles: ["both"] },
+    { key: "payment", icon: <IconDollar size={13} />, label: "Payment", roles: ["client"] },
+    { key: "files", icon: <IconPaperclip size={13} />, label: "Files", roles: ["both"], immediate: true },
   ];
+
+  const actions = allActions.filter((a) =>
+    a.roles.includes("both") || a.roles.includes(isClient ? "client" : "creator")
+  );
 
   const charCount = inputValue.length;
 
@@ -1721,14 +1736,24 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
               // Invoice message
               const invoice = parseInvoiceContent(msg.content);
               if (invoice) {
-                // Determine if current user is the invoice sender (creator) using multiple signals:
-                // 1. msg.senderId matches (most reliable for INVOICE SENT messages)
-                // 2. From: field matches current user name (works for INVOICE PAID messages where senderId is null)
-                // 3. Fall back to checking if current user name appears in From field
-                const invoiceSentByMe =
-                  msg.senderId === currentUserId ||
-                  (invoice.from && currentUserName && invoice.from.toLowerCase() === currentUserName.toLowerCase()) ||
-                  false;
+                // Determine if current user is the invoice sender using From/To fields
+                // matched against all known member names, with senderId as fallback.
+                const fieldMatchesMe = (field: string | null): boolean => {
+                  if (!field) return false;
+                  const lower = field.toLowerCase();
+                  if (currentUserName && lower === currentUserName.toLowerCase()) return true;
+                  const matched = members.find((m) => m.name.toLowerCase() === lower);
+                  return matched?.userId === currentUserId;
+                };
+
+                // Priority: From/To fields are most reliable (survive status update messages
+                // where senderId may be null). Fall back to senderId for legacy messages.
+                let invoiceSentByMe: boolean;
+                if (invoice.from || invoice.to) {
+                  invoiceSentByMe = fieldMatchesMe(invoice.from) || (!!invoice.to && !fieldMatchesMe(invoice.to));
+                } else {
+                  invoiceSentByMe = msg.senderId === currentUserId;
+                }
                 return (
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${invoiceSentByMe ? "justify-end" : "justify-start"}`}>
                     <InvoiceCard
@@ -1749,7 +1774,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 const isOwn = msg.senderId === currentUserId;
                 return (
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${isOwn ? "justify-end" : "justify-start"}`}>
-                    <ProposalCard proposal={proposal} onAccept={!isOwn ? handleAcceptProposal : undefined} isOwn={isOwn} />
+                    <ProposalCard proposal={proposal} onAccept={!isOwn ? handleAcceptProposal : undefined} isOwn={isOwn} senderName={msg.senderName} />
                   </div>
                 );
               }
@@ -1787,11 +1812,21 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                   else if (t.startsWith("From:")) payFrom = t.slice(5).trim();
                   else if (t.startsWith("To:")) payTo = t.slice(3).trim();
                 }
-                // Determine perspective using senderId + From/To name matching
-                const paySentByMe =
-                  msg.senderId === currentUserId ||
-                  (payFrom && currentUserName && payFrom.toLowerCase() === currentUserName.toLowerCase()) ||
-                  false;
+                // Determine perspective using From/To name matching against members
+                const payFieldMatchesMe = (field: string): boolean => {
+                  if (!field) return false;
+                  const lower = field.toLowerCase();
+                  if (currentUserName && lower === currentUserName.toLowerCase()) return true;
+                  const matched = members.find((m) => m.name.toLowerCase() === lower);
+                  return matched?.userId === currentUserId;
+                };
+
+                let paySentByMe: boolean;
+                if (payFrom || payTo) {
+                  paySentByMe = payFieldMatchesMe(payFrom) || (!!payTo && !payFieldMatchesMe(payTo));
+                } else {
+                  paySentByMe = msg.senderId === currentUserId;
+                }
                 const payContextLine = paySentByMe
                   ? `You sent this${payTo ? ` to ${payTo}` : ""}`
                   : `${payFrom || "Someone"} sent you a payment`;
@@ -1859,7 +1894,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                           <div className="flex items-center gap-1.5">
                             <span className="text-positive"><IconCheck size={12} /></span>
                             <span className="text-[11px] font-medium text-positive">
-                              {paySentByMe ? "Payment completed" : "Payment received -- added to your balance"}
+                              {paySentByMe ? "Payment complete" : "Payment received -- credited to your balance"}
                             </span>
                           </div>
                         </div>

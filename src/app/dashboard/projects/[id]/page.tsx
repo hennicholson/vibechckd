@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import ProjectChat from "@/components/projects/ProjectChat";
 import TaskList from "@/components/projects/TaskList";
@@ -57,7 +58,9 @@ function SettingsIcon() {
 export default function ProjectDashboardPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session } = useSession();
   const projectId = params.id as string;
+  const currentUserId = session?.user?.id;
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -317,10 +320,13 @@ export default function ProjectDashboardPage() {
           </div>
         ) : (
           <TaskList
+            projectId={projectId}
             tasks={tasks.map((t) => ({
               id: t.id,
               title: t.title,
               assigneeId: t.assigneeId,
+              assigneeName: t.assigneeName,
+              assigneeImage: t.assigneeImage,
               status: t.status,
               dueDate: t.dueDate || "",
             }))}
@@ -329,7 +335,13 @@ export default function ProjectDashboardPage() {
         )
       )}
       {activeTab === "deliverables" && (
-        <DeliverablesList deliverables={[]} />
+        <DeliverablesList
+          projectId={projectId}
+          currentUserId={currentUserId}
+          isCreator={members.some(
+            (m) => m.userId === currentUserId && m.role !== "client"
+          )}
+        />
       )}
       {activeTab === "details" && (
         <div className="border border-[#e5e5e5] rounded-[10px] p-5">

@@ -135,3 +135,90 @@ export async function POST(
     );
   }
 }
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: projectId } = await params;
+    const body = await req.json();
+    const { taskId, status, title, assignedTo } = body;
+
+    if (!taskId || typeof taskId !== "string") {
+      return NextResponse.json(
+        { error: "taskId is required" },
+        { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify requesting user is a member of this project
+    const [membership] = await db
+      .select()
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (!membership) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Build update payload
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (status !== undefined) updates.status = status;
+    if (title !== undefined) updates.title = title;
+    if (assignedTo !== undefined) updates.assignedTo = assignedTo || null;
+
+    const [updated] = await db
+      .update(tasks)
+      .set(updates)
+      .where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // Fetch assignee info if assigned
+    let assigneeName = "";
+    let assigneeImage = "";
+    if (updated.assignedTo) {
+      const [assignee] = await db
+        .select({ name: users.name, image: users.image })
+        .from(users)
+        .where(eq(users.id, updated.assignedTo))
+        .limit(1);
+      if (assignee) {
+        assigneeName = assignee.name || "";
+        assigneeImage = assignee.image || "";
+      }
+    }
+
+    return NextResponse.json({
+      id: updated.id,
+      title: updated.title,
+      description: updated.description || "",
+      status: updated.status,
+      dueDate: updated.dueDate?.toISOString() || null,
+      assigneeId: updated.assignedTo || "",
+      assigneeName,
+      assigneeImage,
+    });
+  } catch (error) {
+    console.error("Task update error:", error);
+    return NextResponse.json(
+      { error: "Failed to update task" },
+      { status: 500 }
+    );
+  }
+}

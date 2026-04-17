@@ -94,8 +94,20 @@ export default function InboxPage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Track last read timestamps per project (stored in memory for this session)
+  // Track last read timestamps per project (persisted in localStorage)
   const [lastRead, setLastRead] = useState<Record<string, string>>({});
+
+  // Load persisted read timestamps from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("vibechckd-inbox-read");
+    if (saved) {
+      try {
+        setLastRead(JSON.parse(saved));
+      } catch {
+        // ignore malformed data
+      }
+    }
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -124,12 +136,16 @@ export default function InboxPage() {
     return () => clearInterval(interval);
   }, [fetchConversations]);
 
-  // Mark as read when selecting a conversation
+  // Mark as read when selecting a conversation (persists to localStorage)
   const handleSelect = (projectId: string) => {
     setSelected(projectId);
     const conv = conversations.find((c) => c.projectId === projectId);
     if (conv?.lastMessageAt) {
-      setLastRead((prev) => ({ ...prev, [projectId]: conv.lastMessageAt }));
+      setLastRead((prev) => {
+        const updated = { ...prev, [projectId]: conv.lastMessageAt };
+        localStorage.setItem("vibechckd-inbox-read", JSON.stringify(updated));
+        return updated;
+      });
     }
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import TeamSlot from "./TeamSlot";
 import TeamAssembled from "./TeamAssembled";
@@ -20,6 +21,7 @@ const SLOTS: SlotConfig[] = [
 ];
 
 export default function TeamBuilder() {
+  const router = useRouter();
   const [team, setTeam] = useState<Record<string, Coder | null>>({
     frontend: null,
     backend: null,
@@ -27,6 +29,7 @@ export default function TeamBuilder() {
   });
   const [browsingSlot, setBrowsingSlot] = useState<Specialty | null>(null);
   const [initiated, setInitiated] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const filledSlots = Object.entries(team).filter(([, coder]) => coder !== null);
   const filledCount = filledSlots.length;
@@ -53,9 +56,39 @@ export default function TeamBuilder() {
     setBrowsingSlot(null);
   };
 
-  const handleInitiate = () => {
-    setInitiated(true);
+  const handleInitiate = async () => {
+    setIsCreating(true);
     setBrowsingSlot(null);
+
+    try {
+      const selectedMembers = SLOTS
+        .filter((slot) => team[slot.specialty])
+        .map((slot) => ({
+          userId: team[slot.specialty]!.id,
+          roleLabel: slot.label,
+        }));
+
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "New Project",
+          members: selectedMembers,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/dashboard/projects/${data.id}`);
+        return;
+      }
+    } catch {
+      // Fall through to local-only state
+    }
+
+    // Fallback: show assembled state if API fails
+    setInitiated(true);
+    setIsCreating(false);
   };
 
   const selectedIds = new Set(Object.values(team).filter(Boolean).map((c) => c!.id));
@@ -99,9 +132,10 @@ export default function TeamBuilder() {
         <div className="text-center mb-8">
           <button
             onClick={handleInitiate}
-            className="px-[22px] py-2.5 text-[13px] font-medium bg-[#171717] text-[#fafafa] rounded-lg cursor-pointer hover:bg-[#0a0a0a] transition-colors"
+            disabled={isCreating}
+            className="px-[22px] py-2.5 text-[13px] font-medium bg-[#171717] text-[#fafafa] rounded-lg cursor-pointer hover:bg-[#0a0a0a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Initiate project
+            {isCreating ? "Creating..." : "Initiate project"}
           </button>
         </div>
       )}

@@ -14,4 +14,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #9276 | 12:12 AM | 🟣 | Quick action message templates added to project chat | ~561 |
+
+### Apr 17, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #9609 | 1:26 AM | 🟣 | Role-aware chat interface with perspective-specific quick actions and messaging | ~528 |
 </claude-mem-context>

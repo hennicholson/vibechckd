@@ -8,13 +8,17 @@ type Task = {
   id: string;
   title: string;
   assigneeId: string;
+  assigneeName?: string;
+  assigneeImage?: string;
   status: TaskStatus;
   dueDate: string;
 };
 
 interface TaskListProps {
+  projectId: string;
   tasks: Task[];
   onAddTask?: (title: string) => void;
+  onTaskToggle?: (taskId: string, newStatus: TaskStatus) => void;
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -37,7 +41,27 @@ function StatusPill({ status }: { status: TaskStatus }) {
   );
 }
 
-export default function TaskList({ tasks: initialTasks, onAddTask }: TaskListProps) {
+function AssigneeAvatar({ name, image }: { name?: string; image?: string }) {
+  const displayName = name || "Unassigned";
+  const initial = name ? name.charAt(0).toUpperCase() : "?";
+
+  return (
+    <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center text-[10px] font-medium text-neutral-500 overflow-hidden flex-shrink-0">
+        {image ? (
+          <img src={image} alt={displayName} className="w-full h-full object-cover" />
+        ) : (
+          initial
+        )}
+      </div>
+      <span className={`text-[11px] ${name ? "text-[#a3a3a3]" : "text-[#a3a3a3] italic"}`}>
+        {displayName}
+      </span>
+    </div>
+  );
+}
+
+export default function TaskList({ projectId, tasks: initialTasks, onAddTask, onTaskToggle }: TaskListProps) {
   const [tasks, setTasks] = useState(initialTasks);
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -48,14 +72,35 @@ export default function TaskList({ tasks: initialTasks, onAddTask }: TaskListPro
     setTasks(initialTasks);
   });
 
-  const toggleTask = (id: string) => {
+  const toggleTask = async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+
+    const newStatus: TaskStatus = task.status === "done" ? "todo" : "done";
+
+    // Optimistic update
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "done" ? "todo" : ("done" as TaskStatus) }
-          : t
+        t.id === id ? { ...t, status: newStatus } : t
       )
     );
+
+    // Persist to API
+    try {
+      await fetch(`/api/projects/${projectId}/tasks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: id, status: newStatus }),
+      });
+      onTaskToggle?.(id, newStatus);
+    } catch {
+      // Revert on failure
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, status: task.status } : t
+        )
+      );
+    }
   };
 
   const handleAddClick = () => {
@@ -157,6 +202,9 @@ export default function TaskList({ tasks: initialTasks, onAddTask }: TaskListPro
             >
               {task.title}
             </span>
+
+            {/* Assignee */}
+            <AssigneeAvatar name={task.assigneeName} image={task.assigneeImage} />
 
             {/* Status pill */}
             <StatusPill status={task.status} />
