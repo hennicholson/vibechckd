@@ -63,6 +63,11 @@ html {
   border-radius: 4px;
 }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* Subtle static scan effect on PFP images */
 @keyframes pfpScan {
   0% { background-position: 0 0; }

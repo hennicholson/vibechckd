@@ -49,23 +49,27 @@ export async function GET(req: Request) {
         title: projects.title,
         description: projects.description,
         status: projects.status,
+        tags: projects.tags,
         createdAt: projects.createdAt,
         updatedAt: projects.updatedAt,
         memberCount: memberCounts.count,
         lastActivity: latestMsg.latestAt,
+        pinned: projectMembers.pinned,
       })
       .from(projectMembers)
       .innerJoin(projects, eq(projectMembers.projectId, projects.id))
       .leftJoin(memberCounts, eq(projects.id, memberCounts.projectId))
       .leftJoin(latestMsg, eq(projects.id, latestMsg.projectId))
       .where(and(...conditions))
-      .orderBy(desc(sql`coalesce(${latestMsg.latestAt}, ${projects.updatedAt})`));
+      .orderBy(desc(sql`coalesce(${projectMembers.pinned}::int, 0)`), desc(sql`coalesce(${latestMsg.latestAt}, ${projects.updatedAt})`));
 
     const result = rows.map((r) => ({
       id: r.id,
       title: r.title,
       description: r.description || "",
       status: r.status,
+      tags: r.tags || [],
+      pinned: r.pinned || false,
       createdAt: r.createdAt?.toISOString(),
       updatedAt: r.updatedAt?.toISOString(),
       memberCount: r.memberCount || 1,

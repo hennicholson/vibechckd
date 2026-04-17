@@ -150,6 +150,7 @@ export const projects = pgTable("projects", {
   description: text("description"),
   status: projectStatusEnum("status").default("draft"),
   budget: decimal("budget", { precision: 10, scale: 2 }),
+  tags: text("tags").array(),
   startDate: timestamp("start_date", { mode: "date" }),
   endDate: timestamp("end_date", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -161,6 +162,7 @@ export const projectMembers = pgTable("project_members", {
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   roleLabel: text("role_label").notNull(),
+  pinned: boolean("pinned").default(false),
   addedAt: timestamp("added_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -198,6 +200,31 @@ export const messages = pgTable("messages", {
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   senderId: uuid("sender_id").references(() => users.id),
+  content: text("content").notNull(),
+  messageType: messageTypeEnum("message_type").default("text"),
+  fileUrl: text("file_url"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ── Direct Messages ──
+
+export const directMessageThreads = pgTable("direct_message_threads", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const directMessageParticipants = pgTable("direct_message_participants", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  threadId: uuid("thread_id").notNull().references(() => directMessageThreads.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const directMessages = pgTable("direct_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  threadId: uuid("thread_id").notNull().references(() => directMessageThreads.id, { onDelete: "cascade" }),
+  senderId: uuid("sender_id").notNull().references(() => users.id),
   content: text("content").notNull(),
   messageType: messageTypeEnum("message_type").default("text"),
   fileUrl: text("file_url"),

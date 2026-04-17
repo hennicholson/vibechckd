@@ -369,7 +369,7 @@ function CreatorOverview() {
         </div>
       )}
 
-      {/* Quick stats row */}
+      {/* Quick stats row -- folder shape cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: "Projects", value: String(projects.length), href: "/dashboard/projects" },
@@ -377,31 +377,30 @@ function CreatorOverview() {
           { label: "Profile views", value: "\u2014", href: null },
           { label: "Earnings", value: earningsCents > 0 ? `$${(earningsCents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}` : "\u2014", href: "/dashboard/earnings" },
         ].map((stat) => {
-          const content = (
-            <>
-              <p className="text-[11px] font-mono uppercase text-text-muted mb-1">
-                {stat.label}
-              </p>
-              <p className="text-[24px] font-semibold text-text-primary">
-                {stat.value}
-              </p>
-            </>
+          const folderCard = (hoverClass: string = "") => (
+            <div className={`relative ${hoverClass}`}>
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 120" preserveAspectRatio="none" fill="none">
+                <path
+                  d="M4 16 C4 7 4 4 4 4 C4 1.5 6 0 8 0 L56 0 C60 0 62 1 64 4 L70 13 C72 16 75 17 78 17 L190 17 C194 17 196 19 196 22 L196 110 C196 114 194 116 190 116 L10 116 C6 116 4 114 4 110 Z"
+                  className="stroke-border fill-none transition-colors"
+                  strokeWidth="1.2"
+                  vectorEffect="non-scaling-stroke"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div className="relative pt-6 pb-3 px-4">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted mb-1">{stat.label}</p>
+                <p className="text-[22px] font-semibold text-text-primary tabular-nums">{stat.value}</p>
+              </div>
+            </div>
           );
           return stat.href ? (
-            <Link
-              key={stat.label}
-              href={stat.href}
-              className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors"
-            >
-              {content}
+            <Link key={stat.label} href={stat.href} className="group">
+              {folderCard("[&_path]:group-hover:stroke-border-hover")}
             </Link>
           ) : (
-            <div
-              key={stat.label}
-              className="border border-border rounded-[10px] p-4"
-            >
-              {content}
-            </div>
+            <div key={stat.label}>{folderCard()}</div>
           );
         })}
       </div>
