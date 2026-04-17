@@ -137,10 +137,10 @@ export default function ProjectsPage() {
     status === "completed" || status === "cancelled";
 
   return (
-    <div className="px-6 py-6 max-w-[720px]">
+    <div className="px-4 md:px-8 py-6 max-w-[720px]">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-[20px] font-semibold text-[#0a0a0a] font-display">
+        <h1 className="text-[20px] font-semibold text-text-primary">
           Projects
         </h1>
         <Button
@@ -154,19 +154,19 @@ export default function ProjectsPage() {
 
       {/* Loading skeleton */}
       {isLoading && (
-        <div className="border border-[#e5e5e5] rounded-[10px] overflow-hidden">
+        <div className="border border-border rounded-[10px] overflow-hidden">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="flex items-center gap-3 px-4 py-3 border-b border-[#e5e5e5] last:border-b-0"
+              className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0"
             >
               <div className="flex-1">
-                <div className="h-4 w-40 bg-neutral-100 rounded animate-pulse mb-1" />
-                <div className="h-3 w-64 bg-neutral-100 rounded animate-pulse" />
+                <div className="h-4 w-40 bg-surface-muted rounded animate-pulse mb-1" />
+                <div className="h-3 w-64 bg-surface-muted rounded animate-pulse" />
               </div>
-              <div className="h-4 w-14 bg-neutral-100 rounded animate-pulse" />
-              <div className="h-4 w-10 bg-neutral-100 rounded animate-pulse" />
-              <div className="h-4 w-16 bg-neutral-100 rounded animate-pulse" />
+              <div className="h-4 w-14 bg-surface-muted rounded animate-pulse" />
+              <div className="h-4 w-10 bg-surface-muted rounded animate-pulse" />
+              <div className="h-4 w-16 bg-surface-muted rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -175,13 +175,13 @@ export default function ProjectsPage() {
       {/* Empty state */}
       {!isLoading && projects.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-[13px] text-neutral-500 font-body mb-4">
+          <p className="text-[13px] text-text-muted mb-4">
             No projects yet -- browse coders to get started
           </p>
           <Button
             variant="primary"
             size="md"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/browse")}
           >
             Browse coders
           </Button>
@@ -190,19 +190,19 @@ export default function ProjectsPage() {
 
       {/* Project list */}
       {!isLoading && projects.length > 0 && (
-        <div className="border border-[#e5e5e5] rounded-[10px] overflow-hidden">
+        <div className="border border-border rounded-[10px] overflow-hidden">
           {/* Column headers */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-[#e5e5e5] bg-neutral-50">
-            <span className="flex-1 text-[11px] font-mono text-neutral-500 uppercase tracking-wider">
+          <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-surface-muted">
+            <span className="flex-1 text-[11px] font-mono text-text-muted uppercase tracking-wider">
               Project
             </span>
-            <span className="w-20 text-[11px] font-mono text-neutral-500 uppercase tracking-wider text-center">
+            <span className="w-20 text-[11px] font-mono text-text-muted uppercase tracking-wider text-center">
               Status
             </span>
-            <span className="w-14 text-[11px] font-mono text-neutral-500 uppercase tracking-wider text-center">
+            <span className="w-14 text-[11px] font-mono text-text-muted uppercase tracking-wider text-center">
               Team
             </span>
-            <span className="w-20 text-[11px] font-mono text-neutral-500 uppercase tracking-wider text-right">
+            <span className="w-20 text-[11px] font-mono text-text-muted uppercase tracking-wider text-right">
               Updated
             </span>
             <span className="w-[72px]" />
@@ -213,47 +213,52 @@ export default function ProjectsPage() {
             <div
               key={project.id}
               onClick={() => router.push(`/dashboard/projects/${project.id}`)}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 cursor-pointer border-b border-[#e5e5e5] last:border-b-0 ${
+              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 cursor-pointer border-b border-border last:border-b-0 ${
                 isCompleted(project.status)
-                  ? "bg-neutral-50 opacity-60"
-                  : "bg-white hover:bg-neutral-50"
+                  ? "bg-surface-muted opacity-60"
+                  : "bg-background hover:bg-background-alt"
               }`}
             >
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <span className="text-[13px] font-medium text-[#0a0a0a] font-body block truncate">
+                <span className="text-[13px] font-medium text-text-primary block truncate">
                   {project.title}
                 </span>
-                <p className="text-[12px] text-neutral-500 font-body truncate mt-0.5">
+                <p className="text-[12px] text-text-muted truncate mt-0.5">
                   {project.description}
                 </p>
               </div>
 
               {/* Status */}
-              <span className={`w-20 text-center text-[11px] font-mono ${
-                isCompleted(project.status) ? "text-neutral-400" : "text-[#0a0a0a]"
+              <span className={`hidden md:block w-20 text-center text-[11px] font-mono ${
+                isCompleted(project.status) ? "text-text-muted" : "text-text-primary"
               }`}>
                 {STATUS_LABELS[project.status] || project.status}
               </span>
 
               {/* Member count */}
-              <div className="w-14 flex items-center justify-center gap-1 text-neutral-500 flex-shrink-0">
+              <div className="hidden md:flex w-14 items-center justify-center gap-1 text-text-muted flex-shrink-0">
                 <UsersIcon />
                 <span className="text-[11px] font-mono">{project.memberCount}</span>
               </div>
 
               {/* Updated */}
-              <span className="w-20 text-right text-[11px] font-mono text-neutral-500 flex-shrink-0">
+              <span className="hidden md:block w-20 text-right text-[11px] font-mono text-text-muted flex-shrink-0">
                 {formatUpdated(project.lastActivity)}
               </span>
 
+              {/* Mobile status badge */}
+              <span className="md:hidden text-[11px] font-mono text-text-muted flex-shrink-0">
+                {STATUS_LABELS[project.status] || project.status}
+              </span>
+
               {/* Actions */}
-              <div className="w-[72px] flex items-center justify-end gap-1 flex-shrink-0">
+              <div className="hidden md:flex w-[72px] items-center justify-end gap-1 flex-shrink-0">
                 {!isCompleted(project.status) && (
                   <button
                     onClick={(e) => handleArchive(e, project.id)}
                     disabled={actionLoading === project.id}
-                    className="p-1.5 rounded-md text-neutral-400 hover:text-[#0a0a0a] hover:bg-neutral-100 transition-colors duration-150 cursor-pointer disabled:opacity-40"
+                    className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors duration-150 cursor-pointer disabled:opacity-40"
                     title="Archive project"
                   >
                     <ArchiveIcon />
@@ -263,16 +268,21 @@ export default function ProjectsPage() {
                   <button
                     onClick={(e) => handleDelete(e, project.id)}
                     disabled={actionLoading === project.id}
-                    className="p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer disabled:opacity-40"
+                    className="p-1.5 rounded-md text-text-muted hover:text-negative hover:bg-negative/10 transition-colors duration-150 cursor-pointer disabled:opacity-40"
                     title="Delete draft"
                   >
                     <TrashIcon />
                   </button>
                 )}
-                <span className="text-neutral-400 flex-shrink-0 ml-0.5">
+                <span className="text-text-muted flex-shrink-0 ml-0.5">
                   <ChevronRightIcon />
                 </span>
               </div>
+
+              {/* Mobile chevron */}
+              <span className="md:hidden text-text-muted flex-shrink-0">
+                <ChevronRightIcon />
+              </span>
             </div>
           ))}
         </div>

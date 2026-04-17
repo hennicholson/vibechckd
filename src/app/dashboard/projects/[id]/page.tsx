@@ -330,6 +330,7 @@ export default function ProjectDashboardPage() {
               status: t.status,
               dueDate: t.dueDate || "",
             }))}
+            members={members.map((m) => ({ userId: m.userId, name: m.name, role: m.role }))}
             onAddTask={handleAddTask}
           />
         )

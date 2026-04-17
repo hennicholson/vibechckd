@@ -72,8 +72,29 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const goNext = () => { if (step < 5) { setDirection(1); setStep(step + 1); } };
-  const goBack = () => { if (step > 1) { setDirection(-1); setStep(step - 1); } };
+  const [stepError, setStepError] = useState("");
+
+  const validateStep = (): boolean => {
+    if (step === 1) {
+      if (!form.name.trim()) { setStepError("Name is required."); return false; }
+      if (!form.email.trim()) { setStepError("Email is required."); return false; }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) { setStepError("Please enter a valid email."); return false; }
+    }
+    if (step === 2 && form.specialties.length === 0) {
+      setStepError("Select at least one specialty.");
+      return false;
+    }
+    if (step === 3 && form.portfolioLinks.length === 0) {
+      setStepError("Add at least one portfolio link.");
+      return false;
+    }
+    setStepError("");
+    return true;
+  };
+
+  const goNext = () => { if (step < 5 && validateStep()) { setDirection(1); setStep(step + 1); } };
+  const goBack = () => { if (step > 1) { setStepError(""); setDirection(-1); setStep(step - 1); } };
 
   const handleSubmit = async () => {
     setSubmitError("");
@@ -86,6 +107,7 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
           userId: session?.user?.id || null,
           name: form.name,
           email: form.email,
+          location: form.location,
           specialties: form.specialties,
           portfolioLinks: form.portfolioLinks,
           rateExpectation: form.rateExpectation,
@@ -248,8 +270,8 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
         </AnimatePresence>
       </div>
 
-      {submitError && (
-        <p className="text-[12px] text-negative text-center mt-4">{submitError}</p>
+      {(submitError || stepError) && (
+        <p className="text-[12px] text-negative text-center mt-4">{submitError || stepError}</p>
       )}
 
       <div className="flex justify-between mt-8">

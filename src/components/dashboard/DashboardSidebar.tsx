@@ -230,9 +230,6 @@ export default function DashboardSidebar() {
             >
               {item.icon}
               <span className="flex-1">{item.label}</span>
-              {item.label === "Inbox" && (
-                <span className="w-2 h-2 rounded-full bg-[#0a0a0a] flex-shrink-0" />
-              )}
             </Link>
           ))}
         </div>

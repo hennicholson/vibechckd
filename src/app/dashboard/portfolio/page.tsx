@@ -36,7 +36,7 @@ export default function PortfolioPage() {
 
   if (error) {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 md:px-8 py-8">
         <p className="text-negative text-[14px]">Error: {error}</p>
       </div>
     );
@@ -44,7 +44,7 @@ export default function PortfolioPage() {
 
   if (items === null) {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 md:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div className="h-6 w-28 bg-surface-muted rounded animate-pulse" />
           <div className="h-9 w-24 bg-surface-muted rounded-lg animate-pulse" />

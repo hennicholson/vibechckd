@@ -386,7 +386,7 @@ export default function CompanyPage() {
 
         {/* Sticky save bar */}
         {isDirty && (
-          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-8 px-4 md:px-8 py-3 flex items-center justify-between">
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-4 md:-mx-8 px-4 md:px-8 py-3 flex items-center justify-between">
             <span className="text-[12px] text-text-muted">Unsaved changes</span>
             <div className="flex items-center gap-2">
               <button

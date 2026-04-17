@@ -26,6 +26,7 @@ function Code({ children }: { children: React.ReactNode }) {
 
 export default function DocsPage() {
   const [activeSection, setActiveSection] = useState("getting-started");
+  const [mobileTocOpen, setMobileTocOpen] = useState(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -50,6 +51,42 @@ export default function DocsPage() {
   return (
     <PageShell>
       <div className="max-w-[960px] mx-auto px-6 py-12 flex gap-16">
+        {/* Mobile TOC */}
+        <div className="lg:hidden fixed bottom-4 right-4 z-40">
+          <button
+            onClick={() => setMobileTocOpen(!mobileTocOpen)}
+            className="w-10 h-10 rounded-full bg-[#171717] text-[#fafafa] shadow-[0_2px_8px_rgba(0,0,0,0.15)] flex items-center justify-center cursor-pointer"
+            aria-label="Table of contents"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          {mobileTocOpen && (
+            <div className="absolute bottom-12 right-0 w-[220px] bg-background border border-border rounded-lg shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-3">
+              <p className="text-[12px] font-semibold text-text-primary tracking-[-0.02em] mb-2">
+                On this page
+              </p>
+              <nav className="flex flex-col gap-0.5">
+                {tocSections.map((s) => (
+                  <a
+                    key={s.id}
+                    href={`#${s.id}`}
+                    onClick={() => setMobileTocOpen(false)}
+                    className={`text-[13px] py-1 transition-colors duration-150 ${
+                      activeSection === s.id
+                        ? "text-text-primary font-medium"
+                        : "text-text-muted hover:text-text-primary"
+                    }`}
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          )}
+        </div>
+
         {/* Sidebar */}
         <aside className="hidden lg:block w-[200px] flex-shrink-0">
           <div className="sticky top-[72px]">

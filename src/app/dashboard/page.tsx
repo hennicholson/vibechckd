@@ -298,7 +298,7 @@ function CreatorOverview() {
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />
         </div>
         <div className="h-20 bg-surface-muted rounded-[10px] animate-pulse mb-8" />
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-20 bg-surface-muted rounded-[10px] animate-pulse" />
           ))}
@@ -370,7 +370,7 @@ function CreatorOverview() {
       )}
 
       {/* Quick stats row */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: "Projects", value: String(projects.length), href: "/dashboard/projects" },
           { label: "Portfolio items", value: String(portfolioCount), href: "/dashboard/portfolio" },
@@ -496,28 +496,28 @@ function CreatorOverview() {
       {/* Quick links */}
       <div className="border border-border rounded-[10px] p-5">
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Quick links</p>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Link
             href="/dashboard/profile"
             className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
           >
             Edit profile
           </Link>
-          <span className="text-border">|</span>
+          <span className="text-border hidden sm:inline">|</span>
           <Link
             href="/dashboard/portfolio"
             className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
           >
             Manage portfolio
           </Link>
-          <span className="text-border">|</span>
+          <span className="text-border hidden sm:inline">|</span>
           <Link
             href="/dashboard/earnings"
             className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
           >
             Earnings
           </Link>
-          <span className="text-border">|</span>
+          <span className="text-border hidden sm:inline">|</span>
           <Link
             href="/browse"
             className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
@@ -545,7 +545,7 @@ export default function DashboardPage() {
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />
         </div>
         <div className="h-20 bg-surface-muted rounded-[10px] animate-pulse mb-8" />
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-20 bg-surface-muted rounded-[10px] animate-pulse" />
           ))}

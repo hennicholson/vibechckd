@@ -12,6 +12,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+    }
+
     const role = requestedRole === "client" ? "client" : "coder";
 
     if (password.length < 6) {
@@ -22,7 +29,7 @@ export async function POST(req: Request) {
     const [existing] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, normalizedEmail))
       .limit(1);
 
     if (existing) {
@@ -36,7 +43,7 @@ export async function POST(req: Request) {
       .insert(users)
       .values({
         name,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role,
       })

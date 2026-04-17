@@ -9,4 +9,10 @@
 |----|------|---|-------|------|
 | #8931 | 1:28 PM | 🔄 | Register page refactored for Suspense boundary | ~203 |
 | #8928 | " | 🟣 | Two-step registration flow with role selection | ~452 |
+
+### Apr 17, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #9645 | 1:45 AM | 🔴 | Registration email normalization and double-submit prevention | ~359 |
 </claude-mem-context>

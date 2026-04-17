@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Input from "@/components/Input";
@@ -28,6 +28,22 @@ export default function SettingsPage() {
 
   // Availability
   const [availability, setAvailability] = useState<string>("Available");
+  const [availabilityLoading, setAvailabilityLoading] = useState(isCreator);
+
+  // Load current availability from profile
+  useEffect(() => {
+    if (!isCreator) return;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.availability) {
+          const label = data.availability.charAt(0).toUpperCase() + data.availability.slice(1);
+          setAvailability(label);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAvailabilityLoading(false));
+  }, [isCreator]);
 
   // Notifications
   const [emailNotifications, setEmailNotifications] = useState(true);

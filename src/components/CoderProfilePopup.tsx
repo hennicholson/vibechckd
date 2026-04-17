@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSession } from "next-auth/react";
 import Badge from "./Badge";
 import Tag from "./Tag";
 import Button from "./Button";
@@ -23,8 +24,39 @@ const assetLabels: Record<PortfolioAsset["type"], string> = {
 
 export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupProps) {
   const [activeProject, setActiveProject] = useState<PortfolioItem | null>(null);
+  const { status: authStatus } = useSession();
+  const [initiating, setInitiating] = useState<string | null>(null);
 
   if (!coder) return null;
+
+  const handleInquiry = async (type: "project" | "inquiry") => {
+    if (authStatus !== "authenticated") {
+      window.location.href = "/register?role=client";
+      return;
+    }
+    setInitiating(type);
+    try {
+      const res = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coderId: coder.id, coderName: coder.displayName, type }),
+      });
+      const data = await res.json();
+      if (data.projectId) {
+        window.location.href = `/dashboard/projects/${data.projectId}`;
+      }
+    } catch {
+      setInitiating(null);
+    }
+  };
+
+  const specialties = coder.specialties || [];
+  const skills = coder.skills || [];
+  const portfolio = coder.portfolio || [];
+  const location = coder.location || "Remote";
+  const hourlyRate = coder.hourlyRate || "";
+  const specialtyLabel = specialties[0] ? (SPECIALTY_LABELS[specialties[0]] || specialties[0]) : "Developer";
+  const metaParts = [specialtyLabel, hourlyRate, location].filter(Boolean);
 
   return (
     <AnimatePresence>
@@ -58,8 +90,16 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
             {/* Header */}
             <div className="p-6 pb-0">
               <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-[10px] bg-surface-muted flex items-center justify-center text-[18px] font-medium text-border-hover flex-shrink-0">
-                  {coder.displayName.split(" ").map(n => n[0]).join("")}
+                <div className="w-14 h-14 rounded-[10px] bg-surface-muted flex items-center justify-center text-[18px] font-medium text-border-hover flex-shrink-0 overflow-hidden">
+                  {coder.avatarUrl ? (
+                    <img
+                      src={coder.avatarUrl}
+                      alt={coder.displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    coder.displayName.split(" ").map(n => n[0]).join("")
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -69,7 +109,7 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
                     {coder.verified && <Badge variant="verified" />}
                   </div>
                   <p className="text-[13px] text-text-muted mt-0.5">
-                    {SPECIALTY_LABELS[coder.specialties[0]]} &middot; {coder.hourlyRate} &middot; {coder.location}
+                    {metaParts.join(" \u00b7 ")}
                   </p>
                 </div>
               </div>
@@ -79,18 +119,24 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
               </p>
 
               {/* Tags */}
-              <div className="flex flex-wrap gap-1.5 mt-4">
-                {coder.skills.map((skill) => (
-                  <Tag key={skill}>{skill}</Tag>
-                ))}
-              </div>
+              {skills.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-4">
+                  {skills.map((skill) => (
+                    <Tag key={skill}>{skill}</Tag>
+                  ))}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-5">
-                <Button>Start project</Button>
-                <Button variant="secondary">Send inquiry</Button>
+                <Button onClick={() => handleInquiry("project")} disabled={!!initiating}>
+                  {initiating === "project" ? "Starting..." : "Start project"}
+                </Button>
+                <Button variant="secondary" onClick={() => handleInquiry("inquiry")} disabled={!!initiating}>
+                  {initiating === "inquiry" ? "Sending..." : "Send inquiry"}
+                </Button>
                 <div className="flex-1" />
-                <Badge variant={coder.availability} />
+                <Badge variant={coder.availability || "available"} />
               </div>
 
               {/* Social */}
@@ -121,7 +167,7 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
             </div>
 
             {/* Portfolio Section */}
-            {coder.portfolio.length > 0 && (
+            {portfolio.length > 0 && (
               <div className="border-t border-border">
                 <div className="px-6 pt-5 pb-2">
                   <p className="text-[13px] font-medium text-text-muted">Work</p>
@@ -129,7 +175,7 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
 
                 {/* Project Tabs */}
                 <div className="px-6 flex gap-0 border-b border-border">
-                  {coder.portfolio.map((item) => (
+                  {portfolio.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => setActiveProject(activeProject?.id === item.id ? null : item)}

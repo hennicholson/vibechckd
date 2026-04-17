@@ -203,7 +203,7 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <div className="px-8 py-6 max-w-[1100px]">
+    <div className="px-4 md:px-8 py-6 max-w-[1100px]">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">

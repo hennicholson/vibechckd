@@ -179,13 +179,16 @@ function MobileFilterBar({
 function CoderCard({ coder, onClick, index }: { coder: Coder; onClick: () => void; index: number }) {
   const hasGif = coder.gifPreviewUrl && isRealUrl(coder.gifPreviewUrl);
   const thumbnailUrl = hasGif ? coder.gifPreviewUrl : coder.avatarUrl;
-  const projectCount = coder.portfolio.length;
+  const portfolio = coder.portfolio || [];
+  const skills = coder.skills || [];
+  const projectCount = portfolio.length;
+  const location = coder.location || "Remote";
   const availabilityColor = coder.availability === "available"
     ? "bg-emerald-500"
     : coder.availability === "selective"
       ? "bg-amber-400"
       : "bg-neutral-400";
-  const skillsPreview = coder.skills.slice(0, 3).join(", ");
+  const skillsPreview = skills.slice(0, 3).join(", ");
 
   return (
     <motion.button
@@ -232,7 +235,7 @@ function CoderCard({ coder, onClick, index }: { coder: Coder; onClick: () => voi
               {coder.verified && <Badge variant="verified" />}
             </div>
             <span className="text-[12px] text-text-muted truncate block">
-              {SPECIALTY_LABELS[coder.specialties?.[0]] || "Developer"} &middot; {coder.location}
+              {SPECIALTY_LABELS[coder.specialties?.[0]] || "Developer"} &middot; {location}
             </span>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">

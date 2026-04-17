@@ -54,17 +54,19 @@ function RegisterContent() {
   };
 
   async function handleSubmit() {
-    if (!role) return;
+    if (!role || loading) return;
     setError("");
     setLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: role === "client" ? (companyName || name) : name,
-          email,
+          email: normalizedEmail,
           password,
           role,
           onboarding: role === "client"
@@ -76,19 +78,18 @@ function RegisterContent() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Something went wrong");
-        setLoading(false);
         return;
       }
 
-      const result = await signIn("credentials", { email, password, redirect: false });
+      const result = await signIn("credentials", { email: normalizedEmail, password, redirect: false });
       if (result?.error) {
         setError("Account created but sign-in failed. Try logging in.");
-        setLoading(false);
       } else {
         router.push("/dashboard");
       }
     } catch {
       setError("Something went wrong");
+    } finally {
       setLoading(false);
     }
   }
@@ -186,7 +187,7 @@ function RegisterContent() {
                 Create your account
               </h1>
               <p className="text-[11px] text-text-muted text-center mt-1 mb-6">
-                {role === "client" ? "Step 1 of 3 — Account details" : "Step 1 of 3 — Account details"}
+                Step 1 of 3 — Account details
               </p>
 
               <div className="space-y-4">
@@ -352,7 +353,7 @@ function RegisterContent() {
                 <Button onClick={handleSubmit} className="w-full" disabled={loading}>
                   {loading ? "Creating account..." : "Create account"}
                 </Button>
-                <button onClick={handleSubmit} className="w-full text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer text-center">
+                <button onClick={handleSubmit} disabled={loading} className="w-full text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer text-center disabled:opacity-50 disabled:pointer-events-none">
                   Skip for now
                 </button>
               </div>

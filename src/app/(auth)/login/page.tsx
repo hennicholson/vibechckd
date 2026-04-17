@@ -17,20 +17,30 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!email || !password) {
+      setError("Please enter your email and password");
+      return;
+    }
+
     setLoading(true);
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+      });
 
-    setLoading(false);
-
-    if (result?.error) {
-      setError("Invalid email or password");
-    } else {
-      router.push("/dashboard");
+      if (result?.error) {
+        setError("Invalid email or password");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 

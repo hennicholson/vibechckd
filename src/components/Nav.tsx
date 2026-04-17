@@ -133,7 +133,7 @@ export default function Nav() {
                         Profile
                       </Link>
                       {profileSlug && (
-                        <Link href={`/coders/${profileSlug}`} onClick={() => setMenuOpen(false)} className="block px-3 py-1.5 text-[12px] text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors">
+                        <Link href={`/coders/${profileSlug}`} onClick={() => setMenuOpen(false)} className="block px-3 py-1.5 text-[13px] text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors">
                           View public profile
                         </Link>
                       )}
@@ -183,7 +183,7 @@ export default function Nav() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            className="md:hidden border-t border-border bg-background"
+            className="md:hidden border-t border-border bg-background overflow-hidden"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -211,7 +211,7 @@ export default function Nav() {
                     <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Dashboard</Link>
                     <Link href="/dashboard/profile" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Profile</Link>
                     {profileSlug && (
-                      <Link href={`/coders/${profileSlug}`} onClick={() => setMobileOpen(false)} className="block py-2 text-[12px] text-text-muted">View public profile</Link>
+                      <Link href={`/coders/${profileSlug}`} onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">View public profile</Link>
                     )}
                     <Link href="/dashboard/portfolio" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Portfolio</Link>
                     <Link href="/dashboard/projects" onClick={() => setMobileOpen(false)} className="block py-2 text-[13px] text-text-muted">Projects</Link>

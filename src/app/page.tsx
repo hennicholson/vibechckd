@@ -215,6 +215,33 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
+
+      {/* Closing CTA */}
+      <section className="py-20 border-t border-border">
+        <div className="max-w-[960px] mx-auto px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-[24px] font-semibold text-text-primary tracking-[-0.03em] leading-[1.2]">
+              Ready to work with the best?
+            </h2>
+            <p className="text-[14px] text-text-muted mt-3 max-w-[400px] mx-auto leading-[1.55]">
+              Whether you are hiring or building your reputation, vibechckd is where quality meets opportunity.
+            </p>
+            <div className="flex gap-2 mt-6 justify-center">
+              <Link href="/browse">
+                <Button>Browse coders</Button>
+              </Link>
+              <Link href="/apply">
+                <Button variant="secondary">Apply to join</Button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
     </PageShell>
   );
 }

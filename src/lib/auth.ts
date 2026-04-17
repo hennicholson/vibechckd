@@ -20,7 +20,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = credentials.email as string;
+        const email = (credentials.email as string).trim().toLowerCase();
         const password = credentials.password as string;
 
         try {
@@ -53,14 +53,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        (session.user as any).role = token.role;
+        session.user.role = token.role;
       }
       return session;
     },
