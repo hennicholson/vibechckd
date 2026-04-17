@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useToast } from "@/components/Toast";
 
 type DeliverableStatus = "pending" | "submitted" | "approved" | "revision_requested";
 
@@ -148,13 +149,17 @@ export default function DeliverablesList({
 }: DeliverablesListProps) {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newFileUrl, setNewFileUrl] = useState("");
   const [newLiveUrl, setNewLiveUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/deliverables`)
@@ -163,6 +168,38 @@ export default function DeliverablesList({
       .catch(() => setDeliverables([]))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "asset");
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        toast("Upload failed", "error");
+        setUploading(false);
+        return;
+      }
+
+      const { url } = await uploadRes.json();
+      setNewFileUrl(url);
+      setUploadedFileName(file.name);
+      toast("File uploaded", "success");
+    } catch {
+      toast("Upload failed", "error");
+    }
+    setUploading(false);
+  };
 
   const handleSubmitDeliverable = async () => {
     const title = newTitle.trim();
@@ -186,10 +223,12 @@ export default function DeliverablesList({
         setNewTitle("");
         setNewFileUrl("");
         setNewLiveUrl("");
+        setUploadedFileName("");
         setIsAdding(false);
+        toast("Deliverable submitted", "success");
       }
     } catch {
-      // Silently fail -- user can retry
+      toast("Failed to submit", "error");
     } finally {
       setSubmitting(false);
     }
@@ -260,44 +299,84 @@ export default function DeliverablesList({
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Deliverable title..."
-                className="w-full text-[13px] font-body text-[#0a0a0a] placeholder:text-neutral-400 bg-transparent outline-none"
+                className="w-full text-[13px] font-body text-[#0a0a0a] placeholder:text-text-muted bg-transparent outline-none"
               />
-              <div className="flex gap-2">
+
+              {/* File upload + Live URL */}
+              <div className="flex items-center gap-2">
                 <input
-                  type="url"
-                  value={newFileUrl}
-                  onChange={(e) => setNewFileUrl(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="File URL (optional)"
-                  className="flex-1 text-[12px] font-body text-[#0a0a0a] placeholder:text-neutral-400 bg-neutral-50 border border-[#e5e5e5] rounded-md px-2.5 py-1.5 outline-none focus:border-neutral-400 transition-colors duration-150"
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileUpload}
                 />
+                {newFileUrl ? (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-muted border border-border rounded-md text-[12px] text-text-primary">
+                    <FileIcon />
+                    <span className="truncate max-w-[120px]">{uploadedFileName || "File"}</span>
+                    <button
+                      onClick={() => { setNewFileUrl(""); setUploadedFileName(""); }}
+                      className="text-text-muted hover:text-negative ml-1 cursor-pointer"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover transition-colors cursor-pointer disabled:opacity-40"
+                  >
+                    {uploading ? (
+                      <>
+                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        Attach file
+                      </>
+                    )}
+                  </button>
+                )}
+
                 <input
                   type="url"
                   value={newLiveUrl}
                   onChange={(e) => setNewLiveUrl(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Live URL (optional)"
-                  className="flex-1 text-[12px] font-body text-[#0a0a0a] placeholder:text-neutral-400 bg-neutral-50 border border-[#e5e5e5] rounded-md px-2.5 py-1.5 outline-none focus:border-neutral-400 transition-colors duration-150"
+                  placeholder="Live preview URL (optional)"
+                  className="flex-1 text-[12px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-2.5 py-1.5 outline-none focus:border-border-hover transition-colors"
                 />
               </div>
+
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => {
                     setNewTitle("");
                     setNewFileUrl("");
                     setNewLiveUrl("");
+                    setUploadedFileName("");
                     setIsAdding(false);
                   }}
-                  className="text-[12px] font-body text-neutral-500 hover:text-[#0a0a0a] px-3 py-1.5 rounded-md transition-colors duration-150 cursor-pointer"
+                  className="text-[12px] font-body text-text-muted hover:text-text-primary px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitDeliverable}
                   disabled={!newTitle.trim() || submitting}
-                  className="text-[12px] font-body text-white bg-[#0a0a0a] hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-md transition-colors duration-150 cursor-pointer"
+                  className="text-[12px] font-body text-white bg-[#171717] hover:bg-[#0a0a0a] disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                 >
-                  {submitting ? "Submitting..." : "Submit"}
+                  {submitting ? "Submitting..." : "Submit deliverable"}
                 </button>
               </div>
             </div>
@@ -361,10 +440,10 @@ export default function DeliverablesList({
                 href={d.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] font-mono text-neutral-500 hover:text-[#0a0a0a] transition-colors duration-150"
+                className="flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
               >
-                <LinkIcon />
-                File
+                <FileIcon />
+                View file
               </a>
             )}
             {d.liveUrl && (
@@ -372,10 +451,10 @@ export default function DeliverablesList({
                 href={d.liveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] font-mono text-neutral-500 hover:text-[#0a0a0a] transition-colors duration-150"
+                className="flex items-center gap-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md px-2 py-1 hover:border-border-hover hover:text-text-primary transition-colors no-underline"
               >
                 <LinkIcon />
-                Live
+                Live preview
               </a>
             )}
 
