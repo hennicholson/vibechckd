@@ -269,3 +269,86 @@ export async function createWhopWithdrawal(params: {
   const data = await res.json();
   return { id: data.id, status: data.status || "pending" };
 }
+
+export async function createConnectedAccount(params: {
+  email: string;
+  name: string;
+  internalUserId: string;
+}): Promise<{ companyId: string }> {
+  const body = {
+    email: params.email,
+    parent_company_id: getCompanyId(),
+    title: params.name,
+    metadata: {
+      internal_user_id: params.internalUserId,
+    },
+  };
+
+  const res = await fetch(`${WHOP_BASE_URL}/companies`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(
+      `Connected account creation failed (${res.status}): ${errorText}`
+    );
+  }
+
+  const data = await res.json();
+  return { companyId: data.id };
+}
+
+export async function createPayoutTransfer(params: {
+  destinationCompanyId: string;
+  amountDollars: number;
+  description: string;
+  idempotencyKey: string;
+}): Promise<{ id: string; feeAmount: number; status: string }> {
+  const body = {
+    amount: params.amountDollars,
+    currency: "usd",
+    origin_id: getCompanyId(),
+    destination_id: params.destinationCompanyId,
+    idempotence_key: params.idempotencyKey,
+    notes: params.description.slice(0, 50),
+  };
+
+  const res = await fetch(`${WHOP_BASE_URL}/transfers`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Transfer failed (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return {
+    id: data.id,
+    feeAmount: data.fee_amount || 0,
+    status: data.status || "completed",
+  };
+}
+
+export async function generatePayoutPortalToken(
+  connectedCompanyId: string
+): Promise<string> {
+  const res = await fetch(`${WHOP_BASE_URL}/access_tokens`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ company_id: connectedCompanyId }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Token generation failed (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return data.token;
+}

@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   image: text("image"),
   passwordHash: text("password_hash"),
   role: userRoleEnum("role").default("coder").notNull(),
+  whopCompanyId: text("whop_company_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -94,6 +95,7 @@ export const coderProfiles = pgTable("coder_profiles", {
   twitterUrl: text("twitter_url"),
   linkedinUrl: text("linkedin_url"),
   websiteUrl: text("website_url"),
+  whopCompanyId: text("whop_company_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

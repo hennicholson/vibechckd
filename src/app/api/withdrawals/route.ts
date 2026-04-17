@@ -1,9 +1,17 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { transactions, withdrawals } from "@/db/schema";
+import {
+  users,
+  coderProfiles,
+  transactions,
+  withdrawals,
+} from "@/db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
-import { createWhopWithdrawal } from "@/lib/whop";
+import {
+  createConnectedAccount,
+  createPayoutTransfer,
+} from "@/lib/whop";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -11,28 +19,40 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = session.user.id;
+
+  let withdrawalId: string | null = null;
+  let transactionId: string | null = null;
+
   try {
     const body = await request.json();
     const { amountCents } = body;
 
-    if (!amountCents || amountCents <= 0) {
+    if (!amountCents || typeof amountCents !== "number" || amountCents <= 0) {
       return Response.json(
         { error: "amountCents must be a positive integer" },
         { status: 400 }
       );
     }
 
-    const userId = session.user.id;
+    // Get user info (need email and name for connected account creation)
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
-    // SECURITY WARNING: Race condition risk. The balance check and withdrawal insert
-    // are NOT atomic. Two concurrent withdrawal requests could both pass the balance
-    // check and drain more than the available balance. With neon-http (serverless),
-    // wrapping in a DB transaction is not straightforward. Mitigations:
-    // 1. Use a neon-serverless (websocket) driver for real transactions, OR
-    // 2. Add a unique pending-withdrawal constraint, OR
-    // 3. Use SELECT ... FOR UPDATE in a transaction to lock the balance rows.
+    if (!user) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
 
-    // Compute available balance
+    // RACE CONDITION WARNING: The balance check and transaction insert below are
+    // NOT atomic. Two concurrent withdrawal requests could both pass the balance
+    // check and overdraw the account. A proper solution would use a database
+    // transaction with SELECT ... FOR UPDATE to lock the balance rows. With
+    // neon-http (serverless), true DB transactions require the websocket driver.
+
+    // Compute available balance from completed transactions
     const [balance] = await db
       .select({
         total: sql<number>`coalesce(sum(${transactions.amountCents}), 0)`,
@@ -58,15 +78,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert to dollars for Whop API
+    // Check if user has a connected Whop company (check coderProfiles first, then users)
+    let whopCompanyId: string | null = null;
+
+    const [profile] = await db
+      .select({ whopCompanyId: coderProfiles.whopCompanyId })
+      .from(coderProfiles)
+      .where(eq(coderProfiles.userId, userId))
+      .limit(1);
+
+    whopCompanyId = profile?.whopCompanyId ?? user.whopCompanyId ?? null;
+
+    // If no connected account exists, create one
+    if (!whopCompanyId) {
+      const result = await createConnectedAccount({
+        email: user.email,
+        name: user.name || user.email,
+        internalUserId: userId,
+      });
+      whopCompanyId = result.companyId;
+
+      // Save to coderProfiles if profile exists, otherwise save to users table
+      if (profile) {
+        await db
+          .update(coderProfiles)
+          .set({ whopCompanyId })
+          .where(eq(coderProfiles.userId, userId));
+      } else {
+        await db
+          .update(users)
+          .set({ whopCompanyId })
+          .where(eq(users.id, userId));
+      }
+    }
+
+    const idempotencyKey = crypto.randomUUID();
     const amountDollars = amountCents / 100;
 
-    // Create withdrawal via Whop
-    const whopResult = await createWhopWithdrawal({
-      amountDollars,
-    });
+    // Insert withdrawal record with status "pending"
+    const [withdrawal] = await db
+      .insert(withdrawals)
+      .values({
+        userId,
+        amountCents,
+        status: "pending",
+      })
+      .returning();
+    withdrawalId = withdrawal.id;
 
-    // Insert transaction (negative amount for debit)
+    // Insert transaction record with NEGATIVE amountCents, status "pending"
     const [transaction] = await db
       .insert(transactions)
       .values({
@@ -77,25 +137,66 @@ export async function POST(request: NextRequest) {
         description: `Withdrawal of $${amountDollars.toFixed(2)}`,
       })
       .returning();
+    transactionId = transaction.id;
 
-    // Insert withdrawal record
-    const [withdrawal] = await db
-      .insert(withdrawals)
-      .values({
-        userId,
-        amountCents,
-        status: "pending",
-        whopWithdrawalId: whopResult.id,
+    // Execute the payout transfer via Whop
+    const transferResult = await createPayoutTransfer({
+      destinationCompanyId: whopCompanyId,
+      amountDollars,
+      description: "Withdrawal",
+      idempotencyKey,
+    });
+
+    // Update withdrawal and transaction to "completed"
+    await db
+      .update(withdrawals)
+      .set({
+        status: "completed",
+        whopWithdrawalId: transferResult.id,
+        completedAt: new Date(),
       })
-      .returning();
+      .where(eq(withdrawals.id, withdrawal.id));
+
+    await db
+      .update(transactions)
+      .set({
+        status: "completed",
+        whopTransferId: transferResult.id,
+        completedAt: new Date(),
+      })
+      .where(eq(transactions.id, transaction.id));
 
     return Response.json({
       withdrawalId: withdrawal.id,
       transactionId: transaction.id,
-      status: "pending",
+      status: "completed",
+      feeAmount: transferResult.feeAmount,
     });
   } catch (error) {
     console.error("Withdrawal failed:", error);
+
+    // If we already created DB records, mark them as failed
+    const failureReason =
+      error instanceof Error ? error.message : "Unknown error";
+
+    if (withdrawalId) {
+      await db
+        .update(withdrawals)
+        .set({ status: "failed", failureReason })
+        .where(eq(withdrawals.id, withdrawalId))
+        .catch((e) => console.error("Failed to update withdrawal status:", e));
+    }
+
+    if (transactionId) {
+      await db
+        .update(transactions)
+        .set({ status: "failed" })
+        .where(eq(transactions.id, transactionId))
+        .catch((e) =>
+          console.error("Failed to update transaction status:", e)
+        );
+    }
+
     const message =
       error instanceof Error ? error.message : "Failed to create withdrawal";
     return Response.json({ error: message }, { status: 500 });

@@ -408,7 +408,7 @@ export default function EarningsPage() {
       </div>
 
       {/* Whop Wallet - native balance & withdrawal */}
-      <WhopWallet />
+      <WhopWallet availableCents={avail} onWithdrawalComplete={() => { fetchBalance(); fetchTransactions(); }} />
 
       {/* How it works section */}
       {earned === 0 && (
