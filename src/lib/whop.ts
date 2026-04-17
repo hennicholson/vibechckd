@@ -352,3 +352,27 @@ export async function generatePayoutPortalToken(
   const data = await res.json();
   return data.token;
 }
+
+export async function generatePayoutPortalLink(params: {
+  connectedCompanyId: string;
+  returnUrl: string;
+}): Promise<string> {
+  const res = await fetch(`${WHOP_BASE_URL}/account_links`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      company_id: params.connectedCompanyId,
+      use_case: "payouts_portal",
+      return_url: params.returnUrl,
+      refresh_url: params.returnUrl,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Payout portal link failed (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return data.url;
+}

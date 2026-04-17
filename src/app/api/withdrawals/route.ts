@@ -11,6 +11,7 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import {
   createConnectedAccount,
   createPayoutTransfer,
+  generatePayoutPortalLink,
 } from "@/lib/whop";
 
 export async function POST(request: NextRequest) {
@@ -166,11 +167,25 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(transactions.id, transaction.id));
 
+    // Generate payout portal link so creator can claim funds
+    let payoutPortalUrl: string | null = null;
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+      payoutPortalUrl = await generatePayoutPortalLink({
+        connectedCompanyId: whopCompanyId,
+        returnUrl: `${baseUrl}/dashboard/earnings`,
+      });
+    } catch (err) {
+      console.error("Failed to generate payout portal link:", err);
+      // Non-blocking -- transfer already succeeded
+    }
+
     return Response.json({
       withdrawalId: withdrawal.id,
       transactionId: transaction.id,
       status: "completed",
       feeAmount: transferResult.feeAmount,
+      payoutPortalUrl,
     });
   } catch (error) {
     console.error("Withdrawal failed:", error);

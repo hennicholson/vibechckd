@@ -155,6 +155,11 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
       setShowWithdraw(false);
       setWithdrawAmount("");
       onWithdrawalComplete?.();
+
+      // If payout portal URL returned, open it so creator can claim funds
+      if (data.payoutPortalUrl) {
+        window.open(data.payoutPortalUrl, "_blank");
+      }
     } catch {
       toast("Withdrawal failed");
     }
@@ -187,16 +192,34 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
                 You have <span className="font-semibold text-text-primary">${maxDollars.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span> available to withdraw. Set up a payout method to cash out your earnings.
               </p>
 
-              <button
-                onClick={async () => {
-                  // First withdrawal attempt will auto-create connected account
-                  setShowWithdraw(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#171717] text-white rounded-lg hover:bg-[#0a0a0a] transition-colors cursor-pointer mb-4"
-              >
-                <IconArrowDown />
-                Withdraw earnings
-              </button>
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  onClick={() => setShowWithdraw(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#171717] text-white rounded-lg hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+                >
+                  <IconArrowDown />
+                  Withdraw earnings
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/payout-portal");
+                      if (res.ok) {
+                        const data = await res.json();
+                        if (data.url) window.open(data.url, "_blank");
+                      } else {
+                        const err = await res.json().catch(() => ({}));
+                        toast(err.error || "Payout portal unavailable");
+                      }
+                    } catch {
+                      toast("Could not open payout portal");
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium text-text-secondary border border-border rounded-lg hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
+                >
+                  Manage payouts
+                </button>
+              </div>
             </>
           ) : (
             <p className="text-[13px] text-text-secondary leading-relaxed mb-4">
