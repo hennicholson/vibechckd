@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type TaskStatus = "todo" | "in_progress" | "done";
 
@@ -68,9 +68,9 @@ export default function TaskList({ projectId, tasks: initialTasks, onAddTask, on
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync with parent when props change
-  useState(() => {
+  useEffect(() => {
     setTasks(initialTasks);
-  });
+  }, [initialTasks]);
 
   const toggleTask = async (id: string) => {
     const task = tasks.find((t) => t.id === id);
