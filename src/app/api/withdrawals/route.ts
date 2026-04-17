@@ -197,9 +197,27 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const message =
+    const rawMessage =
       error instanceof Error ? error.message : "Failed to create withdrawal";
-    return Response.json({ error: message }, { status: 500 });
+
+    // Parse Whop-specific errors for user-friendly messages
+    let userMessage = rawMessage;
+    let statusCode = 500;
+
+    if (rawMessage.includes("under review")) {
+      userMessage = "Your payment account is currently under review by Whop. Withdrawals will be available once verification is complete. This usually takes 1-2 business days.";
+      statusCode = 503;
+    } else if (rawMessage.includes("insufficient") || rawMessage.includes("Insufficient")) {
+      userMessage = "Insufficient funds in the platform account. Please contact support.";
+      statusCode = 400;
+    } else if (rawMessage.includes("Transfer failed")) {
+      // Extract the actual Whop error from the message
+      const match = rawMessage.match(/"message":"([^"]+)"/);
+      userMessage = match ? match[1] : "Transfer could not be completed. Please try again later.";
+      statusCode = 400;
+    }
+
+    return Response.json({ error: userMessage }, { status: statusCode });
   }
 }
 
