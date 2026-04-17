@@ -1,9 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import dynamic from "next/dynamic";
+
+// Lazy load Whop Elements to avoid SSR issues
+const WhopWallet = dynamic(() => import("@/components/dashboard/WhopWallet"), {
+  ssr: false,
+  loading: () => (
+    <div className="border border-border rounded-[10px] p-6 mb-6">
+      <div className="h-32 bg-surface-muted rounded animate-pulse" />
+    </div>
+  ),
+});
 
 // ---------------------------------------------------------------------------
 // Types
@@ -277,7 +288,7 @@ export default function EarningsPage() {
         const data = await res.json();
         setBalance(data);
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Failed to fetch balance:", err); }
   }, []);
 
   const fetchTransactions = useCallback(async () => {
@@ -289,7 +300,7 @@ export default function EarningsPage() {
         setTransactions(data.transactions || []);
         setTotalTx(data.total || 0);
       }
-    } catch { /* silent */ }
+    } catch (err) { console.error("Failed to fetch transactions:", err); }
   }, [activeFilter, page]);
 
   useEffect(() => {
@@ -316,7 +327,8 @@ export default function EarningsPage() {
       setShowWithdraw(false);
       await fetchBalance();
       await fetchTransactions();
-    } catch {
+    } catch (err) {
+      console.error("Withdrawal failed:", err);
       toast("Withdrawal failed");
     }
     setWithdrawing(false);
@@ -326,7 +338,7 @@ export default function EarningsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl px-8 py-6">
+      <div className="max-w-3xl px-4 md:px-8 py-6">
         <div className="h-6 w-32 bg-surface-muted rounded animate-pulse mb-6" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map((i) => (
@@ -344,7 +356,7 @@ export default function EarningsPage() {
   const withdrawn = balance?.totalWithdrawnCents || 0;
 
   return (
-    <div className="max-w-3xl px-8 py-6">
+    <div className="max-w-3xl px-4 md:px-8 py-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -404,6 +416,9 @@ export default function EarningsPage() {
           </p>
         </div>
       </div>
+
+      {/* Whop Wallet - native balance & withdrawal */}
+      <WhopWallet />
 
       {/* How it works section */}
       {earned === 0 && (

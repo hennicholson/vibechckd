@@ -166,7 +166,7 @@ export default function ProjectDashboardPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl px-8 py-6">
+      <div className="max-w-3xl px-4 md:px-8 py-6">
         <div className="h-6 w-48 bg-neutral-100 rounded animate-pulse mb-2" />
         <div className="h-4 w-96 bg-neutral-100 rounded animate-pulse mb-6" />
         <div className="h-[400px] bg-neutral-100 rounded-[10px] animate-pulse" />
@@ -175,7 +175,7 @@ export default function ProjectDashboardPage() {
   }
 
   return (
-    <div className="max-w-3xl px-8 py-6">
+    <div className="max-w-3xl px-4 md:px-8 py-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-1">

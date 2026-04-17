@@ -41,6 +41,8 @@ export async function POST(
       return Response.json({ error: "Whop not configured" }, { status: 500 });
     }
 
+    console.log("Payment check-status: looking up checkout", transaction.whopCheckoutId, "for transaction", transaction.id);
+
     const res = await fetch(
       `${WHOP_BASE_URL}/checkout_configurations/${transaction.whopCheckoutId}`,
       {
@@ -51,67 +53,109 @@ export async function POST(
       }
     );
 
-    if (!res.ok) {
-      // Try listing payments for this company to find a match
-      const paymentsRes = await fetch(
-        `${WHOP_BASE_URL}/payments?company_id=${process.env.WHOP_COMPANY_ID || ""}&limit=10`,
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
+    let checkoutData: Record<string, unknown> | null = null;
+    if (res.ok) {
+      checkoutData = await res.json();
+      console.log("Payment check-status: checkout config response:", JSON.stringify(checkoutData));
+
+      // Check if the checkout config itself indicates completion
+      const configStatus = (((checkoutData as Record<string, unknown>).status as string) || "").toLowerCase();
+      if (configStatus === "succeeded" || configStatus === "completed" || configStatus === "paid") {
+        console.log("Payment check-status: checkout config status is", configStatus, "- marking completed");
+        await db
+          .update(transactions)
+          .set({ status: "completed", completedAt: new Date() })
+          .where(eq(transactions.id, transaction.id));
+
+        if (transaction.projectId) {
+          const displayAmount = (transaction.amountCents / 100).toLocaleString(
+            "en-US",
+            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+          );
+          await db.insert(messages).values({
+            projectId: transaction.projectId,
+            senderId: null,
+            content: `PAYMENT RECEIVED\nAmount: $${displayAmount}\nDescription: ${transaction.description}\nStatus: Completed`,
+            messageType: "system",
+            fileUrl: null,
+          });
         }
-      );
 
-      if (paymentsRes.ok) {
-        const paymentsData = await paymentsRes.json();
-        const payments = paymentsData.data || paymentsData || [];
-
-        // Try to find a payment matching our checkout config or metadata
-        for (const payment of payments) {
-          const matchesCheckout =
-            payment.checkout_configuration_id === transaction.whopCheckoutId;
-          const matchesMeta =
-            payment.metadata?.transactionId === transaction.id;
-
-          if ((matchesCheckout || matchesMeta) && payment.status === "succeeded") {
-            // Found it -- mark as completed
-            await db
-              .update(transactions)
-              .set({ status: "completed", completedAt: new Date() })
-              .where(eq(transactions.id, transaction.id));
-
-            if (transaction.projectId) {
-              const displayAmount = (transaction.amountCents / 100).toLocaleString(
-                "en-US",
-                { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-              );
-              await db.insert(messages).values({
-                projectId: transaction.projectId,
-                senderId: null,
-                content: `PAYMENT RECEIVED\nAmount: $${displayAmount}\nDescription: ${transaction.description}\nStatus: Completed`,
-                messageType: "system",
-                fileUrl: null,
-              });
-            }
-
-            return Response.json({ status: "completed", changed: true });
-          }
-        }
+        return Response.json({ status: "completed", changed: true });
       }
-
-      return Response.json({ status: transaction.status, changed: false });
+    } else {
+      console.log("Payment check-status: checkout config lookup failed:", res.status, await res.text());
     }
 
-    // Check the checkout config for any completed payment info
-    const configData = await res.json();
+    // Fall back to listing payments for this company to find a match
+    const paymentsRes = await fetch(
+      `${WHOP_BASE_URL}/payments?company_id=${process.env.WHOP_COMPANY_ID || ""}&limit=20`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    // If we got here, the checkout config exists but we need to check
-    // if any payment was made against it
+    if (paymentsRes.ok) {
+      const paymentsData = await paymentsRes.json();
+      const payments = paymentsData.data || paymentsData || [];
+      console.log("Payment check-status: listing", payments.length, "payments to find match for checkout", transaction.whopCheckoutId);
+
+      for (const payment of payments) {
+        console.log("Payment check-status: payment entry:", JSON.stringify({
+          id: payment.id,
+          status: payment.status,
+          checkout_configuration_id: payment.checkout_configuration_id,
+          metadata: payment.metadata,
+        }));
+
+        const matchesCheckout =
+          payment.checkout_configuration_id === transaction.whopCheckoutId;
+        const matchesMeta =
+          payment.metadata?.transactionId === transaction.id;
+        const matchesId =
+          payment.id === transaction.whopCheckoutId;
+
+        const isPaid =
+          payment.status === "succeeded" ||
+          payment.status === "completed" ||
+          payment.status === "paid";
+
+        if ((matchesCheckout || matchesMeta || matchesId) && isPaid) {
+          console.log("Payment check-status: matched payment", payment.id, "via", matchesCheckout ? "checkoutId" : matchesMeta ? "metadata" : "directId");
+
+          await db
+            .update(transactions)
+            .set({ status: "completed", completedAt: new Date() })
+            .where(eq(transactions.id, transaction.id));
+
+          if (transaction.projectId) {
+            const displayAmount = (transaction.amountCents / 100).toLocaleString(
+              "en-US",
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            );
+            await db.insert(messages).values({
+              projectId: transaction.projectId,
+              senderId: null,
+              content: `PAYMENT RECEIVED\nAmount: $${displayAmount}\nDescription: ${transaction.description}\nStatus: Completed`,
+              messageType: "system",
+              fileUrl: null,
+            });
+          }
+
+          return Response.json({ status: "completed", changed: true });
+        }
+      }
+    } else {
+      console.log("Payment check-status: payments list failed:", paymentsRes.status);
+    }
+
     return Response.json({
       status: transaction.status,
       changed: false,
-      checkoutStatus: configData.status || "unknown",
+      checkoutStatus: checkoutData ? (checkoutData as Record<string, unknown>).status || "unknown" : "lookup_failed",
     });
   } catch (error) {
     console.error("Payment check-status error:", error);

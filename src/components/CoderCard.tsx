@@ -14,7 +14,7 @@ interface CoderCardProps {
 
 export default function CoderCard({ coder, index = 0, onClick, compact = false }: CoderCardProps) {
   const hasPfp = coder.avatarUrl.startsWith("/pfp/");
-  const city = coder.location.split(",")[0].trim();
+  const city = (coder.location || "").split(",")[0].trim() || "Remote";
 
   if (compact) {
     return (
@@ -92,7 +92,7 @@ export default function CoderCard({ coder, index = 0, onClick, compact = false }
           </svg>
         </div>
         <p className="text-[12px] text-text-muted mt-0.5">
-          {SPECIALTY_LABELS[coder.specialties[0]]} / {city}
+          {SPECIALTY_LABELS[coder.specialties?.[0]] || "Developer"} / {city}
         </p>
       </div>
     </motion.button>

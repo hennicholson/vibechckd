@@ -112,7 +112,7 @@ export default function CompanyPage() {
           setForm(state);
         }
       })
-      .catch(() => {})
+      .catch((err) => console.error("Failed to load company profile:", err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -162,7 +162,7 @@ export default function CompanyPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl px-8 py-6">
+      <div className="max-w-2xl px-4 md:px-8 py-6">
         <div className="h-6 w-40 bg-surface-muted rounded animate-pulse mb-6" />
         <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
@@ -174,7 +174,7 @@ export default function CompanyPage() {
   }
 
   return (
-    <div className="max-w-2xl px-8 py-6">
+    <div className="max-w-2xl px-4 md:px-8 py-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -386,7 +386,7 @@ export default function CompanyPage() {
 
         {/* Sticky save bar */}
         {isDirty && (
-          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-8 px-8 py-3 flex items-center justify-between">
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-8 px-4 md:px-8 py-3 flex items-center justify-between">
             <span className="text-[12px] text-text-muted">Unsaved changes</span>
             <div className="flex items-center gap-2">
               <button

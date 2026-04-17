@@ -110,12 +110,12 @@ function ClientOverview({ name }: { name: string }) {
         setProjects(p);
         setConversations(c);
       })
-      .catch(() => {})
+      .catch((err) => console.error("Failed to load client data:", err))
       .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="max-w-3xl px-8 py-6">
+    <div className="max-w-3xl px-4 md:px-8 py-6">
       {/* Client label */}
       <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
@@ -283,7 +283,7 @@ function CreatorOverview() {
         setProjects(projectData);
         if (balanceData) setEarningsCents(balanceData.totalEarnedCents || 0);
       })
-      .catch(() => {})
+      .catch((err) => console.error("Failed to load creator data:", err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -292,7 +292,7 @@ function CreatorOverview() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl px-8 py-6">
+      <div className="max-w-3xl px-4 md:px-8 py-6">
         <div className="mb-8">
           <div className="h-6 w-48 bg-surface-muted rounded animate-pulse" />
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />
@@ -308,7 +308,7 @@ function CreatorOverview() {
   }
 
   return (
-    <div className="max-w-3xl px-8 py-6">
+    <div className="max-w-3xl px-4 md:px-8 py-6">
       {/* Creator label */}
       <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-[0.08em] text-text-muted">
@@ -539,7 +539,7 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="max-w-3xl px-8 py-6">
+      <div className="max-w-3xl px-4 md:px-8 py-6">
         <div className="mb-8">
           <div className="h-6 w-48 bg-surface-muted rounded animate-pulse" />
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />

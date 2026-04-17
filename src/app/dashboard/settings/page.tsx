@@ -41,7 +41,7 @@ export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   return (
-    <div className="max-w-2xl px-8 py-6">
+    <div className="max-w-2xl px-4 md:px-8 py-6">
       <h1 className="text-[20px] font-semibold text-text-primary mb-6">Settings</h1>
 
       {/* Account */}
@@ -49,7 +49,7 @@ export default function SettingsPage() {
         <h2 className="text-[14px] font-medium text-text-primary mb-4">Account</h2>
 
         <div className="mb-3">
-          <p className="text-[13px] text-text-muted">creator@vibechckd.cc</p>
+          <p className="text-[13px] text-text-muted">{(session?.user as any)?.email || "your@email.com"}</p>
         </div>
 
         {!showPassword ? (
@@ -114,9 +114,18 @@ export default function SettingsPage() {
           {availabilityOptions.map((option) => (
             <button
               key={option.label}
-              onClick={() => {
+              onClick={async () => {
                 setAvailability(option.label);
-                toast("Availability updated", "success");
+                try {
+                  await fetch("/api/profile", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ availability: option.label.toLowerCase() }),
+                  });
+                  toast("Availability updated", "success");
+                } catch {
+                  toast("Failed to update", "error");
+                }
               }}
               className={`relative px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors duration-150 cursor-pointer ${
                 availability === option.label

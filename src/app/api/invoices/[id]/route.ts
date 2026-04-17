@@ -162,12 +162,12 @@ export async function PATCH(
 
       let messageContent = "";
       if (status === "sent") {
-        messageContent = `\u{1F4E8} Invoice for $${displayAmount} has been sent.\nDescription: ${invoice.description}`;
+        messageContent = `INVOICE SENT\nInvoice for $${displayAmount} has been sent.\nDescription: ${invoice.description}`;
         if (invoice.paymentUrl) {
           messageContent += `\nPay: ${invoice.paymentUrl}`;
         }
       } else if (status === "voided") {
-        messageContent = `\u274C Invoice for $${displayAmount} has been voided.\nDescription: ${invoice.description}`;
+        messageContent = `INVOICE VOIDED\nInvoice for $${displayAmount} has been voided.\nDescription: ${invoice.description}`;
       }
 
       if (messageContent) {

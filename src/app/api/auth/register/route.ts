@@ -89,6 +89,7 @@ export async function POST(req: Request) {
         companyName: onboarding?.companyName || null,
         projectTypes: onboarding?.projectType ? [onboarding.projectType] : null,
         budgetRange: onboarding?.budget || null,
+        description: onboarding?.projectDescription || null,
       });
     }
 

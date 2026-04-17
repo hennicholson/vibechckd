@@ -232,7 +232,7 @@ function CoderCard({ coder, onClick, index }: { coder: Coder; onClick: () => voi
               {coder.verified && <Badge variant="verified" />}
             </div>
             <span className="text-[12px] text-text-muted truncate block">
-              {SPECIALTY_LABELS[coder.specialties[0]]} &middot; {coder.location}
+              {SPECIALTY_LABELS[coder.specialties?.[0]] || "Developer"} &middot; {coder.location}
             </span>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -270,7 +270,9 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
       if (data.projectId) {
         window.location.href = `/dashboard/projects/${data.projectId}`;
       }
-    } catch {
+    } catch (err) {
+      console.error("Inquiry failed:", err);
+    } finally {
       setInitiating(null);
     }
   };
@@ -397,7 +399,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
               {/* Coder profile info */}
               <div className="mt-4 sm:mt-5">
                 <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.06em]">
-                  {SPECIALTY_LABELS[coder.specialties[0]]} &middot; {coder.title}
+                  {SPECIALTY_LABELS[coder.specialties?.[0]] || "Developer"} &middot; {coder.title}
                 </p>
                 <h1 className="text-[20px] sm:text-[24px] font-semibold text-text-primary tracking-[-0.03em] mt-1">
                   {coder.displayName}
@@ -592,7 +594,7 @@ export default function BrowsePage() {
     fetch("/api/coders")
       .then((res) => res.json())
       .then((data) => { if (Array.isArray(data) && data.length > 0) setCoders(data); })
-      .catch(() => {})
+      .catch((err) => console.error("Failed to fetch coders:", err))
       .finally(() => setIsLoading(false));
   }, []);
 

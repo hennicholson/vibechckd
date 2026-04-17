@@ -78,9 +78,16 @@ export async function POST(
     let whopStatus = "";
     try {
       const whopData = await getInvoice(invoice.whopInvoiceId);
-      whopStatus = ((whopData.status as string) || "").toLowerCase();
+      console.log("Whop getInvoice response:", JSON.stringify(whopData));
+      const rawStatus = ((whopData.status as string) || "").toLowerCase();
+      // Normalize various Whop status strings to "paid"
+      if (rawStatus === "paid" || rawStatus === "succeeded" || rawStatus === "complete" || rawStatus === "completed") {
+        whopStatus = "paid";
+      } else {
+        whopStatus = rawStatus;
+      }
     } catch (err) {
-      console.error("Whop getInvoice failed:", err);
+      console.error("Whop getInvoice failed for", invoice.whopInvoiceId, "- full error:", err instanceof Error ? { message: err.message, stack: err.stack } : err);
       // Try listing recent payments to find a match
       try {
         const apiKey = process.env.WHOP_API_KEY;
@@ -92,15 +99,26 @@ export async function POST(
         if (res.ok) {
           const data = await res.json();
           const payments = data.data || data || [];
+          console.log("Whop payments fallback: found", payments.length, "payments, searching for invoice", invoice.whopInvoiceId);
           for (const p of payments) {
-            if (p.invoice_id === invoice.whopInvoiceId && p.status === "succeeded") {
+            console.log("Whop payment entry:", JSON.stringify({ id: p.id, status: p.status, invoice_id: p.invoice_id, metadata: p.metadata, checkout_configuration: p.checkout_configuration }));
+            const matchesInvoice =
+              p.invoice_id === invoice.whopInvoiceId ||
+              p.metadata?.invoiceId === invoice.whopInvoiceId ||
+              p.checkout_configuration?.metadata?.invoiceId === invoice.whopInvoiceId;
+            const isPaid =
+              p.status === "succeeded" || p.status === "paid" || p.status === "completed" || p.status === "complete";
+            if (matchesInvoice && isPaid) {
               whopStatus = "paid";
+              console.log("Whop payments fallback: matched payment", p.id, "with status", p.status);
               break;
             }
           }
+        } else {
+          console.error("Whop payments list failed:", res.status, await res.text());
         }
-      } catch {
-        // Silent fallback failure
+      } catch (fallbackErr) {
+        console.error("Whop payments fallback error:", fallbackErr);
       }
     }
 
