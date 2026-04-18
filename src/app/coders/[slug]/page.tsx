@@ -172,8 +172,8 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          {/* Left column -- Profile info */}
-          <div className="w-full md:w-[320px] flex-shrink-0">
+          {/* Left column -- Profile info (sticky on desktop) */}
+          <div className="w-full md:w-[320px] flex-shrink-0 md:sticky md:top-[80px] md:self-start">
             {/* Avatar */}
             <div className="w-[120px] h-[120px] rounded-[10px] overflow-hidden bg-[#f5f5f5] pfp-static">
               {coder.avatarUrl ? (
@@ -324,7 +324,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
           </div>
         </motion.div>
 
-        <Modal open={selectedItem !== null} onClose={() => setSelectedItem(null)} size="lg">
+        <Modal open={selectedItem !== null} onClose={() => setSelectedItem(null)} size="full">
           {selectedItem && (
             <PortfolioFolder
               item={selectedItem}

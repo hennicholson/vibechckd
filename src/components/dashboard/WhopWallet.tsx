@@ -177,73 +177,67 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
     );
   }
 
-  // ---------- Not Connected ----------
+  // ---------- Not Connected / Show Withdraw ----------
   if (state === "not-connected" || state === "error") {
     return (
       <div className="border border-border rounded-[10px] overflow-hidden mb-6">
-        <div className="px-5 py-3 border-b border-border flex items-center gap-2">
-          <IconWallet />
-          <span className="text-[14px] font-medium text-text-primary">Cash Out</span>
+        <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconWallet />
+            <span className="text-[14px] font-medium text-text-primary">Cash Out</span>
+          </div>
+          {availableCents > 0 && (
+            <span className="text-[15px] font-semibold text-positive tabular-nums">
+              ${maxDollars.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          )}
         </div>
         <div className="p-5">
-          {availableCents > 0 ? (
-            <>
-              <p className="text-[13px] text-text-secondary leading-relaxed mb-4">
-                You have <span className="font-semibold text-text-primary">${maxDollars.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span> available to withdraw. Set up a payout method to cash out your earnings.
-              </p>
+          <p className="text-[13px] text-text-secondary leading-relaxed mb-4">
+            {availableCents > 0
+              ? "Withdraw your earnings to your bank account, Venmo, CashApp, or crypto."
+              : "When you receive payments, you can withdraw them here."}
+          </p>
 
-              <div className="flex items-center gap-2 mb-4">
-                <button
-                  onClick={() => setShowWithdraw(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#171717] text-white rounded-lg hover:bg-[#0a0a0a] transition-colors cursor-pointer"
-                >
-                  <IconArrowDown />
-                  Withdraw earnings
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch("/api/payout-portal");
-                      if (res.ok) {
-                        const data = await res.json();
-                        if (data.url) window.open(data.url, "_blank");
-                      } else {
-                        const err = await res.json().catch(() => ({}));
-                        toast(err.error || "Payout portal unavailable");
-                      }
-                    } catch {
-                      toast("Could not open payout portal");
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {/* Always show withdraw button */}
+            <button
+              onClick={() => setShowWithdraw(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#171717] text-white rounded-lg hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+            >
+              <IconArrowDown />
+              Withdraw
+            </button>
+
+            {/* Payout portal -- manage payout methods on Whop */}
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch("/api/payout-portal");
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) {
+                      window.open(data.url, "_blank");
+                      return;
                     }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium text-text-secondary border border-border rounded-lg hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
-                >
-                  Manage payouts
-                </button>
-              </div>
-            </>
-          ) : (
-            <p className="text-[13px] text-text-secondary leading-relaxed mb-4">
-              When you receive payments from invoices or direct transfers, your balance will appear here and you can cash out anytime.
-            </p>
-          )}
-
-          <div className="space-y-2 mb-4">
-            {[
-              "Bank transfer (241+ countries), Venmo, CashApp, or crypto",
-              "Fees deducted from withdrawal amount -- no hidden charges",
-              "Withdrawals typically process in 1-3 business days",
-              "Secure identity verification through Whop Payments",
-            ].map((item) => (
-              <div key={item} className="flex items-start gap-2">
-                <span className="text-positive mt-0.5"><IconCheck /></span>
-                <span className="text-[12px] text-text-secondary">{item}</span>
-              </div>
-            ))}
+                  }
+                  // If no portal available, try creating account first via withdraw
+                  toast("Set up your payout method by making your first withdrawal");
+                  setShowWithdraw(true);
+                } catch {
+                  toast("Set up your payout method by making your first withdrawal");
+                  setShowWithdraw(true);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium text-text-secondary border border-border rounded-lg hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
+            >
+              Payout settings
+            </button>
           </div>
 
           <div className="flex items-center gap-1.5">
             <span className="text-text-muted"><IconShield /></span>
-            <span className="text-[10px] text-text-muted">Powered by Whop Payments</span>
+            <span className="text-[10px] text-text-muted">Bank, Venmo, CashApp, crypto -- powered by Whop Payments</span>
           </div>
         </div>
 
@@ -327,7 +321,7 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
   if (state === "connected" && whopElements && token && companyId) {
     const { react: WhopReact, loader } = whopElements;
     const els = loader();
-    const { Elements, PayoutsSession, BalanceElement, WithdrawalsElement } = WhopReact;
+    const { Elements, PayoutsSession, BalanceElement, WithdrawButtonElement, WithdrawalsElement } = WhopReact;
 
     return (
       <div className="border border-border rounded-[10px] overflow-hidden mb-6">
@@ -345,7 +339,7 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
           <Elements
             appearance={{
               classes: {
-                ".Button": { height: "36px", "border-radius": "8px", "font-size": "13px" },
+                ".Button": { height: "40px", "border-radius": "8px", "font-size": "13px", "font-weight": "500" },
                 ".Container": { "border-radius": "10px" },
               },
             }}
@@ -358,8 +352,13 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
             >
               <div className="space-y-4">
                 <BalanceElement
-                  showWithdrawButton={true}
+                  showWithdrawButton={false}
                   fallback={<div className="h-20 bg-surface-muted rounded-lg animate-pulse" />}
+                />
+                <WithdrawButtonElement
+                  size="3"
+                  variant="solid"
+                  fallback={<div className="h-10 bg-surface-muted rounded-lg animate-pulse" />}
                 />
                 <WithdrawalsElement
                   fallback={<div className="h-16 bg-surface-muted rounded-lg animate-pulse" />}

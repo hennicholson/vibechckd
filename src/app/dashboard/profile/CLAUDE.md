@@ -9,4 +9,10 @@
 |----|------|---|-------|------|
 | #9178 | 5:30 PM | 🟣 | Live profile preview with Edit/Preview tabs | ~638 |
 | #9027 | 2:40 PM | 🟣 | Profile and Portfolio API Database Integration | ~524 |
+
+### Apr 18, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #9848 | 1:15 PM | 🔄 | Refined portfolio preview hover overlay with subtle darkening effect | ~353 |
 </claude-mem-context>

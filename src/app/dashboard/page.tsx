@@ -115,7 +115,7 @@ function ClientOverview({ name }: { name: string }) {
   }, []);
 
   return (
-    <div className="max-w-3xl h-full flex flex-col">
+    <div className="max-w-5xl h-full flex flex-col">
       {/* Fixed header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ function ClientOverview({ name }: { name: string }) {
           </div>
         ) : (
           <div className="border border-border rounded-[10px] divide-y divide-border">
-            {projects.map((project) => (
+            {projects.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((project) => (
               <Link
                 key={project.id}
                 href={`/dashboard/projects/${project.id}`}
@@ -292,7 +292,7 @@ function CreatorOverview() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl px-4 md:px-8 py-6">
+      <div className="max-w-5xl px-4 md:px-8 py-6">
         <div className="mb-8">
           <div className="h-6 w-48 bg-surface-muted rounded animate-pulse" />
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />
@@ -308,7 +308,7 @@ function CreatorOverview() {
   }
 
   return (
-    <div className="max-w-3xl h-full flex flex-col">
+    <div className="max-w-5xl h-full flex flex-col">
       {/* Fixed header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-start justify-between">
@@ -472,7 +472,7 @@ function CreatorOverview() {
           </div>
         ) : (
           <div className="border border-border rounded-[10px] divide-y divide-border">
-            {projects.map((project) => (
+            {projects.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((project) => (
               <Link
                 key={project.id}
                 href={`/dashboard/projects/${project.id}`}
@@ -543,7 +543,7 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="max-w-3xl px-4 md:px-8 py-6">
+      <div className="max-w-5xl px-4 md:px-8 py-6">
         <div className="mb-8">
           <div className="h-6 w-48 bg-surface-muted rounded animate-pulse" />
           <div className="h-3 w-32 bg-surface-muted rounded animate-pulse mt-2" />

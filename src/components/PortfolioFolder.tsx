@@ -42,27 +42,38 @@ const assetIcons: Record<PortfolioAsset["type"], React.ReactNode> = {
 
 function LivePreviewAsset({ asset }: { asset: PortfolioAsset }) {
   return (
-    <div className="border border-border rounded-[10px] overflow-hidden">
-      {/* Browser chrome */}
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-surface-muted border-b border-border">
-        <div className="flex gap-1.5">
-          <div className="w-[7px] h-[7px] rounded-full bg-border-hover" />
-          <div className="w-[7px] h-[7px] rounded-full bg-border-hover" />
-          <div className="w-[7px] h-[7px] rounded-full bg-border-hover" />
+    <div className="flex flex-col h-full">
+      {/* Compact browser chrome */}
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-muted border-b border-border flex-shrink-0">
+        <div className="flex gap-1 flex-shrink-0">
+          <div className="w-[6px] h-[6px] rounded-full bg-[#ef4444]/50" />
+          <div className="w-[6px] h-[6px] rounded-full bg-[#f59e0b]/50" />
+          <div className="w-[6px] h-[6px] rounded-full bg-[#22c55e]/50" />
         </div>
-        <div className="flex-1 mx-2">
-          <div className="bg-background border border-border rounded-md px-2.5 py-1 text-[11px] font-mono text-text-muted truncate">
+        <div className="flex-1 min-w-0 mx-1">
+          <div className="bg-background border border-border rounded px-2 py-0.5 text-[10px] font-mono text-text-muted truncate">
             {asset.url}
           </div>
         </div>
+        <a
+          href={asset.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-text-muted hover:text-text-primary border border-border rounded hover:border-border-hover transition-colors no-underline flex-shrink-0"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+          Open
+        </a>
       </div>
-      {/* iframe */}
-      <div className="aspect-[16/9] bg-surface-muted">
+      {/* iframe -- full size, scrollable */}
+      <div className="flex-1 bg-surface-muted overflow-hidden">
         <iframe
           src={asset.url}
           className="w-full h-full border-0"
           title={asset.title}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
           loading="lazy"
         />
       </div>
@@ -128,10 +139,64 @@ export default function PortfolioFolder({ item, onBack }: { item: PortfolioItem;
   const liveAssets = item.assets.filter((a) => a.type === "live_preview");
   const imageAssets = item.assets.filter((a) => a.type === "image");
   const fileAssets = item.assets.filter((a) => a.type === "pdf" || a.type === "video" || a.type === "figma");
+  const hasLivePreview = liveAssets.length > 0;
 
+  // Full-height layout for live previews -- minimal chrome, max iframe space
+  if (hasLivePreview) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Compact inline header */}
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border flex-shrink-0">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer flex-shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+          <h2 className="text-[14px] font-semibold text-text-primary truncate flex-1">{item.title}</h2>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {liveAssets[0] && (
+              <a
+                href={liveAssets[0].url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors no-underline"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                Open in new tab
+              </a>
+            )}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Live preview fills remaining space */}
+        <div className="flex-1 min-h-0">
+          <LivePreviewAsset asset={liveAssets[0]} />
+        </div>
+      </div>
+    );
+  }
+
+  // Standard layout for non-live-preview items
   return (
-    <div>
-      {/* Back / breadcrumb */}
+    <div className="p-6">
+      {/* Back */}
       {onBack && (
         <button
           onClick={onBack}
@@ -140,53 +205,27 @@ export default function PortfolioFolder({ item, onBack }: { item: PortfolioItem;
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to work
+          Back
         </button>
       )}
 
       {/* Header */}
       <div className="mb-6 pr-8">
-        <h2 className="text-[22px] font-semibold text-text-primary tracking-[-0.02em] leading-[1.2]">{item.title}</h2>
-        <p className="text-[14px] text-text-secondary mt-2 leading-[1.6]">{item.description}</p>
-        <p className="text-[11px] text-text-muted font-mono mt-3 tracking-[0.04em]">
-          {item.assets.length} asset{item.assets.length !== 1 ? "s" : ""}
-        </p>
+        <h2 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">{item.title}</h2>
+        {item.description && (
+          <p className="text-[13px] text-text-secondary mt-2 leading-[1.6]">{item.description}</p>
+        )}
       </div>
 
       <div className="space-y-5">
-        {/* Live preview assets with browser chrome */}
-        {liveAssets.map((asset) => (
-          <motion.div
-            key={asset.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.08em] mb-2">{asset.title}</p>
-            <LivePreviewAsset asset={asset} />
-          </motion.div>
-        ))}
-
-        {/* Image assets as thumbnail grid */}
         {imageAssets.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-          >
-            <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.08em] mb-2">Images</p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <ImageAssetGrid assets={imageAssets} />
           </motion.div>
         )}
 
-        {/* File assets as bordered list */}
         {fileAssets.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.08em] mb-2">Files</p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.1 }}>
             <FileAssetList assets={fileAssets} />
           </motion.div>
         )}

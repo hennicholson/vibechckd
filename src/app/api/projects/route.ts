@@ -63,20 +63,28 @@ export async function GET(req: Request) {
       .where(and(...conditions))
       .orderBy(desc(sql`coalesce(${projectMembers.pinned}::int, 0)`), desc(sql`coalesce(${latestMsg.latestAt}, ${projects.updatedAt})`));
 
-    const result = rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description || "",
-      status: r.status,
-      tags: r.tags || [],
-      pinned: r.pinned || false,
-      createdAt: r.createdAt?.toISOString(),
-      updatedAt: r.updatedAt?.toISOString(),
-      memberCount: r.memberCount || 1,
-      lastActivity: r.lastActivity
-        ? new Date(r.lastActivity).toISOString()
-        : r.updatedAt?.toISOString(),
-    }));
+    // Deduplicate by project ID (joins can produce duplicates)
+    const seen = new Set<string>();
+    const result = rows
+      .filter((r) => {
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+      })
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description || "",
+        status: r.status,
+        tags: r.tags || [],
+        pinned: r.pinned || false,
+        createdAt: r.createdAt?.toISOString(),
+        updatedAt: r.updatedAt?.toISOString(),
+        memberCount: r.memberCount || 1,
+        lastActivity: r.lastActivity
+          ? new Date(r.lastActivity).toISOString()
+          : r.updatedAt?.toISOString(),
+      }));
 
     return NextResponse.json(result);
   } catch (error) {

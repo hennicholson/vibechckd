@@ -202,6 +202,163 @@ function CloseIcon() {
 }
 
 // ---------------------------------------------------------------------------
+// Inbox Menu (3-dot)
+// ---------------------------------------------------------------------------
+
+function InboxMenu({ onOpenContacts }: { onOpenContacts: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<string>("available");
+  const [showContacts, setShowContacts] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Load saved status
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.availability) setStatus(data.availability); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const setAvailability = async (val: string) => {
+    setStatus(val);
+    try {
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ availability: val }),
+      });
+      toast(`Status: ${val}`, "success");
+    } catch {
+      toast("Failed to update", "error");
+    }
+  };
+
+  const statuses = [
+    { value: "available", label: "Available", color: "#22c55e" },
+    { value: "selective", label: "Selective", color: "#f59e0b" },
+    { value: "unavailable", label: "Away", color: "#a3a3a3" },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors cursor-pointer"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="12" cy="5" r="1" />
+          <circle cx="12" cy="19" r="1" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-[200px] bg-background border border-border rounded-lg shadow-lg py-1 z-50 animate-[fadeInUp_0.1s_ease-out]">
+          <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-text-muted">
+            Status
+          </div>
+          {statuses.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setAvailability(s.value)}
+              className={`w-full text-left px-3 py-2 text-[12px] hover:bg-surface-muted transition-colors cursor-pointer flex items-center gap-2 ${
+                status === s.value ? "text-text-primary font-medium" : "text-text-secondary"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+              {s.label}
+              {status === s.value && (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="ml-auto">
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+
+          <div className="h-px bg-border my-1" />
+
+          <button
+            onClick={() => { setOpen(false); onOpenContacts(); }}
+            className="w-full text-left px-3 py-2 text-[12px] text-text-secondary hover:bg-surface-muted transition-colors cursor-pointer flex items-center gap-2"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+            Contacts
+          </button>
+
+          <a
+            href="/dashboard/settings"
+            className="w-full text-left px-3 py-2 text-[12px] text-text-secondary hover:bg-surface-muted transition-colors cursor-pointer flex items-center gap-2 no-underline"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+            </svg>
+            Settings
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recent Project Card (with balance)
+// ---------------------------------------------------------------------------
+
+function RecentProjectCard({ convo, onClick }: { convo: Conversation; onClick: () => void }) {
+  const [paidCents, setPaidCents] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/projects/${convo.projectId}/balance`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setPaidCents(data.totalPaid || 0);
+      })
+      .catch(() => {});
+  }, [convo.projectId]);
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-background/80 backdrop-blur-sm border border-white/60 rounded-[10px] px-4 py-3 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:border-white/80 transition-all duration-200 cursor-pointer group"
+    >
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[13px] font-medium text-text-primary truncate">
+          {convo.projectName}
+        </span>
+        <span className="text-[10px] font-mono text-text-muted leading-none flex-shrink-0 ml-2">
+          {relativeTimestamp(convo.lastMessageAt)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-text-muted truncate flex-1">
+          <span className="text-text-secondary">{convo.lastSenderName}:</span> {convo.lastMessage}
+        </p>
+        {paidCents !== null && paidCents > 0 && (
+          <span className="text-[13px] font-semibold text-positive tabular-nums ml-2 flex-shrink-0 animate-pulse">
+            ${(paidCents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Notification Prompt
 // ---------------------------------------------------------------------------
 
@@ -227,17 +384,17 @@ function NotificationPrompt({ onDismiss }: { onDismiss: () => void }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.98 }}
       transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-      className="fixed bottom-4 right-4 z-50 bg-white border border-[#e5e5e5] rounded-lg shadow-lg p-4 max-w-[320px]"
+      className="fixed bottom-4 right-4 z-50 bg-background border border-border rounded-lg shadow-lg p-4 max-w-[320px]"
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-text-muted">
           <BellIcon />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-medium text-[#0a0a0a] mb-1">
+          <p className="text-[13px] font-medium text-text-primary mb-1">
             Enable notifications
           </p>
-          <p className="text-[12px] text-neutral-500 leading-relaxed mb-3">
+          <p className="text-[12px] text-text-muted leading-relaxed mb-3">
             Stay updated on new messages from your projects and team.
           </p>
           <div className="flex items-center gap-2">
@@ -249,7 +406,7 @@ function NotificationPrompt({ onDismiss }: { onDismiss: () => void }) {
             </button>
             <button
               onClick={handleDismiss}
-              className="px-3 py-1.5 text-[12px] font-medium text-neutral-500 hover:text-[#0a0a0a] transition-colors cursor-pointer"
+              className="px-3 py-1.5 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             >
               Not now
             </button>
@@ -257,7 +414,7 @@ function NotificationPrompt({ onDismiss }: { onDismiss: () => void }) {
         </div>
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 p-0.5 text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
+          className="flex-shrink-0 p-0.5 text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
         >
           <CloseIcon />
         </button>
@@ -456,7 +613,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
   }
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
@@ -466,13 +623,13 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
         {isLoading && (
           <div className="flex flex-col gap-3 px-1 py-6 animate-pulse">
             <div className="flex gap-2 max-w-[65%]">
-              <div className="w-[200px] h-[36px] rounded-[16px] rounded-bl-[4px] bg-neutral-100" />
+              <div className="w-[200px] h-[36px] rounded-[16px] rounded-bl-[4px] bg-surface-muted" />
             </div>
             <div className="flex gap-2 max-w-[55%] self-end">
-              <div className="w-[160px] h-[36px] rounded-[16px] rounded-br-[4px] bg-neutral-100" />
+              <div className="w-[160px] h-[36px] rounded-[16px] rounded-br-[4px] bg-surface-muted" />
             </div>
             <div className="flex gap-2 max-w-[70%]">
-              <div className="w-[240px] h-[36px] rounded-[16px] rounded-bl-[4px] bg-neutral-100" />
+              <div className="w-[240px] h-[36px] rounded-[16px] rounded-bl-[4px] bg-surface-muted" />
             </div>
           </div>
         )}
@@ -481,8 +638,8 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
           <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
             <ChatBubbleIcon />
             <div className="text-center">
-              <p className="text-[14px] font-medium text-[#0a0a0a]">Start the conversation</p>
-              <p className="text-[13px] text-neutral-500 mt-0.5">Send a message to {otherUserName}</p>
+              <p className="text-[14px] font-medium text-text-primary">Start the conversation</p>
+              <p className="text-[13px] text-text-muted mt-0.5">Send a message to {otherUserName}</p>
             </div>
           </div>
         )}
@@ -502,24 +659,24 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
                 >
                   {showMeta && (
                     <div className={`flex items-center gap-2 mb-1 px-1 ${isOwn ? "flex-row-reverse" : ""}`}>
-                      <span className="text-[12px] text-neutral-500 font-medium">{isOwn ? "You" : msg.senderName || "Unknown"}</span>
-                      <span className="text-[11px] font-mono text-neutral-400">{formatTime(msg.createdAt)}</span>
+                      <span className="text-[12px] text-text-muted font-medium">{isOwn ? "You" : msg.senderName || "Unknown"}</span>
+                      <span className="text-[11px] font-mono text-text-muted">{formatTime(msg.createdAt)}</span>
                     </div>
                   )}
 
                   {msg.messageType === "file" && msg.fileUrl ? (
                     <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" className="block no-underline max-w-[calc(100vw-48px)] sm:max-w-[280px] w-full">
-                      <div className="border border-[#e5e5e5] rounded-lg overflow-hidden hover:border-neutral-300 transition-colors">
+                      <div className="border border-border rounded-lg overflow-hidden hover:border-neutral-300 transition-colors">
                         {isImageUrl(msg.fileUrl) && (
-                          <div className="bg-neutral-50">
+                          <div className="bg-surface-muted">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={msg.fileUrl} alt={msg.content} className="w-full h-auto max-h-[160px] object-cover" />
                           </div>
                         )}
                         <div className="flex items-center gap-2.5 p-2.5">
-                          <span className="text-neutral-400 flex-shrink-0"><FileIcon /></span>
-                          <span className="text-[13px] text-[#0a0a0a] truncate flex-1">{msg.content || getFileName(msg.fileUrl)}</span>
-                          <span className="text-neutral-400 flex-shrink-0 hover:text-[#0a0a0a] transition-colors"><DownloadIcon /></span>
+                          <span className="text-text-muted flex-shrink-0"><FileIcon /></span>
+                          <span className="text-[13px] text-text-primary truncate flex-1">{msg.content || getFileName(msg.fileUrl)}</span>
+                          <span className="text-text-muted flex-shrink-0 hover:text-text-primary transition-colors"><DownloadIcon /></span>
                         </div>
                       </div>
                     </a>
@@ -529,7 +686,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
                         max-w-[70%] px-3 py-1.5 text-[13px] font-body leading-snug whitespace-pre-wrap break-words
                         ${isOwn
                           ? "bg-[#171717] text-white rounded-[16px] rounded-br-[4px]"
-                          : "bg-neutral-100 text-[#0a0a0a] rounded-[16px] rounded-bl-[4px]"
+                          : "bg-surface-muted text-text-primary rounded-[16px] rounded-bl-[4px]"
                         }
                       `}
                     >
@@ -554,11 +711,11 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
       />
 
       {/* Input row */}
-      <div className="border-t border-[#e5e5e5] bg-white">
+      <div className="border-t border-border bg-background">
         <div className="flex items-end gap-2 px-3 py-2">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex-shrink-0 w-7 h-7 flex items-center justify-center text-neutral-400 hover:text-[#0a0a0a] transition-colors cursor-pointer rounded-md hover:bg-neutral-100"
+            className="flex-shrink-0 w-7 h-7 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors cursor-pointer rounded-md hover:bg-surface-muted"
             aria-label="Attach file"
           >
             <PaperclipIcon />
@@ -574,7 +731,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 text-[13px] font-body text-[#0a0a0a] placeholder:text-neutral-400 bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
+            className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
             style={{ minHeight: "22px" }}
           />
           <button
@@ -584,7 +741,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
               flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer
               ${inputValue.trim()
                 ? "bg-[#171717] text-white hover:bg-[#0a0a0a]"
-                : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+                : "bg-surface-muted text-text-muted cursor-not-allowed"
               }
             `}
             aria-label="Send message"
@@ -630,6 +787,10 @@ export default function InboxPage() {
 
   // --- Notification prompt ---
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
+  const [contacts, setContacts] = useState<{ userId: string; name: string; image: string; role: string }[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
 
   // Persist tab
   useEffect(() => {
@@ -802,36 +963,44 @@ export default function InboxPage() {
   return (
     <div className="flex h-[calc(100vh-48px)] md:h-screen">
       {/* Sidebar / conversation list */}
-      <div className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[280px] border-r-0 md:border-r border-[#e5e5e5] flex-shrink-0 flex-col h-full bg-white`}>
+      <div className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[280px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}>
         {/* Header */}
-        <div className="px-4 h-[48px] flex items-center border-b border-[#e5e5e5]">
-          <span className="text-[14px] font-medium text-[#0a0a0a] font-body">
+        <div className="px-4 pt-4 md:pt-5 pb-2 flex items-center justify-between">
+          <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
             Inbox
-          </span>
+          </h1>
+          <InboxMenu onOpenContacts={() => {
+            setShowContacts(true);
+            setContactsLoading(true);
+            fetch("/api/dm/contacts")
+              .then((r) => (r.ok ? r.json() : []))
+              .then((data) => setContacts(data))
+              .catch(() => setContacts([]))
+              .finally(() => setContactsLoading(false));
+          }} />
         </div>
 
         {/* Segmented control */}
-        <div className="px-3 pt-2 pb-1.5">
-          <div className="inline-flex bg-neutral-100 rounded-lg p-0.5 w-full">
+        <div className="px-3 pt-1 pb-1.5">
+          <div className="inline-flex bg-surface-muted rounded-lg p-0.5 w-full">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => {
                   setActiveTab(tab.key);
-                  // Reset selections when switching tabs
                   if (tab.key === "projects") setSelectedThread(null);
                   if (tab.key === "messages") setSelected(null);
                 }}
                 className={`relative flex-1 px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors duration-150 cursor-pointer ${
                   activeTab === tab.key
-                    ? "text-[#0a0a0a]"
-                    : "text-neutral-500 hover:text-neutral-600"
+                    ? "text-text-primary"
+                    : "text-text-muted hover:text-text-secondary"
                 }`}
               >
                 {activeTab === tab.key && (
                   <motion.div
                     layoutId="inbox-tab"
-                    className="absolute inset-0 bg-white border border-[#e5e5e5] rounded-md"
+                    className="absolute inset-0 bg-background border border-border rounded-md"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -842,9 +1011,9 @@ export default function InboxPage() {
         </div>
 
         {/* Search */}
-        <div className="px-3 py-1.5 border-b border-[#e5e5e5]">
-          <div className="flex items-center gap-2 bg-neutral-50 rounded-md px-2.5 py-1.5">
-            <span className="text-neutral-400 flex-shrink-0">
+        <div className="px-3 py-1.5 border-b border-border">
+          <div className="flex items-center gap-2 bg-surface-muted rounded-md px-2.5 py-1.5">
+            <span className="text-text-muted flex-shrink-0">
               <SearchIcon />
             </span>
             <input
@@ -855,7 +1024,7 @@ export default function InboxPage() {
                 else setDmSearch(e.target.value);
               }}
               placeholder={activeTab === "projects" ? "Search projects" : "Search messages"}
-              className="flex-1 text-[12px] font-body text-[#0a0a0a] placeholder:text-neutral-400 bg-transparent outline-none"
+              className="flex-1 text-[12px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none"
             />
           </div>
         </div>
@@ -867,12 +1036,12 @@ export default function InboxPage() {
             <>
               {isLoading && (
                 <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-neutral-400 font-mono">Loading...</span>
+                  <span className="text-[12px] text-text-muted font-mono">Loading...</span>
                 </div>
               )}
               {!isLoading && filteredConversations.length === 0 && (
                 <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-neutral-500 font-body italic">
+                  <span className="text-[12px] text-text-muted font-body italic">
                     {search.trim()
                       ? "No conversations match your search"
                       : "No conversations yet"}
@@ -885,15 +1054,17 @@ export default function InboxPage() {
                 const hasNoMessages = !conv.lastMessage;
 
                 return (
-                  <button
+                  <div
                     key={conv.projectId}
                     onClick={() => handleSelectProject(conv.projectId)}
                     onMouseEnter={() => setHoveredId(conv.projectId)}
                     onMouseLeave={() => setHoveredId(null)}
-                    className={`w-full text-left px-4 py-3 border-b border-[#e5e5e5] transition-colors duration-150 cursor-pointer relative ${
+                    role="button"
+                    tabIndex={0}
+                    className={`w-full text-left px-4 py-3 border-b border-border transition-colors duration-150 cursor-pointer relative ${
                       selected === conv.projectId
-                        ? "bg-neutral-50"
-                        : "bg-white hover:bg-neutral-50"
+                        ? "bg-surface-muted"
+                        : "bg-background hover:bg-surface-muted"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-0.5">
@@ -904,8 +1075,8 @@ export default function InboxPage() {
                         <span
                           className={`text-[13px] font-body truncate ${
                             unread
-                              ? "text-[#0a0a0a] font-semibold"
-                              : "text-[#0a0a0a] font-medium"
+                              ? "text-text-primary font-semibold"
+                              : "text-text-primary font-medium"
                           }`}
                         >
                           {conv.projectName}
@@ -917,7 +1088,7 @@ export default function InboxPage() {
                             <button
                               onClick={(e) => handleArchive(e, conv.projectId)}
                               disabled={actionLoading === conv.projectId}
-                              className="p-1 rounded text-neutral-400 hover:text-[#0a0a0a] hover:bg-neutral-200 transition-colors duration-150 cursor-pointer disabled:opacity-40"
+                              className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-neutral-200 transition-colors duration-150 cursor-pointer disabled:opacity-40"
                               title="Archive"
                             >
                               <ArchiveIcon />
@@ -926,7 +1097,7 @@ export default function InboxPage() {
                               <button
                                 onClick={(e) => handleDelete(e, conv.projectId)}
                                 disabled={actionLoading === conv.projectId}
-                                className="p-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer disabled:opacity-40"
+                                className="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer disabled:opacity-40"
                                 title="Delete"
                               >
                                 <TrashIcon />
@@ -935,7 +1106,7 @@ export default function InboxPage() {
                           </>
                         )}
                         {!showActions && (
-                          <span className="text-[11px] font-mono text-neutral-400">
+                          <span className="text-[11px] font-mono text-text-muted">
                             {conv.lastMessageAt ? relativeTimestamp(conv.lastMessageAt) : ""}
                           </span>
                         )}
@@ -943,12 +1114,12 @@ export default function InboxPage() {
                     </div>
                     <p
                       className={`text-[12px] font-body truncate ${
-                        unread ? "text-neutral-600" : "text-neutral-400"
+                        unread ? "text-text-secondary" : "text-text-muted"
                       }`}
                     >
                       {conv.lastMessage || "No messages yet"}
                     </p>
-                  </button>
+                  </div>
                 );
               })}
             </>
@@ -958,10 +1129,10 @@ export default function InboxPage() {
           {activeTab === "messages" && (
             <>
               {/* New message button */}
-              <div className="px-3 py-2 border-b border-[#e5e5e5]">
+              <div className="px-3 py-2 border-b border-border">
                 <button
                   onClick={handleNewMessage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[#0a0a0a] border border-[#e5e5e5] rounded-md hover:bg-neutral-50 transition-colors cursor-pointer w-full justify-center"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-text-primary border border-border rounded-md hover:bg-surface-muted transition-colors cursor-pointer w-full justify-center"
                 >
                   <PlusIcon />
                   New message
@@ -970,12 +1141,12 @@ export default function InboxPage() {
 
               {dmLoading && (
                 <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-neutral-400 font-mono">Loading...</span>
+                  <span className="text-[12px] text-text-muted font-mono">Loading...</span>
                 </div>
               )}
               {!dmLoading && filteredDmThreads.length === 0 && (
                 <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-neutral-500 font-body italic">
+                  <span className="text-[12px] text-text-muted font-body italic">
                     {dmSearch.trim()
                       ? "No conversations match your search"
                       : "No direct messages yet"}
@@ -986,32 +1157,32 @@ export default function InboxPage() {
                 <button
                   key={thread.id}
                   onClick={() => setSelectedThread(thread.id)}
-                  className={`w-full text-left px-4 py-3 border-b border-[#e5e5e5] transition-colors duration-150 cursor-pointer ${
+                  className={`w-full text-left px-4 py-3 border-b border-border transition-colors duration-150 cursor-pointer ${
                     selectedThread === thread.id
-                      ? "bg-neutral-50"
-                      : "bg-white hover:bg-neutral-50"
+                      ? "bg-surface-muted"
+                      : "bg-background hover:bg-surface-muted"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-neutral-100 flex-shrink-0 flex items-center justify-center text-[12px] font-medium text-neutral-500 overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-surface-muted flex-shrink-0 flex items-center justify-center text-[12px] font-medium text-text-muted overflow-hidden">
                       {thread.otherUserAvatar ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={thread.otherUserAvatar} alt={thread.otherUserName} className="w-full h-full object-cover" />
                       ) : (
-                        thread.otherUserName.charAt(0).toUpperCase()
+                        (thread.otherUserName || "?").charAt(0).toUpperCase()
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[13px] font-medium text-[#0a0a0a] font-body truncate">
+                        <span className="text-[13px] font-medium text-text-primary font-body truncate">
                           {thread.otherUserName}
                         </span>
-                        <span className="text-[11px] font-mono text-neutral-400 flex-shrink-0 ml-2">
+                        <span className="text-[11px] font-mono text-text-muted flex-shrink-0 ml-2">
                           {thread.lastMessageAt ? relativeTimestamp(thread.lastMessageAt) : ""}
                         </span>
                       </div>
-                      <p className="text-[12px] font-body text-neutral-400 truncate">
+                      <p className="text-[12px] font-body text-text-muted truncate">
                         {thread.lastMessage || "No messages yet"}
                       </p>
                     </div>
@@ -1029,20 +1200,20 @@ export default function InboxPage() {
         {activeTab === "projects" && selectedConv && (
           <div className="flex-1 min-h-0 flex flex-col">
             {/* Chat header with back + open project */}
-            <div className="flex items-center gap-2 px-4 h-[44px] border-b border-[#e5e5e5] flex-shrink-0">
+            <div className="flex items-center gap-2 px-4 h-[44px] border-b border-border flex-shrink-0">
               <button
                 onClick={() => setSelected(null)}
-                className="md:hidden flex items-center gap-1 text-[13px] text-neutral-500 hover:text-[#0a0a0a] transition-colors cursor-pointer min-h-[44px]"
+                className="md:hidden flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer min-h-[44px]"
               >
                 <BackIcon />
                 Back
               </button>
-              <span className="text-[13px] font-medium text-[#0a0a0a] truncate flex-1 md:text-left text-center">
+              <span className="text-[13px] font-medium text-text-primary truncate flex-1 md:text-left text-center">
                 {selectedConv.projectName}
               </span>
               <button
                 onClick={() => router.push(`/dashboard/projects/${selectedConv.projectId}`)}
-                className="flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-500 hover:text-[#0a0a0a] transition-colors cursor-pointer rounded-md hover:bg-neutral-100 flex-shrink-0"
+                className="flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors cursor-pointer rounded-md hover:bg-surface-muted flex-shrink-0"
                 title="Open project"
               >
                 <span className="hidden sm:inline">Open project</span>
@@ -1059,23 +1230,23 @@ export default function InboxPage() {
         {activeTab === "messages" && selectedDmThread && (
           <div className="flex-1 min-h-0 flex flex-col">
             {/* DM header */}
-            <div className="flex items-center gap-2 px-4 h-[44px] border-b border-[#e5e5e5] flex-shrink-0">
+            <div className="flex items-center gap-2 px-4 h-[44px] border-b border-border flex-shrink-0">
               <button
                 onClick={() => setSelectedThread(null)}
-                className="md:hidden flex items-center gap-1 text-[13px] text-neutral-500 hover:text-[#0a0a0a] transition-colors cursor-pointer min-h-[44px]"
+                className="md:hidden flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer min-h-[44px]"
               >
                 <BackIcon />
                 Back
               </button>
-              <div className="w-7 h-7 rounded-full bg-neutral-100 flex-shrink-0 flex items-center justify-center text-[11px] font-medium text-neutral-500 overflow-hidden">
+              <div className="w-7 h-7 rounded-full bg-surface-muted flex-shrink-0 flex items-center justify-center text-[11px] font-medium text-text-muted overflow-hidden">
                 {selectedDmThread.otherUserAvatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={selectedDmThread.otherUserAvatar} alt={selectedDmThread.otherUserName} className="w-full h-full object-cover" />
                 ) : (
-                  selectedDmThread.otherUserName.charAt(0).toUpperCase()
+                  (selectedDmThread.otherUserName || "?").charAt(0).toUpperCase()
                 )}
               </div>
-              <span className="text-[13px] font-medium text-[#0a0a0a] truncate flex-1">
+              <span className="text-[13px] font-medium text-text-primary truncate flex-1">
                 {selectedDmThread.otherUserName}
               </span>
             </div>
@@ -1085,18 +1256,166 @@ export default function InboxPage() {
           </div>
         )}
 
-        {/* ---------- Empty state ---------- */}
+        {/* ---------- Quick-pick: recent conversations ---------- */}
         {!hasChatOpen && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-white">
-            <ChatBubbleIcon />
-            <span className="text-[13px] text-neutral-500 font-body">
-              {activeTab === "projects"
-                ? "Select a conversation to view messages"
-                : "Select a thread or start a new message"}
-            </span>
+          <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
+            {/* Background GIF */}
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-[0.04]"
+              style={{ backgroundImage: "url('https://mir-s3-cdn-cf.behance.net/project_modules/source/c560dd40693289.57890a5289475.gif')" }}
+            />
+            <div className="flex-1 flex flex-col items-center justify-center px-8 relative z-10">
+              <div className="w-full max-w-[400px]">
+                <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-4">
+                  Pick up where you left off:
+                </p>
+
+                {activeTab === "projects" && conversations.length > 0 && (
+                  <div className="space-y-2">
+                    {conversations.slice(0, 2).map((convo) => (
+                      <RecentProjectCard
+                        key={convo.projectId}
+                        convo={convo}
+                        onClick={() => setSelected(convo.projectId)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {activeTab === "messages" && dmThreads.length > 0 && (
+                  <div className="space-y-2">
+                    {dmThreads.slice(0, 2).map((thread) => (
+                      <button
+                        key={thread.id}
+                        onClick={() => setSelectedThread(thread.id)}
+                        className="w-full text-left bg-background/80 backdrop-blur-sm border border-white/60 rounded-[10px] p-4 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:border-white/80 transition-all duration-200 cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted flex-shrink-0 overflow-hidden">
+                            {thread.otherUserAvatar ? (
+                              <img src={thread.otherUserAvatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              (thread.otherUserName || "?").charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <span className="text-[14px] font-medium text-text-primary truncate">{thread.otherUserName}</span>
+                          <span className="text-[10px] font-mono text-text-muted flex-shrink-0 ml-auto">
+                            {relativeTimestamp(thread.lastMessageAt)}
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-text-muted truncate pl-11">{thread.lastMessage}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {((activeTab === "projects" && conversations.length === 0) ||
+                  (activeTab === "messages" && dmThreads.length === 0)) && (
+                  <div className="flex flex-col items-center py-8">
+                    <ChatBubbleIcon />
+                    <span className="text-[13px] text-text-muted mt-3">
+                      {activeTab === "projects" ? "No conversations yet" : "No messages yet"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Contacts panel */}
+      {showContacts && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowContacts(false)} />
+          <div className="relative w-full max-w-[340px] bg-background border-l border-border h-full flex flex-col animate-[slideInRight_0.2s_ease-out]">
+            <div className="px-4 py-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-text-primary">Contacts</h2>
+              <button onClick={() => setShowContacts(false)} className="text-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-4 py-2 border-b border-border">
+              <div className="flex items-center gap-2 bg-surface-muted rounded-md px-2.5 py-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted flex-shrink-0">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="text"
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  placeholder="Search contacts..."
+                  className="flex-1 text-[12px] text-text-primary placeholder:text-text-muted bg-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {contactsLoading ? (
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-10 bg-surface-muted rounded animate-pulse" />
+                  ))}
+                </div>
+              ) : contacts.length === 0 ? (
+                <div className="p-4 text-center text-[12px] text-text-muted">No contacts found</div>
+              ) : (
+                <div className="py-1">
+                  {contacts
+                    .filter((c) => !contactSearch || c.name.toLowerCase().includes(contactSearch.toLowerCase()))
+                    .map((contact) => (
+                    <button
+                      key={contact.userId}
+                      onClick={async () => {
+                        // Create or find DM thread with this contact
+                        try {
+                          const res = await fetch("/api/dm/threads", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ recipientId: contact.userId }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setActiveTab("messages");
+                            setSelectedThread(data.threadId);
+                            setShowContacts(false);
+                            // Refresh DM threads
+                            fetch("/api/dm/threads")
+                              .then((r) => (r.ok ? r.json() : []))
+                              .then((threads) => setDmThreads(threads))
+                              .catch(() => {});
+                          }
+                        } catch {
+                          toast("Failed to start conversation");
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-muted/50 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted overflow-hidden flex-shrink-0">
+                        {contact.image ? (
+                          <img src={contact.image} alt={contact.name} className="w-full h-full object-cover" />
+                        ) : (
+                          contact.name.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-[13px] font-medium text-text-primary truncate">{contact.name}</p>
+                        <p className="text-[10px] text-text-muted">{contact.role}</p>
+                      </div>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted flex-shrink-0">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notification prompt */}
       {showNotifPrompt && (

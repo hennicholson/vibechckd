@@ -5,7 +5,9 @@ import { motion } from "framer-motion";
 import ProfileForm from "@/components/dashboard/ProfileForm";
 import Badge from "@/components/Badge";
 import VerifiedSeal from "@/components/VerifiedSeal";
-import { SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
+import Modal from "@/components/Modal";
+import PortfolioFolder from "@/components/PortfolioFolder";
+import { SPECIALTY_LABELS, type Specialty, type PortfolioItem as MockPortfolioItem } from "@/lib/mock-data";
 
 type ProfileData = {
   displayName: string;
@@ -34,7 +36,14 @@ function isRealUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
 
-function ProfilePreview({ data }: { data: ProfileData }) {
+function ensureHttps(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `https://${url}`;
+}
+
+function ProfilePreview({ data, portfolio = [] }: { data: ProfileData; portfolio?: PortfolioItem[] }) {
+  const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
   const hasPfp = isRealUrl(data.avatarUrl) || data.avatarUrl.startsWith("/pfp/");
   const hasGif = data.gifPreviewUrl && isRealUrl(data.gifPreviewUrl);
   const initials = data.displayName
@@ -65,157 +74,256 @@ function ProfilePreview({ data }: { data: ProfileData }) {
     { url: data.websiteUrl, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> },
   ].filter((s) => s.url);
 
-  // Simulated browser frame
+  const specialtyLabel = data.specialties?.[0]
+    ? SPECIALTY_LABELS[data.specialties[0]] || data.specialties[0]
+    : "";
+
   return (
-    <div className="space-y-4">
-      {/* Browser chrome */}
+    <div className="space-y-3">
+      {/* Browser chrome frame */}
       <div className="border border-border rounded-[12px] overflow-hidden bg-background shadow-sm">
-        {/* URL bar */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-surface-muted border-b border-border">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-muted border-b border-border">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]/60" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]/60" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]/60" />
+            <span className="w-2 h-2 rounded-full bg-[#ef4444]/50" />
+            <span className="w-2 h-2 rounded-full bg-[#f59e0b]/50" />
+            <span className="w-2 h-2 rounded-full bg-[#22c55e]/50" />
           </div>
-          <div className="flex-1 bg-background border border-border rounded-md px-3 py-1 text-[11px] font-mono text-text-muted truncate">
+          <div className="flex-1 bg-background border border-border rounded px-2.5 py-0.5 text-[10px] font-mono text-text-muted truncate">
             vibechckd.cc/coders/{data.slug || "your-name"}
           </div>
         </div>
 
-        {/* Profile content */}
+        {/* Matches /coders/[slug] layout exactly */}
         <div className="p-4 md:p-6">
-          {/* Hero area */}
-          <div className="flex flex-col sm:flex-row gap-5 mb-6">
-            {/* Avatar / GIF */}
-            <div className="flex-shrink-0">
-              {hasGif ? (
-                <div className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] rounded-[14px] overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div className="flex flex-col md:flex-row gap-8">
+            {/* Left column -- matches public profile (sticky) */}
+            <div className="w-full md:w-[280px] flex-shrink-0 md:sticky md:top-4 md:self-start">
+              {/* Avatar */}
+              <div className="w-[100px] h-[100px] rounded-[10px] overflow-hidden bg-surface-muted pfp-static">
+                {hasGif ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={data.gifPreviewUrl} alt={data.displayName} className="w-full h-full object-cover" />
-                </div>
-              ) : hasPfp ? (
-                <div className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] rounded-[14px] overflow-hidden pfp-static">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                ) : hasPfp ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={data.avatarUrl} alt={data.displayName} className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] rounded-[14px] bg-surface-muted flex items-center justify-center text-[28px] font-semibold text-text-muted select-none">
-                  {initials || "?"}
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[28px] font-semibold text-text-muted">
+                    {initials || "?"}
+                  </div>
+                )}
+              </div>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] truncate">
+              {/* Name + verified */}
+              <div className="flex items-center gap-2 mt-3">
+                <h2 className="text-[18px] font-semibold text-text-primary tracking-[-0.02em]">
                   {data.displayName || "Your Name"}
                 </h2>
                 {data.verified && <VerifiedSeal size="md" />}
               </div>
 
-              {data.tagline && (
-                <p className="text-[14px] text-text-secondary mb-3">{data.tagline}</p>
+              {/* Specialty + rate */}
+              {(specialtyLabel || data.hourlyRate) && (
+                <p className="text-[13px] text-text-muted mt-1">
+                  {[specialtyLabel, data.hourlyRate].filter(Boolean).join(" \u00b7 ")}
+                </p>
+              )}
+              {data.location && (
+                <p className="text-[13px] text-text-muted mt-0.5">{data.location}</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-3 mb-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: availabilityColor }} />
-                  <span className="text-[12px] font-mono text-text-muted">{availabilityLabel}</span>
-                </div>
-                {data.hourlyRate && (
-                  <>
-                    <span className="text-border">|</span>
-                    <span className="text-[12px] font-mono text-text-muted">{data.hourlyRate}</span>
-                  </>
-                )}
-                {data.location && (
-                  <>
-                    <span className="text-border">|</span>
-                    <span className="text-[12px] text-text-muted flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      </svg>
-                      {data.location}
-                    </span>
-                  </>
-                )}
-              </div>
+              {/* Bio */}
+              {data.bio && (
+                <p className="text-[13px] text-text-secondary mt-3 leading-[1.65] whitespace-pre-wrap">
+                  {data.bio}
+                </p>
+              )}
 
-              {/* Specialties */}
+              {/* Specialties as tags */}
               {data.specialties.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
+                <div className="flex flex-wrap gap-1.5 mt-3">
                   {data.specialties.map((s) => (
-                    <span key={s} className="px-2 py-0.5 rounded-md bg-surface-muted text-[11px] font-medium text-text-secondary">
+                    <span key={s} className="px-2 py-0.5 rounded bg-surface-muted text-[11px] font-medium text-text-secondary">
                       {SPECIALTY_LABELS[s]}
                     </span>
                   ))}
                 </div>
               )}
 
+              {/* CTA buttons (non-functional in preview) */}
+              <div className="flex gap-2 mt-4">
+                <span className="px-4 py-2 text-[13px] font-medium bg-[#171717] text-white rounded-lg">Start project</span>
+                <span className="px-4 py-2 text-[13px] font-medium border border-border text-text-primary rounded-lg">Send inquiry</span>
+              </div>
+
               {/* Social links */}
               {socials.length > 0 && (
-                <div className="flex items-center gap-2.5">
+                <div className="flex gap-2 mt-3">
                   {socials.map((s, i) => (
-                    <span key={i} className="text-text-muted">{s.icon}</span>
+                    <span key={i} className="w-8 h-8 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors">
+                      {s.icon}
+                    </span>
                   ))}
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Bio */}
-          {data.bio && (
-            <div className="mb-6">
-              <h3 className="text-[12px] font-mono uppercase tracking-wider text-text-muted mb-2">About</h3>
-              <p className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap">
-                {data.bio}
-              </p>
-            </div>
-          )}
-
-          {/* Portfolio placeholder */}
-          <div>
-            <h3 className="text-[12px] font-mono uppercase tracking-wider text-text-muted mb-3">Portfolio</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="aspect-[3/2] rounded-[8px] bg-surface-muted border border-border flex items-center justify-center">
-                  <span className="text-[11px] text-text-muted">Project {i}</span>
+            {/* Right column -- Portfolio */}
+            <div className="flex-1 min-w-0">
+              {portfolio.length > 0 ? (
+                <>
+                  <p className="text-[11px] font-mono text-text-muted uppercase tracking-[0.08em] mb-3">Work</p>
+                  <div className="space-y-3">
+                    {portfolio.map((item) => {
+                      const thumb = item.thumbnailUrl || item.assets?.find((a) => a.type !== "live_preview")?.url || "";
+                      const hasImage = thumb && (thumb.startsWith("http") || thumb.startsWith("/"));
+                      const livePreview = item.assets?.find((a) => a.type === "live_preview");
+                      return (
+                        <div key={item.id} onClick={() => setSelectedItem(item)} className="border border-border rounded-[10px] overflow-hidden hover:border-border-hover transition-colors group cursor-pointer">
+                          {livePreview ? (
+                            /* Live preview -- scaled iframe render */
+                            <div className="relative aspect-[16/9] bg-surface-muted overflow-hidden">
+                              <div className="absolute inset-0 origin-top-left grayscale group-hover:grayscale-0 transition-[filter] duration-500" style={{ width: "200%", height: "200%", transform: "scale(0.5)" }}>
+                                <iframe
+                                  src={livePreview.url}
+                                  title={item.title}
+                                  className="w-full h-full border-0 pointer-events-none" scrolling="no"
+                                  loading="lazy"
+                                  sandbox="allow-scripts allow-same-origin"
+                                />
+                              </div>
+                              <div className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm z-10">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+                                <span className="text-[9px] font-medium text-white uppercase tracking-wider">Live</span>
+                              </div>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-end justify-start p-3 z-10">
+                                <span className="text-[11px] font-medium text-white/0 group-hover:text-white transition-colors duration-300 flex items-center gap-1">
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                                  View
+                                </span>
+                              </div>
+                            </div>
+                          ) : hasImage ? (
+                            <div className="aspect-[16/9] bg-surface-muted">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={thumb} alt={item.title} className="w-full h-full object-cover" />
+                            </div>
+                          ) : null}
+                          <div className="px-3 py-2.5">
+                            <p className="text-[14px] font-medium text-text-primary">{item.title}</p>
+                            {item.description && (
+                              <p className="text-[12px] text-text-muted mt-0.5 line-clamp-2">{item.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
+                    <svg className="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <p className="text-[13px] text-text-muted">No portfolio items yet</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Portfolio item modal */}
+      <Modal open={selectedItem !== null} onClose={() => setSelectedItem(null)} size="full">
+        {selectedItem && (
+          <PortfolioFolder
+            item={{
+              ...selectedItem,
+              assets: selectedItem.assets.map((a) => ({
+                id: a.id,
+                type: a.type as "pdf" | "image" | "video" | "live_preview" | "figma",
+                title: a.type === "live_preview" ? "Live Preview" : selectedItem.title,
+                url: a.url,
+              })),
+            }}
+            onBack={() => setSelectedItem(null)}
+          />
+        )}
+      </Modal>
+
       {/* Shareable link */}
-      <div className="flex items-center gap-2 px-1">
-        <span className="text-[11px] text-text-muted">This is how clients will see your profile at</span>
-        <span className="text-[11px] font-mono text-text-primary">vibechckd.cc/coders/{data.slug || "your-name"}</span>
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-text-muted">Share your profile:</span>
+          <span className="text-[11px] font-mono text-text-primary">vibechckd.cc/coders/{data.slug || "your-name"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const url = `https://vibechckd.cc/coders/${data.slug || ""}`;
+              navigator.clipboard.writeText(url);
+            }}
+            className="text-[10px] font-medium text-text-muted hover:text-text-primary border border-border rounded px-2 py-0.5 transition-colors cursor-pointer"
+          >
+            Copy link
+          </button>
+          {data.slug && (
+            <a
+              href={`/coders/${data.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-medium text-text-muted hover:text-text-primary border border-border rounded px-2 py-0.5 transition-colors no-underline"
+            >
+              Open
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
+type PortfolioItem = {
+  id: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  assets: { id: string; type: string; url: string }[];
+};
+
 export default function ProfilePage() {
   const [initialData, setInitialData] = useState<ProfileData | null>(null);
   const [liveData, setLiveData] = useState<ProfileData | null>(null);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
 
   useEffect(() => {
-    fetch("/api/profile")
-      .then((res) => {
-        if (res.ok) return res.json();
-        return null;
-      })
-      .then((data) => {
-        if (data) {
-          setInitialData(data);
-          setLiveData(data);
+    Promise.all([
+      fetch("/api/profile").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/portfolio").then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([profileData, portfolioData]) => {
+        if (profileData) {
+          setInitialData(profileData);
+          setLiveData(profileData);
+        }
+        if (Array.isArray(portfolioData)) {
+          setPortfolio(portfolioData.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description || "",
+            thumbnailUrl: item.thumbnailUrl || "",
+            assets: (item.assets || []).map((a: any) => ({
+              id: a.id,
+              type: a.assetType || a.type,
+              url: a.fileUrl || a.url || "",
+            })),
+          })));
         }
       })
-      .catch(() => {})
+      .catch((err) => console.error("Profile load error:", err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -290,6 +398,7 @@ export default function ProfilePage() {
             slug: initialData?.slug,
             verified: initialData?.verified,
           }}
+          portfolio={portfolio}
         />
       )}
       </div>{/* end scrollable content */}

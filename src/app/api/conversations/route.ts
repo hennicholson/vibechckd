@@ -45,17 +45,25 @@ export async function GET() {
     .where(eq(projectMembers.userId, userId))
     .orderBy(desc(messages.createdAt));
 
-  const conversations = rows.map((row) => ({
-    projectId: row.projectId,
-    projectName: row.projectName,
-    lastMessage:
-      row.lastMessageType === "file"
-        ? "Shared a file"
-        : row.lastMessageContent || "",
-    lastSenderName: row.lastSenderName || "System",
-    lastMessageAt: row.lastMessageAt,
-    status: row.projectStatus,
-  }));
+  // Deduplicate by projectId (joins can produce duplicates)
+  const seen = new Set<string>();
+  const conversations = rows
+    .filter((row) => {
+      if (seen.has(row.projectId)) return false;
+      seen.add(row.projectId);
+      return true;
+    })
+    .map((row) => ({
+      projectId: row.projectId,
+      projectName: row.projectName,
+      lastMessage:
+        row.lastMessageType === "file"
+          ? "Shared a file"
+          : row.lastMessageContent || "",
+      lastSenderName: row.lastSenderName || "System",
+      lastMessageAt: row.lastMessageAt,
+      status: row.projectStatus,
+    }));
 
   return Response.json(conversations);
 }

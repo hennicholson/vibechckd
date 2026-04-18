@@ -171,11 +171,11 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
   }
 
   return (
-    <div className="max-w-3xl mx-auto h-full flex flex-col">
+    <div className="max-w-5xl h-full flex flex-col">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-[20px] font-semibold text-text-primary">Portfolio</h1>
+          <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Portfolio</h1>
           <Button variant="secondary" size="md" onClick={() => openEditor(null)}>
             Add project
           </Button>

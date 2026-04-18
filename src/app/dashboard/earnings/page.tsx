@@ -338,7 +338,7 @@ export default function EarningsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl h-full flex flex-col">
+      <div className="max-w-5xl h-full flex flex-col">
         <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
           <div className="h-6 w-32 bg-surface-muted rounded animate-pulse" />
           <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
@@ -361,11 +361,28 @@ export default function EarningsPage() {
   const withdrawn = balance?.totalWithdrawnCents || 0;
 
   return (
-    <div className="max-w-3xl h-full flex flex-col">
+    <div className="max-w-5xl h-full flex flex-col">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
-        <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Earnings</h1>
-        <p className="text-[12px] text-text-muted mt-0.5">Track your income and cash out through Whop Payments</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Earnings</h1>
+            <p className="text-[12px] text-text-muted mt-0.5">Track your income and cash out through Whop Payments</p>
+          </div>
+          <button
+            onClick={() => {
+              const walletEl = document.getElementById("whop-wallet");
+              if (walletEl) walletEl.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="inline-flex items-center gap-1.5 px-[18px] py-2 text-[13px] font-medium bg-background border border-border text-text-primary hover:border-border-hover rounded-lg transition-colors cursor-pointer"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <polyline points="19 12 12 19 5 12" />
+            </svg>
+            Withdraw
+          </button>
+        </div>
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
@@ -424,7 +441,9 @@ export default function EarningsPage() {
       )}
 
       {/* Whop Wallet - native balance & withdrawal */}
-      <WhopWallet availableCents={avail} onWithdrawalComplete={() => { fetchBalance(); fetchTransactions(); }} />
+      <div id="whop-wallet">
+        <WhopWallet availableCents={avail} onWithdrawalComplete={() => { fetchBalance(); fetchTransactions(); }} />
+      </div>
 
       {/* How it works section */}
       {earned === 0 && (

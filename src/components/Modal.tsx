@@ -8,14 +8,15 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   title?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
 const sizeClasses = {
   sm: "max-w-sm",
   md: "max-w-[480px]",
-  lg: "max-w-2xl",
-  xl: "max-w-4xl",
+  lg: "max-w-5xl",
+  xl: "max-w-6xl",
+  full: "max-w-[calc(100vw-48px)] md:max-w-[calc(100vw-80px)]",
 };
 
 export default function Modal({ open, onClose, children, title, size = "md" }: ModalProps) {
@@ -51,22 +52,27 @@ export default function Modal({ open, onClose, children, title, size = "md" }: M
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
           <motion.div
-            className={`relative bg-background rounded-xl border border-border shadow-[0_24px_80px_rgba(0,0,0,0.15)] ${sizeClasses[size]} w-full p-6 max-h-[90vh] overflow-y-auto`}
+            className={`relative bg-background rounded-xl border border-border shadow-[0_24px_80px_rgba(0,0,0,0.15)] ${sizeClasses[size]} w-full ${
+              size === "full" ? "p-0 h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] overflow-hidden" :
+              size === "lg" || size === "xl" ? "p-6 max-h-[95vh] overflow-y-auto" : "p-6 max-h-[90vh] overflow-y-auto"
+            }`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
           >
-            {/* Close button */}
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 w-8 h-8 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors duration-150 cursor-pointer z-10"
-              aria-label="Close"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Close button -- hidden for full size since content provides its own */}
+            {size !== "full" && (
+              <button
+                onClick={onClose}
+                className="absolute top-4 right-4 w-8 h-8 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors duration-150 cursor-pointer z-10"
+                aria-label="Close"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
 
             {title && (
               <div className="mb-4 pr-8">
