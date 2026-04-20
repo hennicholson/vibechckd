@@ -29,9 +29,21 @@ export async function POST(request: NextRequest) {
     const type = (formData.get("type") as string) || "asset";
 
     // Application uploads don't require auth (applicants aren't logged in yet)
+    // but have stricter limits to prevent abuse
     const isApplicationUpload = type === "application";
     if (!isApplicationUpload && !session?.user?.id) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (isApplicationUpload) {
+      // Restrict unauthenticated uploads: images/PDFs only, 5MB max
+      const allowedAppTypes = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]);
+      if (file && !allowedAppTypes.has(file.type)) {
+        return Response.json({ error: "Only images and PDFs are accepted for applications" }, { status: 400 });
+      }
+      if (file && file.size > 5 * 1024 * 1024) {
+        return Response.json({ error: "Application files must be under 5MB" }, { status: 400 });
+      }
     }
     const itemId = formData.get("itemId") as string | null;
 
