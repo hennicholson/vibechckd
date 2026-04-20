@@ -11,6 +11,7 @@ interface FileUploadProps {
   label?: string;
   accept?: string;
   className?: string;
+  uploadType?: string;
   onFilesChange: (files: UploadedFile[]) => void;
   files?: UploadedFile[];
 }
@@ -19,6 +20,7 @@ export default function FileUpload({
   label = "Upload Files",
   accept,
   className = "",
+  uploadType = "asset",
   onFilesChange,
   files = [],
 }: FileUploadProps) {
@@ -35,7 +37,7 @@ export default function FileUpload({
       try {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("type", "asset");
+        formData.append("type", uploadType);
 
         const res = await fetch("/api/upload", {
           method: "POST",

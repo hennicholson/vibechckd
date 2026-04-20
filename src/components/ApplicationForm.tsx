@@ -310,6 +310,7 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
                 <FileUpload
                   label="Work Samples"
                   accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.mp4,.webm"
+                  uploadType="application"
                   onFilesChange={handleSampleFilesChange}
                   files={form.sampleProjectFiles}
                 />

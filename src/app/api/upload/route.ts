@@ -25,12 +25,14 @@ export async function POST(request: NextRequest) {
       request.formData(),
     ]);
 
-    if (!session?.user?.id) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const file = formData.get("file") as File | null;
     const type = (formData.get("type") as string) || "asset";
+
+    // Application uploads don't require auth (applicants aren't logged in yet)
+    const isApplicationUpload = type === "application";
+    if (!isApplicationUpload && !session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const itemId = formData.get("itemId") as string | null;
 
     if (!file) {
@@ -52,14 +54,16 @@ export async function POST(request: NextRequest) {
     const id = crypto.randomUUID();
     let path: string;
 
-    if (type === "pfp") {
-      path = `pfp/${session.user.id}.${ext}`;
+    if (type === "application") {
+      path = `applications/${id}.${ext}`;
+    } else if (type === "pfp") {
+      path = `pfp/${session!.user!.id}.${ext}`;
     } else if (type === "preview") {
-      path = `previews/${session.user.id}.gif`;
+      path = `previews/${session!.user!.id}.gif`;
     } else if (type === "asset" && itemId) {
       path = `portfolio/${itemId}/${id}.${ext}`;
     } else {
-      path = `uploads/${session.user.id}/${id}.${ext}`;
+      path = `uploads/${session!.user!.id}/${id}.${ext}`;
     }
 
     // Get env vars
@@ -97,14 +101,15 @@ export async function POST(request: NextRequest) {
     // Update database in the background — don't block the response
     const dbUpdatePromise = (async () => {
       try {
-        if (type === "pfp") {
+        const userId = session?.user?.id;
+        if (type === "pfp" && userId) {
           await db.update(coderProfiles)
             .set({ pfpUrl: url, updatedAt: new Date() })
-            .where(eq(coderProfiles.userId, session.user.id));
-        } else if (type === "preview") {
+            .where(eq(coderProfiles.userId, userId));
+        } else if (type === "preview" && userId) {
           await db.update(coderProfiles)
             .set({ gifPreviewUrl: url, updatedAt: new Date() })
-            .where(eq(coderProfiles.userId, session.user.id));
+            .where(eq(coderProfiles.userId, userId));
         } else if (type === "asset" && itemId) {
           const assetId = formData.get("assetId") as string | null;
           if (assetId) {
