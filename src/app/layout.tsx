@@ -7,6 +7,31 @@ export const metadata: Metadata = {
   title: "vibechckd — The Most Vetted Vibe Coders in the Game",
   description:
     "A vetted marketplace for vibe coders. Every coder on vibechckd has been heavily verified. Browse talent, view portfolios, and build project teams.",
+  metadataBase: new URL("https://vibechckd.cc"),
+  icons: {
+    icon: "/icon.svg",
+  },
+  openGraph: {
+    title: "vibechckd — The Most Vetted Vibe Coders in the Game",
+    description: "Apply to join the most vetted vibe coder network in the game.",
+    url: "https://vibechckd.cc",
+    siteName: "vibechckd",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "vibechckd — We're looking for the top 1%",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "vibechckd — The Most Vetted Vibe Coders in the Game",
+    description: "Apply to join the most vetted vibe coder network in the game.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
