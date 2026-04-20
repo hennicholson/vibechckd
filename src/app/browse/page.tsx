@@ -43,15 +43,11 @@ function BrowseSidebarUser() {
 
   return (
     <div className="mt-auto px-3 py-4 border-t border-border space-y-2">
-      <Link href="/apply">
-        <button className="w-full px-3 py-2 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover transition-colors cursor-pointer">
-          Apply to join
-        </button>
+      <Link href="/apply" className="block w-full px-3 py-2 text-center text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover transition-colors">
+        Apply to join
       </Link>
-      <Link href="/login">
-        <button className="w-full px-3 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">
-          Log in
-        </button>
+      <Link href="/login" className="block w-full px-3 py-1.5 text-center text-[12px] text-text-muted hover:text-text-primary transition-colors">
+        Log in
       </Link>
     </div>
   );
@@ -346,9 +342,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
           <span className="sm:hidden text-[13px] font-medium text-text-primary truncate max-w-[200px]">{coder.displayName}</span>
           {/* Desktop header CTAs */}
           <div className="hidden sm:flex gap-2">
-            <Link href={`/coders/${coder.slug}`}>
-              <Button variant="secondary" size="sm">View full profile</Button>
-            </Link>
+            <Button href={`/coders/${coder.slug}`} variant="secondary" size="sm">View full profile</Button>
             <Button size="sm" onClick={() => handleInquiry("project")} disabled={!!initiating}>
               {initiating === "project" ? "Starting..." : "Start project"}
             </Button>
@@ -429,9 +423,7 @@ function CoderOverlay({ coder, onClose }: { coder: Coder; onClose: () => void })
                 <Button className="w-full min-h-[44px]" onClick={() => handleInquiry("project")} disabled={!!initiating}>
                   {initiating === "project" ? "Starting..." : "Start project"}
                 </Button>
-                <Link href={`/coders/${coder.slug}`} className="w-full">
-                  <Button variant="secondary" className="w-full min-h-[44px]">View full profile</Button>
-                </Link>
+                <Button href={`/coders/${coder.slug}`} variant="secondary" className="w-full min-h-[44px]">View full profile</Button>
               </div>
 
               {/* Portfolio items -- compact list with accordion */}
@@ -594,17 +586,24 @@ export default function BrowsePage() {
   const { data: session } = useSession();
   const [coders, setCoders] = useState<Coder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
 
-  useEffect(() => {
+  const loadCoders = useCallback(() => {
     setIsLoading(true);
+    setFetchError(false);
     fetch("/api/coders")
-      .then((res) => res.json())
-      .then((data) => { if (Array.isArray(data) && data.length > 0) setCoders(data); })
-      .catch((err) => console.error("Failed to fetch coders:", err))
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => { if (Array.isArray(data)) setCoders(data); })
+      .catch(() => setFetchError(true))
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => { loadCoders(); }, [loadCoders]);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   useEffect(() => {
@@ -759,11 +758,11 @@ export default function BrowsePage() {
                     </>
                   ) : (
                     <div className="border-t border-border pt-2 mt-2 flex gap-2">
-                      <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="flex-1">
-                        <button className="w-full py-2 text-[13px] text-text-muted border border-border rounded-md cursor-pointer">Log in</button>
+                      <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="flex-1 block text-center py-2 text-[13px] text-text-muted border border-border rounded-md">
+                        Log in
                       </Link>
-                      <Link href="/apply" onClick={() => setMobileMenuOpen(false)} className="flex-1">
-                        <button className="w-full py-2 text-[13px] text-[#fafafa] bg-[#171717] rounded-md cursor-pointer">Apply</button>
+                      <Link href="/apply" onClick={() => setMobileMenuOpen(false)} className="flex-1 block text-center py-2 text-[13px] text-[#fafafa] bg-[#171717] rounded-md">
+                        Apply
                       </Link>
                     </div>
                   )}
@@ -847,8 +846,25 @@ export default function BrowsePage() {
             <span className="text-[11px] font-mono text-text-muted ml-1">{filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}</span>
           </motion.div>
 
-          {/* Loading skeleton */}
-          {isLoading ? (
+          {/* Error state */}
+          {fetchError ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-12 h-12 rounded-full bg-[#fef2f2] flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <p className="text-[14px] font-medium text-text-primary mb-1">Failed to load coders</p>
+              <p className="text-[13px] text-text-muted mb-4">Something went wrong. Please try again.</p>
+              <button
+                onClick={loadCoders}
+                className="px-4 py-2 text-[13px] font-medium text-text-primary border border-border rounded-lg hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer min-h-[44px]"
+              >
+                Retry
+              </button>
+            </div>
+          ) : /* Loading skeleton */
+          isLoading ? (
             <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <SkeletonCard key={i} />

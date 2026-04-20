@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import TeamSlot from "./TeamSlot";
 import TeamAssembled from "./TeamAssembled";
 import CoderCard from "./CoderCard";
 import type { Coder, Specialty } from "@/lib/mock-data";
-import { coders, SPECIALTY_LABELS, getCodersBySpecialty } from "@/lib/mock-data";
+import { SPECIALTY_LABELS } from "@/lib/mock-data";
 
 type SlotConfig = {
   specialty: Specialty;
@@ -22,6 +22,8 @@ const SLOTS: SlotConfig[] = [
 
 export default function TeamBuilder() {
   const router = useRouter();
+  const [allCoders, setAllCoders] = useState<Coder[]>([]);
+  const [codersLoading, setCodersLoading] = useState(true);
   const [team, setTeam] = useState<Record<string, Coder | null>>({
     frontend: null,
     backend: null,
@@ -30,6 +32,17 @@ export default function TeamBuilder() {
   const [browsingSlot, setBrowsingSlot] = useState<Specialty | null>(null);
   const [initiated, setInitiated] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/coders")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
+      })
+      .then((data) => { if (Array.isArray(data)) setAllCoders(data); })
+      .catch(() => {})
+      .finally(() => setCodersLoading(false));
+  }, []);
 
   const filledSlots = Object.entries(team).filter(([, coder]) => coder !== null);
   const filledCount = filledSlots.length;
@@ -93,12 +106,12 @@ export default function TeamBuilder() {
 
   const selectedIds = new Set(Object.values(team).filter(Boolean).map((c) => c!.id));
   const availableCoders = browsingSlot
-    ? getCodersBySpecialty(browsingSlot).filter((c) => !selectedIds.has(c.id))
+    ? allCoders.filter((c) => (c.specialties || []).includes(browsingSlot) && !selectedIds.has(c.id))
     : [];
   const browsableCoders = availableCoders.length > 0
     ? availableCoders
     : browsingSlot
-      ? coders.filter((c) => !selectedIds.has(c.id))
+      ? allCoders.filter((c) => !selectedIds.has(c.id))
       : [];
 
   const assembledTeam = filledSlots.map(([specialty, coder]) => ({

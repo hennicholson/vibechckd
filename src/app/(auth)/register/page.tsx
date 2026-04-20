@@ -193,8 +193,8 @@ function RegisterContent() {
               <div className="space-y-4">
                 <Input label="Full name" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
                 <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                <Input label="Password" type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
-                <Button onClick={goNext} className="w-full" disabled={!name || !email || !password || password.length < 6}>
+                <Input label="Password" type="password" placeholder="Min 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Button onClick={goNext} className="w-full" disabled={!name || !email || !password || password.length < 8}>
                   Continue
                 </Button>
               </div>

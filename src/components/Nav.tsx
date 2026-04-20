@@ -76,15 +76,11 @@ export default function Nav() {
         <div className="flex items-center gap-2">
           {/* Not logged in — Login + Apply (always rendered, hidden when authenticated) */}
           <div className={`hidden md:flex items-center gap-2 ${status === "authenticated" ? "!hidden" : ""}`}>
-            <Link href="/login">
-              <button className="px-3 py-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer">
-                Log in
-              </button>
+            <Link href="/login" className="px-3 py-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors">
+              Log in
             </Link>
-            <Link href="/apply">
-              <button className="px-3.5 py-1.5 text-[12px] font-medium text-[#fafafa] bg-[#171717] rounded-md hover:bg-[#0a0a0a] transition-colors duration-150 cursor-pointer">
-                Apply
-              </button>
+            <Link href="/apply" className="px-3.5 py-1.5 text-[12px] font-medium text-[#fafafa] bg-[#171717] rounded-md hover:bg-[#0a0a0a] transition-colors duration-150">
+              Apply
             </Link>
           </div>
 
@@ -224,11 +220,11 @@ export default function Nav() {
                 </>
               ) : (
                 <div className="border-t border-border pt-2 mt-2 flex gap-2">
-                  <Link href="/login" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <button className="w-full py-2 text-[13px] text-text-muted border border-border rounded-md cursor-pointer">Log in</button>
+                  <Link href="/login" onClick={() => setMobileOpen(false)} className="flex-1 block text-center py-2 text-[13px] text-text-muted border border-border rounded-md">
+                    Log in
                   </Link>
-                  <Link href="/apply" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <button className="w-full py-2 text-[13px] text-[#fafafa] bg-[#171717] rounded-md cursor-pointer">Apply</button>
+                  <Link href="/apply" onClick={() => setMobileOpen(false)} className="flex-1 block text-center py-2 text-[13px] text-[#fafafa] bg-[#171717] rounded-md">
+                    Apply
                   </Link>
                 </div>
               )}

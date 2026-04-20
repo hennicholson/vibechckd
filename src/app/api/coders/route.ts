@@ -91,6 +91,9 @@ export async function GET() {
     return NextResponse.json(codersWithPortfolio);
   } catch (error) {
     console.error("Error fetching coders:", error);
-    return NextResponse.json([]);
+    return NextResponse.json(
+      { error: "Failed to fetch coders" },
+      { status: 500 }
+    );
   }
 }

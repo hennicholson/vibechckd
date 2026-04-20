@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get("reset") === "success";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -53,6 +55,12 @@ export default function LoginPage() {
         Welcome back to vibechckd
       </p>
 
+      {resetSuccess && (
+        <p className="text-[12px] text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4 text-center">
+          Password reset successfully. Sign in with your new password.
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Email"
@@ -61,13 +69,20 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Input
-          label="Password"
-          type="password"
-          placeholder="Your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div>
+          <Input
+            label="Password"
+            type="password"
+            placeholder="Your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="mt-1.5 text-right">
+            <Link href="/forgot-password" className="text-[12px] text-text-muted hover:text-text-primary transition-colors">
+              Forgot password?
+            </Link>
+          </div>
+        </div>
 
         {error && (
           <p className="text-[12px] text-negative">{error}</p>
@@ -96,5 +111,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

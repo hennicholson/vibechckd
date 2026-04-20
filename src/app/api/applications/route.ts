@@ -3,11 +3,12 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { emails } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { userId, name, email, specialties, portfolioLinks, rateExpectation, pitch } = body;
+    const { userId, name, email, specialties, portfolioLinks, sampleProjectUrls, rateExpectation, pitch } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -16,6 +17,19 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!rateExpectation) {
+      return NextResponse.json(
+        { error: "Rate expectation is required" },
+        { status: 400 }
+      );
+    }
+
+    // Merge portfolio links and sample project URLs into the portfolioLinks array
+    const allLinks: string[] = [
+      ...(portfolioLinks || []),
+      ...(sampleProjectUrls || []),
+    ];
+
     const [application] = await db
       .insert(applications)
       .values({
@@ -23,12 +37,16 @@ export async function POST(req: Request) {
         name,
         email,
         specialties: specialties || [],
-        portfolioLinks: portfolioLinks || [],
+        portfolioLinks: allLinks,
+        sampleProjectUrl: sampleProjectUrls?.length ? sampleProjectUrls.join(",") : null,
         rateExpectation: rateExpectation || null,
         pitch: pitch || null,
         status: "applied",
       })
       .returning();
+
+    // Fire-and-forget application confirmation email
+    emails.applicationSubmitted(body.email, body.name).catch(() => {});
 
     return NextResponse.json({ success: true, id: application.id });
   } catch (error) {

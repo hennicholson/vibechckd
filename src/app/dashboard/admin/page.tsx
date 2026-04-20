@@ -16,52 +16,13 @@ type Application = {
   email: string;
   specialties: string[];
   portfolioLinks: string[];
+  sampleProjectUrl: string | null;
   rateExpectation: string;
   pitch: string;
   status: ApplicationStatus;
+  reviewerNotes: string | null;
   createdAt: string;
 };
-
-// ── Mock Data (fallback) ──
-
-const fallbackApplications: Application[] = [
-  {
-    id: "app-1",
-    userId: null,
-    name: "Alex Rivera",
-    email: "alex@example.com",
-    specialties: ["frontend", "full-stack"],
-    portfolioLinks: ["https://alexrivera.dev"],
-    rateExpectation: "$120-180/hr",
-    pitch: "I build interfaces that feel alive. 5 years at startups, shipped 20+ products.",
-    status: "applied",
-    createdAt: "2026-04-12",
-  },
-  {
-    id: "app-2",
-    userId: null,
-    name: "Jordan Lee",
-    email: "jordan@example.com",
-    specialties: ["backend", "automation"],
-    portfolioLinks: ["https://github.com/jordanlee"],
-    rateExpectation: "$100-160/hr",
-    pitch: "Backend specialist with expertise in event-driven architectures and DevOps.",
-    status: "under_review",
-    createdAt: "2026-04-10",
-  },
-  {
-    id: "app-3",
-    userId: null,
-    name: "Morgan Taylor",
-    email: "morgan@example.com",
-    specialties: ["security"],
-    portfolioLinks: ["https://morgansec.io"],
-    rateExpectation: "$180-280/hr",
-    pitch: "Former pentester turned builder. I audit and harden codebases.",
-    status: "applied",
-    createdAt: "2026-04-13",
-  },
-];
 
 // ── Status helpers ──
 
@@ -87,6 +48,15 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function getSampleProjectUrls(app: Application): string[] {
+  if (!app.sampleProjectUrl) return [];
+  return app.sampleProjectUrl.split(",").filter(Boolean);
+}
+
+function isImageUrl(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+}
+
 // ── Component ──
 
 export default function AdminPage() {
@@ -96,80 +66,65 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fetchError, setFetchError] = useState("");
+  const [reviewerNotes, setReviewerNotes] = useState("");
 
-  // Fetch applications from the database on mount
-  useEffect(() => {
-    async function fetchApplications() {
-      try {
-        const res = await fetch("/api/admin/applications");
-        if (!res.ok) {
-          throw new Error(`Failed to fetch: ${res.status}`);
-        }
-        const data = await res.json();
-        if (data.applications && data.applications.length > 0) {
-          setApplications(data.applications);
-        } else {
-          // Fall back to mock data if no DB applications exist
-          setApplications(fallbackApplications);
-        }
-      } catch (err) {
-        console.error("Failed to fetch applications:", err);
-        // Fall back to mock data on error
-        setApplications(fallbackApplications);
-      } finally {
-        setLoading(false);
+  const fetchApplications = async () => {
+    setLoading(true);
+    setFetchError("");
+    try {
+      const res = await fetch("/api/admin/applications");
+      if (!res.ok) {
+        throw new Error(`Failed to fetch: ${res.status}`);
       }
+      const data = await res.json();
+      setApplications(data.applications || []);
+    } catch (err) {
+      console.error("Failed to fetch applications:", err);
+      setFetchError("Failed to load applications. Please check your connection and try again.");
+      setApplications([]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     fetchApplications();
   }, []);
 
-  async function handleApprove(id: string) {
-    setActionLoading(true);
+  // When opening a review modal, initialize reviewer notes from the application
+  const openReview = (app: Application) => {
+    setReviewingApp(app);
+    setReviewerNotes(app.reviewerNotes || "");
     setError("");
-    try {
-      const res = await fetch("/api/admin/applications", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: "approved" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to approve application");
-        setActionLoading(false);
-        return;
-      }
-      setApplications((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: "approved" as ApplicationStatus } : a))
-      );
-      setReviewingApp(null);
-    } catch {
-      setError("Failed to approve application. Please try again.");
-    } finally {
-      setActionLoading(false);
-    }
-  }
+  };
 
-  async function handleReject(id: string) {
+  async function handleStatusUpdate(id: string, status: "approved" | "rejected") {
     setActionLoading(true);
     setError("");
     try {
       const res = await fetch("/api/admin/applications", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: "rejected" }),
+        body: JSON.stringify({ id, status, reviewerNotes: reviewerNotes.trim() || null }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to reject application");
+        setError(data.error || `Failed to ${status === "approved" ? "approve" : "reject"} application`);
         setActionLoading(false);
         return;
       }
       setApplications((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: "rejected" as ApplicationStatus } : a))
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, status: status as ApplicationStatus, reviewerNotes: reviewerNotes.trim() || null }
+            : a
+        )
       );
       setReviewingApp(null);
+      setReviewerNotes("");
     } catch {
-      setError("Failed to reject application. Please try again.");
+      setError(`Failed to update application. Please try again.`);
     } finally {
       setActionLoading(false);
     }
@@ -197,9 +152,11 @@ export default function AdminPage() {
             }`}
           >
             Applications
-            <span className="ml-1.5 text-[11px] font-mono text-text-muted">
-              {applications.filter((a) => a.status !== "approved" && a.status !== "rejected").length}
-            </span>
+            {!loading && !fetchError && (
+              <span className="ml-1.5 text-[11px] font-mono text-text-muted">
+                {applications.filter((a) => a.status !== "approved" && a.status !== "rejected").length}
+              </span>
+            )}
           </button>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
@@ -215,8 +172,36 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Error state with retry */}
+      {!loading && fetchError && (
+        <div className="px-3 py-12 text-center">
+          <div className="w-10 h-10 bg-surface-muted rounded-lg flex items-center justify-center mx-auto mb-3">
+            <svg className="w-5 h-5 text-negative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <p className="text-[13px] text-text-secondary mb-4">{fetchError}</p>
+          <Button variant="secondary" size="sm" onClick={fetchApplications}>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !fetchError && applications.length === 0 && (
+        <div className="px-3 py-12 text-center">
+          <div className="w-10 h-10 bg-surface-muted rounded-lg flex items-center justify-center mx-auto mb-3">
+            <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+          </div>
+          <p className="text-[14px] font-medium text-text-primary mb-1">No applications</p>
+          <p className="text-[13px] text-text-muted">Applications will appear here when creators apply.</p>
+        </div>
+      )}
+
       {/* Applications Tab */}
-      {!loading && tab === "applications" && (
+      {!loading && !fetchError && applications.length > 0 && tab === "applications" && (
         <div className="space-y-0 overflow-x-auto">
           {/* Table header -- hidden on mobile, cards used instead */}
           <div className="hidden md:grid grid-cols-[1fr_1fr_1fr_100px_80px_80px] gap-3 px-3 py-2 text-[11px] font-mono text-text-muted uppercase tracking-wide">
@@ -249,7 +234,7 @@ export default function AdminPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setReviewingApp(app)}
+                onClick={() => openReview(app)}
               >
                 Review
               </Button>
@@ -281,18 +266,13 @@ export default function AdminPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setReviewingApp(app)}
+                  onClick={() => openReview(app)}
                 >
                   Review
                 </Button>
               </div>
             </div>
           ))}
-          {applications.length === 0 && (
-            <div className="px-3 py-12 text-center text-[13px] text-text-muted">
-              No applications to review.
-            </div>
-          )}
         </div>
       )}
 
@@ -301,7 +281,7 @@ export default function AdminPage() {
       {/* Review Modal */}
       <Modal
         open={!!reviewingApp}
-        onClose={() => { setReviewingApp(null); setError(""); }}
+        onClose={() => { setReviewingApp(null); setError(""); setReviewerNotes(""); }}
         title="Review Application"
         size="md"
       >
@@ -333,29 +313,69 @@ export default function AdminPage() {
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Portfolio</div>
                 <div className="space-y-1">
-                  {(reviewingApp.portfolioLinks || []).map((link) => (
-                    <a
-                      key={link}
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-[13px] text-text-primary underline underline-offset-2 decoration-border hover:decoration-text-primary transition-colors"
-                    >
-                      {link}
-                    </a>
-                  ))}
-                  {(!reviewingApp.portfolioLinks || reviewingApp.portfolioLinks.length === 0) && (
+                  {(reviewingApp.portfolioLinks || []).length > 0 ? (
+                    (reviewingApp.portfolioLinks || []).map((link) => (
+                      <a
+                        key={link}
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-[13px] text-text-primary underline underline-offset-2 decoration-border hover:decoration-text-primary transition-colors truncate"
+                      >
+                        {link}
+                      </a>
+                    ))
+                  ) : (
                     <span className="text-[13px] text-text-muted italic">No links provided</span>
                   )}
                 </div>
               </div>
+
+              {/* Work Samples */}
+              {(() => {
+                const sampleUrls = getSampleProjectUrls(reviewingApp);
+                if (sampleUrls.length === 0) return null;
+                return (
+                  <div>
+                    <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Work Samples</div>
+                    <div className="space-y-1.5">
+                      {sampleUrls.map((url) => (
+                        <div key={url} className="flex items-center gap-2">
+                          {isImageUrl(url) ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                              <img
+                                src={url}
+                                alt="Work sample"
+                                className="w-12 h-12 rounded-md object-cover border border-border hover:opacity-80 transition-opacity"
+                              />
+                            </a>
+                          ) : (
+                            <svg className="w-4 h-4 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12px] text-text-primary font-mono underline underline-offset-2 decoration-border hover:decoration-text-primary transition-colors truncate flex-1"
+                          >
+                            {url.split("/").pop()?.split("?")[0] || "File"}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Rate</div>
                 <div className="text-[13px] text-text-primary font-mono">{reviewingApp.rateExpectation || "Not specified"}</div>
               </div>
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Pitch</div>
-                <div className="text-[13px] text-text-secondary leading-relaxed">{reviewingApp.pitch || "Not provided"}</div>
+                <div className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap">{reviewingApp.pitch || "Not provided"}</div>
               </div>
               <div>
                 <div className="text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1">Current Status</div>
@@ -364,6 +384,23 @@ export default function AdminPage() {
                   <span className="ml-2 text-[12px] text-text-muted">{statusLabel(reviewingApp.status)}</span>
                 </span>
               </div>
+            </div>
+
+            {/* Reviewer Notes */}
+            <div>
+              <label
+                htmlFor="reviewer-notes"
+                className="block text-[11px] font-mono text-text-muted uppercase tracking-wide mb-1.5"
+              >
+                Reviewer Notes
+              </label>
+              <textarea
+                id="reviewer-notes"
+                value={reviewerNotes}
+                onChange={(e) => setReviewerNotes(e.target.value)}
+                placeholder="Add notes before approving or rejecting..."
+                className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted/60 transition-colors duration-150 focus:outline-none focus:border-text-secondary resize-y min-h-[80px]"
+              />
             </div>
 
             {/* Error display */}
@@ -376,7 +413,7 @@ export default function AdminPage() {
               <Button
                 variant="primary"
                 size="md"
-                onClick={() => handleApprove(reviewingApp.id)}
+                onClick={() => handleStatusUpdate(reviewingApp.id, "approved")}
                 disabled={reviewingApp.status === "approved" || actionLoading}
               >
                 {actionLoading ? "Processing..." : "Approve"}
@@ -384,7 +421,7 @@ export default function AdminPage() {
               <Button
                 variant="secondary"
                 size="md"
-                onClick={() => handleReject(reviewingApp.id)}
+                onClick={() => handleStatusUpdate(reviewingApp.id, "rejected")}
                 disabled={reviewingApp.status === "rejected" || actionLoading}
                 className="text-negative hover:text-negative"
               >

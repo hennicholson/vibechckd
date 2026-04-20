@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { applications, coderProfiles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { emails } from "@/lib/email";
 
 export async function GET() {
   try {
@@ -36,7 +37,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, status } = body as { id: string; status: string };
+    const { id, status, reviewerNotes } = body as { id: string; status: string; reviewerNotes?: string };
 
     if (!id || !status) {
       return NextResponse.json(
@@ -52,13 +53,18 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Update the application status
+    // Update the application status and reviewer notes
+    const updateData: Record<string, unknown> = {
+      status: status as "applied" | "under_review" | "interview" | "approved" | "rejected",
+      reviewedAt: (status === "approved" || status === "rejected") ? new Date() : undefined,
+    };
+    if (reviewerNotes !== undefined) {
+      updateData.reviewerNotes = reviewerNotes;
+    }
+
     const [updatedApp] = await db
       .update(applications)
-      .set({
-        status: status as "applied" | "under_review" | "interview" | "approved" | "rejected",
-        reviewedAt: (status === "approved" || status === "rejected") ? new Date() : undefined,
-      })
+      .set(updateData)
       .where(eq(applications.id, id))
       .returning();
 
@@ -106,6 +112,14 @@ export async function PUT(request: NextRequest) {
           })
           .where(eq(coderProfiles.id, profile.id));
       }
+    }
+
+    // Fire-and-forget status notification emails
+    if (status === "approved" && updatedApp.email) {
+      emails.applicationApproved(updatedApp.email, updatedApp.name).catch(() => {});
+    }
+    if (status === "rejected" && updatedApp.email) {
+      emails.applicationRejected(updatedApp.email, updatedApp.name).catch(() => {});
     }
 
     return NextResponse.json({ success: true, application: updatedApp });

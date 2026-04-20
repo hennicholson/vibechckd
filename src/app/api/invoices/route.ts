@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { invoices, invoiceSplits, messages, projectMembers, users } from "@/db/schema";
 import { eq, and, ne, desc } from "drizzle-orm";
 import { createInvoice } from "@/lib/whop";
+import { emails } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -165,6 +166,12 @@ export async function POST(request: NextRequest) {
           }))
         )
         .returning();
+    }
+
+    // Fire-and-forget invoice notification email
+    if (email) {
+      const displayAmountEmail = "$" + (amount / 100).toFixed(2);
+      emails.invoiceCreated(email, description, displayAmountEmail, whopInvoice.paymentUrl).catch(() => {});
     }
 
     return Response.json({

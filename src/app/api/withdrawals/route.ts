@@ -13,6 +13,7 @@ import {
   createPayoutTransfer,
   generatePayoutPortalLink,
 } from "@/lib/whop";
+import { emails } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -179,6 +180,9 @@ export async function POST(request: NextRequest) {
       console.error("Failed to generate payout portal link:", err);
       // Non-blocking -- transfer already succeeded
     }
+
+    // Fire-and-forget withdrawal confirmation email
+    emails.withdrawalProcessed(user.email, "$" + amountDollars.toFixed(2)).catch(() => {});
 
     return Response.json({
       withdrawalId: withdrawal.id,

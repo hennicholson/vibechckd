@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { users, coderProfiles, clientProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { emails } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -21,8 +22,8 @@ export async function POST(req: Request) {
 
     const role = requestedRole === "client" ? "client" : "coder";
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    if (password.length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
     // Check if user exists
@@ -99,6 +100,9 @@ export async function POST(req: Request) {
         description: onboarding?.projectDescription || null,
       });
     }
+
+    // Fire-and-forget welcome email
+    emails.welcome(normalizedEmail, name).catch(() => {});
 
     return NextResponse.json({ success: true, userId: user.id });
   } catch (error) {

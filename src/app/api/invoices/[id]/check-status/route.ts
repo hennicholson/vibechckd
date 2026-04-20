@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { invoices, messages, transactions } from "@/db/schema";
+import { invoices, messages, transactions, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getInvoice } from "@/lib/whop";
+import { emails } from "@/lib/email";
 
 export async function POST(
   _req: Request,
@@ -173,6 +174,18 @@ export async function POST(
             description: `Invoice payment: ${invoice.description}`,
             completedAt: new Date(),
           });
+        }
+
+        // Fire-and-forget payment received email to the invoice sender (creator)
+        const [senderUser] = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, invoice.senderId))
+          .limit(1);
+
+        if (senderUser?.email) {
+          const paidDisplayAmount = "$" + (invoice.amountCents / 100).toFixed(2);
+          emails.paymentReceived(senderUser.email, paidDisplayAmount, invoice.description || "Invoice").catch(() => {});
         }
       }
     }

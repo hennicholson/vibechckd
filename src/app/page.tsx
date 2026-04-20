@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
 import PageShell from "@/components/PageShell";
 import Button from "@/components/Button";
 import HeroVSL from "@/components/HeroVSL";
@@ -64,12 +63,8 @@ export default function LandingPage() {
               Every coder on vibechckd has been heavily vetted. Clients don&apos;t gamble on talent. The verified badge means something.
             </p>
             <div className="flex gap-2 mt-6">
-              <Link href="/browse">
-                <Button>Browse coders</Button>
-              </Link>
-              <Link href="/apply">
-                <Button variant="secondary">Apply</Button>
-              </Link>
+              <Button href="/browse">Browse coders</Button>
+              <Button href="/apply" variant="secondary">Apply</Button>
             </div>
           </motion.div>
 
@@ -153,9 +148,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <Link href="/browse">
-              <Button>Browse the gallery</Button>
-            </Link>
+            <Button href="/browse">Browse the gallery</Button>
           </motion.div>
         </div>
       </section>
@@ -209,9 +202,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <Link href="/apply">
-              <Button>Apply to join</Button>
-            </Link>
+            <Button href="/apply">Apply to join</Button>
           </motion.div>
         </div>
       </section>
@@ -232,12 +223,8 @@ export default function LandingPage() {
               Whether you are hiring or building your reputation, vibechckd is where quality meets opportunity.
             </p>
             <div className="flex gap-2 mt-6 justify-center">
-              <Link href="/browse">
-                <Button>Browse coders</Button>
-              </Link>
-              <Link href="/apply">
-                <Button variant="secondary">Apply to join</Button>
-              </Link>
+              <Button href="/browse">Browse coders</Button>
+              <Button href="/apply" variant="secondary">Apply to join</Button>
             </div>
           </motion.div>
         </div>

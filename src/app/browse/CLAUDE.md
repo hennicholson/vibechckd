@@ -7,6 +7,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #9250 | 10:48 PM | 🟣 | Public profile viewing and navigation for creators/admins | ~470 |
 | #8877 | 2:48 AM | ✅ | VibeCheck deployed to Netlify production | ~233 |
 </claude-mem-context>

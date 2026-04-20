@@ -8,5 +8,4 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #8877 | 2:48 AM | ✅ | VibeCheck deployed to Netlify production | ~233 |
-| #8849 | 2:01 AM | 🔵 | HeroVSL component integrated into homepage landing page | ~300 |
 </claude-mem-context>

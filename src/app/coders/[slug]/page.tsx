@@ -2,7 +2,6 @@
 
 import { use, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { useSession } from "next-auth/react";
 import PageShell from "@/components/PageShell";
 import Badge from "@/components/Badge";
@@ -11,7 +10,7 @@ import Button from "@/components/Button";
 import PortfolioGrid from "@/components/PortfolioGrid";
 import PortfolioFolder from "@/components/PortfolioFolder";
 import Modal from "@/components/Modal";
-import { getCoderBySlug as getMockCoder, SPECIALTY_LABELS, type Coder, type PortfolioItem } from "@/lib/mock-data";
+import { SPECIALTY_LABELS, type Coder, type PortfolioItem } from "@/lib/mock-data";
 
 function ensureHttps(url: string): string {
   if (!url) return url;
@@ -60,50 +59,32 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
     return () => { document.title = "vibechckd"; };
   }, [coder]);
 
-  // Fetch coder from API, fall back to mock data
+  const [fetchError, setFetchError] = useState(false);
+
+  // Fetch coder from API
   useEffect(() => {
     let cancelled = false;
 
     async function fetchCoder() {
       setLoading(true);
+      setFetchError(false);
       try {
         const res = await fetch("/api/coders");
-        if (res.ok) {
-          const coders = await res.json();
-          const found = coders.find((c: Coder) => c.slug === slug);
-          if (!cancelled) {
-            if (found) {
-              setCoder(found);
-            } else {
-              // Try mock data as final fallback
-              const mock = getMockCoder(slug);
-              if (mock) {
-                setCoder(mock);
-              } else {
-                setNotFound(true);
-              }
-            }
-          }
-        } else {
-          // API failed, try mock data
-          if (!cancelled) {
-            const mock = getMockCoder(slug);
-            if (mock) {
-              setCoder(mock);
-            } else {
-              setNotFound(true);
-            }
-          }
+        if (!res.ok) {
+          if (!cancelled) setFetchError(true);
+          return;
         }
-      } catch {
+        const coders = await res.json();
         if (!cancelled) {
-          const mock = getMockCoder(slug);
-          if (mock) {
-            setCoder(mock);
+          const found = coders.find((c: Coder) => c.slug === slug);
+          if (found) {
+            setCoder(found);
           } else {
             setNotFound(true);
           }
         }
+      } catch {
+        if (!cancelled) setFetchError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -139,6 +120,29 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
     );
   }
 
+  // Error state
+  if (fetchError) {
+    return (
+      <PageShell>
+        <div className="max-w-[960px] mx-auto px-4 md:px-6 py-16 md:py-24 text-center">
+          <div className="w-12 h-12 rounded-full bg-[#fef2f2] flex items-center justify-center mx-auto mb-4">
+            <svg className="w-5 h-5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-[20px] font-semibold text-[#0a0a0a]">Something went wrong</h1>
+          <p className="text-[14px] text-[#737373] mt-2">We couldn&apos;t load this profile. Please try again.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-[18px] py-2 text-[13px] font-medium bg-[#171717] text-[#fafafa] rounded-lg hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      </PageShell>
+    );
+  }
+
   // 404 state
   if (notFound || !coder) {
     return (
@@ -151,9 +155,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
           </div>
           <h1 className="text-[20px] font-semibold text-[#0a0a0a]">Coder not found</h1>
           <p className="text-[14px] text-[#737373] mt-2">This profile doesn&apos;t exist or has been removed.</p>
-          <Link href="/browse">
-            <Button variant="secondary" className="mt-6">Browse coders</Button>
-          </Link>
+          <Button href="/browse" variant="secondary" className="mt-6">Browse coders</Button>
         </div>
       </PageShell>
     );
