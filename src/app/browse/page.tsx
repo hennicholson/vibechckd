@@ -390,7 +390,6 @@ export default function BrowsePage() {
         filter={filter}
         onFilterChange={setFilter}
         counts={specialtyCounts}
-        totalCount={searchFiltered.length}
       />
 
       <main className="flex-1 min-w-0 flex flex-col">

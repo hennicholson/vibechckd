@@ -40,7 +40,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // don't leak which addresses are registered. The login UI offers a
           // "didn't get the verification email?" link that any user can click
           // to kick off a resend — this preserves UX without enumeration.
-          if (!user.emailVerified) return null;
+          // Dev escape hatch: set AUTH_DEV_SKIP_VERIFICATION=1 in .env.local
+          // to bypass this check during local iteration. Never respected in prod.
+          const devSkipVerify =
+            process.env.NODE_ENV !== "production" &&
+            process.env.AUTH_DEV_SKIP_VERIFICATION === "1";
+          if (!user.emailVerified && !devSkipVerify) return null;
 
           return {
             id: user.id,

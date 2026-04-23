@@ -31,7 +31,6 @@ interface BrowseSidebarProps {
   filter: Filter;
   onFilterChange: (f: Filter) => void;
   counts: Record<string, number>;
-  totalCount: number;
 }
 
 // Minimal stroke icons — 20px to match the bumped-up type scale.
@@ -127,15 +126,15 @@ function FilterButton({
   );
 }
 
-export default function BrowseSidebar({ filter, onFilterChange, counts, totalCount }: BrowseSidebarProps) {
+export default function BrowseSidebar({ filter, onFilterChange, counts }: BrowseSidebarProps) {
   const { data: session, status } = useSession();
 
   return (
-    <aside className="hidden md:flex flex-col w-[300px] lg:w-[320px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background">
+    <aside className="hidden md:flex flex-col w-[280px] lg:w-[300px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background">
       {/* Logo */}
       <div className="px-6 pt-7 pb-6">
         <Link href="/" className="inline-flex items-center gap-2 group">
-          <span className="text-[17px] font-semibold text-text-primary tracking-[-0.02em]">
+          <span className="text-[18px] font-semibold text-text-primary tracking-[-0.02em]">
             vibechckd
           </span>
           <VerifiedSeal size="sm" />
@@ -169,7 +168,6 @@ export default function BrowseSidebar({ filter, onFilterChange, counts, totalCou
           active={filter === "all"}
           label="All coders"
           onClick={() => onFilterChange("all")}
-          count={totalCount}
         />
         {SPECIALTIES.map((s) => (
           <FilterButton
