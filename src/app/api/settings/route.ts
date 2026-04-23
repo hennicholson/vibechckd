@@ -4,6 +4,24 @@ import { db } from "@/db";
 import { coderProfiles, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { parseBody, z } from "@/lib/validation";
+
+// PUT body — whitelist of what a user can change via settings.
+// NEVER includes role, email, id, or any other privileged field. Even if
+// a client sends those, zod's `.strict()` rejects the entire request.
+const settingsPutSchema = z
+  .object({
+    availability: z.enum(["available", "selective", "unavailable"]).optional(),
+    password: z.string().min(8).max(200).optional(),
+    notifications: z
+      .object({
+        email: z.boolean().optional(),
+        push: z.boolean().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .strict();
 
 export async function PUT(request: Request) {
   const session = await auth();
@@ -11,8 +29,15 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { availability, password, notifications } = body;
+  const rawBody = await request.json().catch(() => null);
+  const parsed = parseBody(settingsPutSchema, rawBody);
+  if (!parsed.ok) {
+    return NextResponse.json(
+      { error: "Invalid input", details: parsed.error },
+      { status: 400 }
+    );
+  }
+  const { availability, password } = parsed.data;
 
   // Update availability on coder_profiles if provided
   if (availability) {
@@ -30,9 +55,10 @@ export async function PUT(request: Request) {
     }
   }
 
-  // Update password if provided
-  if (password && typeof password === "string" && password.length >= 8) {
-    const hash = await bcrypt.hash(password, 12);
+  // Update password if provided.
+  // bcrypt cost=13 per current policy (tradeoff: ~1s per hash on modern CPU)
+  if (password) {
+    const hash = await bcrypt.hash(password, 13);
     await db
       .update(users)
       .set({ passwordHash: hash })

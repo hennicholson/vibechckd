@@ -1,30 +1,43 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { transactions, users, messages } from "@/db/schema";
+import { transactions, users, messages, projectMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createCheckoutSession } from "@/lib/whop";
+import { parseBody, z } from "@/lib/validation";
+
+// Strict schema: the sender is ALWAYS session.user.id. Never accept sender from body.
+// amountCents is bounded to prevent Whop-side / integer-overflow abuse.
+const paymentSchema = z
+  .object({
+    recipientId: z.string().uuid(),
+    projectId: z.string().uuid().optional(),
+    amountCents: z.number().int().positive().max(10_000_000), // $100k cap
+    description: z.string().min(1).max(500),
+  })
+  .strict();
 
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const body = await request.json();
-    const { recipientId, projectId, amountCents, description } = body;
-
-    if (!recipientId || !amountCents || !description) {
-      return Response.json(
-        { error: "recipientId, amountCents, and description are required" },
+    const rawBody = await request.json().catch(() => null);
+    const parsed = parseBody(paymentSchema, rawBody);
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error },
         { status: 400 }
       );
     }
+    const { recipientId, projectId, amountCents, description } = parsed.data;
 
-    if (amountCents <= 0) {
-      return Response.json(
-        { error: "amountCents must be positive" },
+    // A user cannot pay themselves.
+    if (recipientId === session.user.id) {
+      return NextResponse.json(
+        { error: "Cannot send a payment to yourself" },
         { status: 400 }
       );
     }
@@ -37,7 +50,31 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!recipient) {
-      return Response.json({ error: "Recipient not found" }, { status: 404 });
+      return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+    }
+
+    // If this payment is tied to a project, confirm BOTH parties belong to it.
+    // TODO(security): If the product intent is "a client can pay any coder
+    // on the marketplace" without a project context, that's currently the
+    // fallback behavior here. Revisit whether unsolicited direct payments
+    // from arbitrary users should be allowed at all, or should require an
+    // invoice / inquiry linkage first. For now, we enforce project
+    // co-membership when projectId is supplied, and allow direct payment
+    // otherwise (sender is always the authenticated user, so no
+    // impersonation risk exists — just unsolicited-payment risk).
+    if (projectId) {
+      const memberships = await db
+        .select({ userId: projectMembers.userId })
+        .from(projectMembers)
+        .where(eq(projectMembers.projectId, projectId));
+
+      const memberSet = new Set(memberships.map((m) => m.userId));
+      if (!memberSet.has(session.user.id) || !memberSet.has(recipientId)) {
+        return NextResponse.json(
+          { error: "Forbidden: both parties must be project members" },
+          { status: 403 }
+        );
+      }
     }
 
     // Convert cents to dollars for Whop API
@@ -56,7 +93,7 @@ export async function POST(request: NextRequest) {
       redirectUrl: `${baseUrl}${redirectPath}`,
     });
 
-    // Insert transaction record
+    // Insert transaction record (sender is always session.user.id)
     const [transaction] = await db
       .insert(transactions)
       .values({
@@ -104,7 +141,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return Response.json({
+    return NextResponse.json({
       transactionId: transaction.id,
       paymentUrl: checkout.purchaseUrl,
     });
@@ -112,6 +149,7 @@ export async function POST(request: NextRequest) {
     console.error("Payment creation failed:", error);
     const message =
       error instanceof Error ? error.message : "Failed to create payment";
-    return Response.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

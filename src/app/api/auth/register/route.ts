@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email already registered" }, { status: 409 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 13);
 
     // Create user
     const [user] = await db

@@ -3,6 +3,15 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.EMAIL_FROM || "vibechckd <noreply@vibechckd.cc>";
 
+// Escape user-controlled strings before embedding in HTML.
+// Apply to any value that originates from user input or DB fields that
+// could contain control characters. Do NOT apply to HTML markup you
+// construct internally. For URLs, escaping quotes/ampersands is enough
+// to prevent attribute breakout.
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
 // Branded HTML email wrapper
 function brandedEmail(params: {
   heading: string;
@@ -26,20 +35,21 @@ function brandedEmail(params: {
     </div>
 
     <!-- Heading -->
-    <h1 style="font-size:22px;font-weight:600;color:#0a0a0a;margin:0 0 16px;line-height:1.3;letter-spacing:-0.02em;">${params.heading}</h1>
+    <h1 style="font-size:22px;font-weight:600;color:#0a0a0a;margin:0 0 16px;line-height:1.3;letter-spacing:-0.02em;">${escapeHtml(params.heading)}</h1>
 
-    <!-- Body -->
+    <!-- Body: callers are responsible for pre-escaping user-controlled
+         substrings. Non-user markup (e.g. <strong>, <p>) is passed through. -->
     <div style="font-size:14px;color:#525252;line-height:1.7;margin-bottom:24px;">${params.body}</div>
 
     ${params.ctaText && params.ctaUrl ? `
     <!-- CTA Button -->
-    <a href="${params.ctaUrl}" style="display:inline-block;padding:12px 24px;background:#171717;color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:500;">${params.ctaText}</a>
+    <a href="${escapeHtml(params.ctaUrl)}" style="display:inline-block;padding:12px 24px;background:#171717;color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:500;">${escapeHtml(params.ctaText)}</a>
     ` : ""}
 
     <!-- Footer -->
     <div style="margin-top:48px;padding-top:24px;border-top:1px solid #e5e5e5;">
       <p style="font-size:11px;color:#a3a3a3;margin:0;line-height:1.6;">
-        ${params.footer || "vibechckd -- The vetted coder marketplace"}
+        ${escapeHtml(params.footer || "vibechckd -- The vetted coder marketplace")}
       </p>
     </div>
   </div>
@@ -91,7 +101,7 @@ export const emails = {
       to,
       subject: "Application received -- vibechckd",
       heading: "We received your application",
-      body: `Thanks for applying, ${name}. Our team reviews every application carefully. You'll hear back within 3-5 business days.`,
+      body: `Thanks for applying, ${escapeHtml(name)}. Our team reviews every application carefully. You'll hear back within 3-5 business days.`,
       ctaText: "View your application",
       ctaUrl: "https://vibechckd.cc/dashboard",
     }),
@@ -111,7 +121,7 @@ export const emails = {
       to,
       subject: "Application update -- vibechckd",
       heading: "Application update",
-      body: `Hi ${name}, thanks for your interest in vibechckd. After reviewing your application, we're not able to approve it at this time. You're welcome to reapply in the future with updated work samples.`,
+      body: `Hi ${escapeHtml(name)}, thanks for your interest in vibechckd. After reviewing your application, we're not able to approve it at this time. You're welcome to reapply in the future with updated work samples.`,
     }),
 
   invoiceCreated: (to: string, description: string, amount: string, payUrl?: string) =>
@@ -119,7 +129,7 @@ export const emails = {
       to,
       subject: `Invoice: ${description} -- vibechckd`,
       heading: "You have a new invoice",
-      body: `<p><strong>${description}</strong></p><p style="font-size:24px;font-weight:600;color:#0a0a0a;margin:8px 0;">${amount}</p>`,
+      body: `<p><strong>${escapeHtml(description)}</strong></p><p style="font-size:24px;font-weight:600;color:#0a0a0a;margin:8px 0;">${escapeHtml(amount)}</p>`,
       ctaText: payUrl ? "Pay invoice" : undefined,
       ctaUrl: payUrl,
     }),
@@ -129,7 +139,7 @@ export const emails = {
       to,
       subject: `Payment received: ${amount} -- vibechckd`,
       heading: "Payment received",
-      body: `You received a payment of <strong>${amount}</strong> for "${description}". The funds have been added to your balance.`,
+      body: `You received a payment of <strong>${escapeHtml(amount)}</strong> for "${escapeHtml(description)}". The funds have been added to your balance.`,
       ctaText: "View earnings",
       ctaUrl: "https://vibechckd.cc/dashboard/earnings",
     }),
@@ -139,7 +149,7 @@ export const emails = {
       to,
       subject: `Withdrawal processed: ${amount} -- vibechckd`,
       heading: "Withdrawal processed",
-      body: `Your withdrawal of <strong>${amount}</strong> has been initiated. Funds will arrive in 1-3 business days depending on your payout method.`,
+      body: `Your withdrawal of <strong>${escapeHtml(amount)}</strong> has been initiated. Funds will arrive in 1-3 business days depending on your payout method.`,
       ctaText: "View earnings",
       ctaUrl: "https://vibechckd.cc/dashboard/earnings",
     }),

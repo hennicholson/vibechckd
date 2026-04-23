@@ -1,8 +1,26 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { invoices, invoiceSplits, users, messages, projectMembers } from "@/db/schema";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { parseBody, z } from "@/lib/validation";
+
+// PATCH body schema. Status transitions enforced below by role.
+const patchSchema = z
+  .object({
+    status: z.enum(["sent", "voided"]),
+  })
+  .strict();
+
+// Role-gated state machine. Each transition declares which party is
+// allowed to perform it (sender = invoice creator, recipient = payer).
+const transitions: Record<
+  string,
+  Record<string, "sender" | "recipient" | "any">
+> = {
+  draft: { sent: "sender" },
+  sent: { voided: "sender" },
+};
 
 export async function GET(
   _req: Request,
@@ -107,12 +125,15 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await req.json();
-    const { status } = body;
-
-    if (!status) {
-      return Response.json({ error: "status is required" }, { status: 400 });
+    const rawBody = await req.json().catch(() => null);
+    const parsed = parseBody(patchSchema, rawBody);
+    if (!parsed.ok) {
+      return Response.json(
+        { error: "Invalid input", details: parsed.error },
+        { status: 400 }
+      );
     }
+    const { status } = parsed.data;
 
     // Fetch the invoice
     const [invoice] = await db
@@ -132,17 +153,22 @@ export async function PATCH(
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Validate status transitions
-    const allowedTransitions: Record<string, string[]> = {
-      draft: ["sent"],
-      sent: ["voided"],
-    };
-
-    const allowed = allowedTransitions[invoice.status];
-    if (!allowed || !allowed.includes(status)) {
+    // Enforce the role-gated state machine
+    const fromState = transitions[invoice.status];
+    const requiredRole = fromState?.[status];
+    if (!requiredRole) {
       return Response.json(
         { error: `Cannot transition from ${invoice.status} to ${status}` },
         { status: 400 }
+      );
+    }
+    if (
+      (requiredRole === "sender" && !isSender) ||
+      (requiredRole === "recipient" && !isRecipient)
+    ) {
+      return Response.json(
+        { error: `Only the ${requiredRole} may perform this transition` },
+        { status: 403 }
       );
     }
 

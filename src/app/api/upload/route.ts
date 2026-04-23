@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { coderProfiles, portfolioAssets } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const MAX_SIZE: Record<string, number> = {
   image: 10 * 1024 * 1024,
@@ -14,7 +15,15 @@ const MAX_SIZE: Record<string, number> = {
 const ALLOWED_TYPES = new Set([
   "image/jpeg", "image/png", "image/gif", "image/webp",
   "application/pdf",
-  "video/mp4", "video/webm",
+  "video/mp4", "video/webm", "video/quicktime",
+]);
+
+// Explicit extension whitelist. Matched case-insensitively against the
+// final dot-segment of the uploaded filename.
+const ALLOWED_EXTENSIONS = new Set([
+  "jpg", "jpeg", "png", "gif", "webp",
+  "pdf",
+  "mp4", "webm", "mov",
 ]);
 
 export async function POST(request: NextRequest) {
@@ -36,6 +45,27 @@ export async function POST(request: NextRequest) {
     }
 
     if (isApplicationUpload) {
+      // Rate-limit unauthenticated application uploads: 5 per IP per hour.
+      const rl = checkRateLimit(
+        rateLimitKey(request, "upload:application"),
+        5,
+        60 * 60 * 1000
+      );
+      if (!rl.allowed) {
+        return Response.json(
+          { error: "Too many uploads. Please try again later." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": Math.max(
+                1,
+                Math.ceil((rl.resetAt - Date.now()) / 1000)
+              ).toString(),
+            },
+          }
+        );
+      }
+
       // Restrict unauthenticated uploads: images/PDFs only, 5MB max
       const allowedAppTypes = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]);
       if (file && !allowedAppTypes.has(file.type)) {
@@ -53,6 +83,16 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_TYPES.has(file.type)) {
       return Response.json({ error: `File type not supported: ${file.type}` }, { status: 400 });
+    }
+
+    // Extension whitelist: reject any file whose extension doesn't match.
+    // Defense-in-depth in case a malicious client spoofs the Content-Type.
+    const extForCheck = (file.name.split(".").pop() || "").toLowerCase();
+    if (!ALLOWED_EXTENSIONS.has(extForCheck)) {
+      return Response.json(
+        { error: `File extension not allowed: .${extForCheck || "(none)"}` },
+        { status: 400 }
+      );
     }
 
     const sizeCategory = file.type.startsWith("video/") ? "video" : file.type === "image/gif" ? "gif" : "image";

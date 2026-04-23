@@ -9,6 +9,11 @@ export function middleware(request: NextRequest) {
                 request.cookies.get("__Secure-authjs.session-token");
 
   if (!token) {
+    // API routes → return 401 JSON, don't redirect (would break JSON clients)
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Team builder → redirect to client signup
     if (pathname.startsWith("/dashboard/teams")) {
       const url = request.nextUrl.clone();
@@ -27,5 +32,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/api/admin/:path*"],
 };

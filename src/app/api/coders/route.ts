@@ -1,17 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, coderProfiles, portfolioItems, portfolioAssets } from "@/db/schema";
 import { eq, isNotNull } from "drizzle-orm";
 // No mock data — only real DB coders
 
-export async function GET() {
+// TODO(perf): This endpoint runs an N+1 query against portfolio_items and
+// portfolio_assets for each coder returned. Replace with a single LEFT JOIN
+// on portfolio_items + portfolio_assets and assemble in memory once the
+// list stabilizes. For now, pagination below caps the blast radius.
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const rawLimit = parseInt(searchParams.get("limit") || "50", 10);
+    const rawOffset = parseInt(searchParams.get("offset") || "0", 10);
+    const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
+    const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+
     // Query all active/verified coder profiles from Neon
     const allProfiles = await db
       .select()
       .from(coderProfiles)
       .innerJoin(users, eq(coderProfiles.userId, users.id))
-      .where(isNotNull(coderProfiles.creatorSlug));
+      .where(isNotNull(coderProfiles.creatorSlug))
+      .limit(limit)
+      .offset(offset);
 
     // Filter out coders with empty profiles (no name or no slug)
     const profiles = allProfiles.filter((row) => {
@@ -74,7 +86,7 @@ export async function GET() {
           twitterUrl: profile.twitterUrl || undefined,
           linkedinUrl: profile.linkedinUrl || undefined,
           title: (profile.specialties?.[0] || "Developer"),
-          specialties: (profile.specialties || []) as any[],
+          specialties: (profile.specialties || []) as unknown[],
           yearsExperience: 0,
           availability: profile.availability || "available",
           hourlyRate: profile.hourlyRate || "",
