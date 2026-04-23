@@ -35,6 +35,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const valid = await bcrypt.compare(password, user.passwordHash);
           if (!valid) return null;
 
+          // Block unverified accounts. We intentionally return null (generic
+          // "invalid credentials") rather than throwing a distinct error so we
+          // don't leak which addresses are registered. The login UI offers a
+          // "didn't get the verification email?" link that any user can click
+          // to kick off a resend — this preserves UX without enumeration.
+          if (!user.emailVerified) return null;
+
           return {
             id: user.id,
             email: user.email,

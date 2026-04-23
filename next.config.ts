@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Gzip/Brotli responses. Default is true in Next.js, but we're explicit
+  // so a future config change doesn't silently regress this.
+  compress: true,
+  // Strip the "X-Powered-By: Next.js" fingerprint header.
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {
@@ -9,6 +14,13 @@ const nextConfig: NextConfig = {
         hostname: "vibechckd-cdn.b-cdn.net",
       },
     ],
+  },
+  // Tree-shake only the icon/animation symbols actually imported. We don't
+  // ship lucide-react or @tabler/icons-react today, so framer-motion is the
+  // only entry that matters — keep the list tight so we don't pay for
+  // optimizations on packages that aren't installed.
+  experimental: {
+    optimizePackageImports: ["framer-motion"],
   },
   turbopack: {
     root: path.resolve(__dirname),

@@ -57,6 +57,13 @@
       "when": 1776422893178,
       "tag": "0007_solid_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776930047326,
+      "tag": "0008_noisy_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -81,12 +80,9 @@ function RegisterContent() {
         return;
       }
 
-      const result = await signIn("credentials", { email: normalizedEmail, password, redirect: false });
-      if (result?.error) {
-        setError("Account created but sign-in failed. Try logging in.");
-      } else {
-        router.push("/dashboard");
-      }
+      // Do NOT auto-signIn — the account starts unverified. Send the user to
+      // the verify-email landing page which shows "check your inbox".
+      router.push(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`);
     } catch {
       setError("Something went wrong");
     } finally {

@@ -8,6 +8,7 @@ import {
   boolean,
   pgEnum,
   primaryKey,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ── Enums ──
@@ -74,6 +75,25 @@ export const verificationTokens = pgTable(
   ]
 );
 
+// Email verification tokens — issued at registration (and on resend).
+// Mirrors the shape used for password reset: a sha256-hashed token is stored
+// on the server, the raw token travels in the verification URL once and is
+// consumed (deleted) on successful verify.
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    email: text("email").notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("email_verification_tokens_token_hash_uq").on(t.tokenHash)]
+);
+
 // ── Coder Profiles ──
 
 export const coderProfiles = pgTable("coder_profiles", {
@@ -83,6 +103,7 @@ export const coderProfiles = pgTable("coder_profiles", {
   bio: text("bio"),
   tagline: text("tagline"),
   location: text("location"),
+  experience: text("experience"),
   specialties: text("specialties").array(),
   tags: text("tags").array(),
   hourlyRate: text("hourly_rate"),
