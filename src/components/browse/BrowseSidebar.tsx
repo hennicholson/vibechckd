@@ -1,23 +1,19 @@
 "use client";
 
 /**
- * BrowseSidebar — Editorial left rail for the /browse page.
+ * BrowseSidebar — Left rail for the /browse page.
  *
- * Design tokens used (all defined in globals.css @theme):
- *  - border / border-hover / text-primary / text-muted / text-secondary
- *  - surface-muted / background / background-alt
+ * Sized + styled to match DashboardSidebar exactly so the product feels unified.
+ * Adds a "Filter" sub-section below the primary nav for specialty filtering.
  *
- * Typography scale (deliberately generous to feel editorial, not dashboard-y):
- *  - Logo:         17px  semibold   tracking -0.02em
- *  - Nav labels:   16px  medium     tracking 0.01em
- *  - FILTER label: 11px  medium     uppercase  letter-spacing 0.16em
- *  - Filter items: 16px  regular    tracking 0.01em  (active = 500)
- *  - User name:    14px  medium
- *  - Footer links: 13px  regular
+ *  Width:           200px  (matches DashboardSidebar)
+ *  Logo:            14px   semibold + VerifiedSeal sm
+ *  Nav items:       13px   px-2 py-1.5 rounded-md gap-2  (active = bg-surface-muted)
+ *  FILTER label:    10px   font-mono uppercase tracking-wider
+ *  Filter buttons:  same shape as nav items — list-item treatment, not pills
+ *  User footer:     6×6 avatar, 13px name, 12px footer links
  *
- * Responsive plan:
- *  - >= 768px (md+): sticky full-height sidebar, 320px wide
- *  - <  768px: hidden; parent renders a top bar + drawer instead
+ * Responsive: hidden < md; parent renders mobile top bar + drawer instead.
  */
 
 import Link from "next/link";
@@ -33,30 +29,29 @@ interface BrowseSidebarProps {
   counts: Record<string, number>;
 }
 
-// Minimal stroke icons — 20px to match the bumped-up type scale.
-const iconBase = "w-5 h-5 flex-shrink-0";
+const iconBase = "w-4 h-4 flex-shrink-0";
 
 const SearchIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.2-5.2m1.95-5.05a7 7 0 11-14 0 7 7 0 0114 0z" />
+  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
   </svg>
 );
 
 const UsersIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
+  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
   </svg>
 );
 
 const FolderIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h3.6a2 2 0 011.4.58l1.42 1.42A2 2 0 0012.83 8H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
   </svg>
 );
 
 const ChatIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
   </svg>
 );
 
@@ -74,14 +69,14 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 px-4 py-3 rounded-full text-[16px] leading-[1.25] transition-colors ${
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
         active
-          ? "bg-[#0a0a0a] text-white"
-          : "text-text-secondary hover:text-text-primary hover:bg-surface-muted"
+          ? "text-text-primary font-medium bg-surface-muted"
+          : "text-text-muted hover:text-text-primary hover:bg-background-alt"
       }`}
     >
       {icon}
-      <span className="font-medium tracking-[0.01em]">{children}</span>
+      <span className="flex-1">{children}</span>
     </Link>
   );
 }
@@ -100,28 +95,18 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left pl-5 pr-3 py-2 flex items-center cursor-pointer group relative"
+      className={`w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer ${
+        active
+          ? "text-text-primary font-medium bg-surface-muted"
+          : "text-text-muted hover:text-text-primary hover:bg-background-alt"
+      }`}
     >
-      {/* Active left indicator — bold 3px × 24px editorial mark */}
-      <span
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[24px] rounded-[1px] bg-text-primary transition-opacity duration-150 ${
-          active ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      <span
-        className={`text-[16px] leading-[1.6] tracking-[0.01em] transition-colors duration-150 ${
-          active
-            ? "text-text-primary font-medium"
-            : "text-text-muted group-hover:text-text-primary"
-        }`}
-      >
-        {label}
-        {count !== undefined && (
-          <span className={`ml-1.5 font-normal ${active ? "text-text-muted" : "text-text-muted/70"}`}>
-            ({count})
-          </span>
-        )}
-      </span>
+      <span className="truncate">{label}</span>
+      {count !== undefined && (
+        <span className="text-[11px] font-mono text-text-muted tabular-nums flex-shrink-0">
+          {count}
+        </span>
+      )}
     </button>
   );
 }
@@ -130,19 +115,17 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
   const { data: session, status } = useSession();
 
   return (
-    <aside className="hidden md:flex flex-col w-[280px] lg:w-[300px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background">
+    <aside className="hidden md:flex flex-col w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background">
       {/* Logo */}
-      <div className="px-6 pt-7 pb-6">
-        <Link href="/" className="inline-flex items-center gap-2 group">
-          <span className="text-[18px] font-semibold text-text-primary tracking-[-0.02em]">
-            vibechckd
-          </span>
+      <div className="px-4 h-[48px] flex items-center border-b border-border">
+        <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
+          vibechckd
           <VerifiedSeal size="sm" />
         </Link>
       </div>
 
       {/* Primary nav */}
-      <nav className="px-3 space-y-1.5">
+      <div className="px-3 py-3 space-y-0.5">
         <NavItem href="/browse" active icon={<SearchIcon />}>
           Browse
         </NavItem>
@@ -155,81 +138,79 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
         <NavItem href="/dashboard/inbox" icon={<ChatIcon />}>
           Messages
         </NavItem>
-      </nav>
+      </div>
 
       {/* Filter section */}
-      <div className="mt-11 px-6 mb-4">
-        <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.16em]">
+      <div className="px-3 pt-2 pb-1">
+        <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-1">
           Filter
         </p>
-      </div>
-      <div className="px-3 space-y-1">
-        <FilterButton
-          active={filter === "all"}
-          label="All coders"
-          onClick={() => onFilterChange("all")}
-        />
-        {SPECIALTIES.map((s) => (
+        <div className="space-y-0.5">
           <FilterButton
-            key={s}
-            active={filter === s}
-            label={SPECIALTY_LABELS[s]}
-            count={counts[s] ?? 0}
-            onClick={() => onFilterChange(s)}
+            active={filter === "all"}
+            label="All coders"
+            onClick={() => onFilterChange("all")}
           />
-        ))}
+          {SPECIALTIES.map((s) => (
+            <FilterButton
+              key={s}
+              active={filter === s}
+              label={SPECIALTY_LABELS[s]}
+              count={counts[s] ?? 0}
+              onClick={() => onFilterChange(s)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* User footer */}
       <div className="mt-auto border-t border-border">
         {status === "authenticated" && session?.user ? (
-          <div className="px-6 py-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-[#0a0a0a] flex items-center justify-center text-[13px] font-medium text-white flex-shrink-0">
+          <div className="px-3 py-3">
+            <div className="flex items-center gap-2 px-2 mb-2">
+              <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0">
                 {session.user.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
-              <span className="text-[14px] text-text-primary font-medium truncate tracking-[0.01em]">
+              <span className="text-[13px] text-text-primary truncate">
                 {session.user.name}
               </span>
             </div>
-            <div className="space-y-2">
-              <Link
-                href="/dashboard"
-                className="block text-[13px] text-text-muted hover:text-text-primary transition-colors tracking-[0.01em]"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/dashboard/profile"
-                className="block text-[13px] text-text-muted hover:text-text-primary transition-colors tracking-[0.01em]"
-              >
-                Profile
-              </Link>
-              <Link
-                href="/dashboard/portfolio"
-                className="block text-[13px] text-text-muted hover:text-text-primary transition-colors tracking-[0.01em]"
-              >
-                Portfolio
-              </Link>
-              <button
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="block text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer tracking-[0.01em]"
-              >
-                Sign out
-              </button>
-            </div>
+            <Link
+              href="/dashboard"
+              className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/dashboard/profile"
+              className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+            >
+              Profile
+            </Link>
+            <Link
+              href="/dashboard/portfolio"
+              className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+            >
+              Portfolio
+            </Link>
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+            >
+              Sign out
+            </button>
           </div>
         ) : (
-          <div className="px-6 py-5 space-y-2">
+          <div className="px-3 py-3 space-y-1.5">
             <Link
               href="/apply"
-              className="block w-full text-center px-4 py-2.5 text-[14px] font-medium text-white bg-[#0a0a0a] rounded-full hover:bg-black transition-colors tracking-[0.01em]"
+              className="block w-full text-center px-3 py-1.5 text-[12px] font-medium text-white bg-text-primary rounded-md hover:bg-accent-hover transition-colors"
             >
               Apply to join
             </Link>
             <Link
               href="/login"
-              className="block w-full text-center px-4 py-2 text-[13px] text-text-muted hover:text-text-primary transition-colors tracking-[0.01em]"
+              className="block w-full text-center px-2 py-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
             >
               Log in
             </Link>

@@ -6,10 +6,12 @@
  * Two groups:
  *  1. Primary specialty filters (mutually exclusive: All, Frontend, Full stack, ...)
  *  2. "Add-filter" secondary pills (rate, timezone, availability) — dashed outline,
- *     non-functional placeholders for v1. They are visually present to match the
- *     reference but don't wire to any filter state yet.
+ *     non-functional placeholders for v1.
  *
- * Mobile: overflow-x-auto with momentum scroll + snap.
+ * Sizing: matches the dashboard's compact rhythm — h-8 chips, 11px text,
+ * rounded-md (the dashboard prefers rounded-md across the board).
+ *
+ * Mobile: overflow-x-auto with snap.
  */
 
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
@@ -35,10 +37,10 @@ function Pill({
   return (
     <button
       onClick={onClick}
-      className={`flex-shrink-0 h-8 px-3.5 rounded-full text-[12px] font-medium tracking-[-0.005em] transition-all duration-150 cursor-pointer snap-start whitespace-nowrap ${
+      className={`flex-shrink-0 h-8 px-2.5 rounded-md text-[11px] font-medium transition-colors duration-150 cursor-pointer snap-start whitespace-nowrap inline-flex items-center ${
         active
-          ? "bg-[#0a0a0a] text-white border border-[#0a0a0a]"
-          : "bg-white text-text-primary border border-border hover:border-border-hover hover:bg-background-alt"
+          ? "bg-text-primary text-white border border-text-primary"
+          : "bg-background text-text-primary border border-border hover:border-border-hover hover:bg-background-alt"
       }`}
     >
       {children}
@@ -51,9 +53,9 @@ function GhostPill({ children }: { children: React.ReactNode }) {
     <button
       disabled
       title="Coming soon"
-      className="flex-shrink-0 h-8 px-3 rounded-full text-[12px] font-medium tracking-[-0.005em] text-text-muted bg-transparent border border-dashed border-border hover:border-border-hover hover:text-text-secondary transition-colors cursor-not-allowed snap-start whitespace-nowrap inline-flex items-center gap-1"
+      className="flex-shrink-0 h-8 px-2.5 rounded-md text-[11px] font-medium text-text-muted bg-transparent border border-dashed border-border hover:border-border-hover hover:text-text-secondary transition-colors cursor-not-allowed snap-start whitespace-nowrap inline-flex items-center gap-1"
     >
-      <span className="text-[13px] leading-none">+</span>
+      <span className="text-[12px] leading-none">+</span>
       {children}
     </button>
   );
@@ -68,14 +70,14 @@ export default function BrowseFilterPills({
   return (
     <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 py-0.5 snap-x snap-proximity">
       <Pill active={filter === "all"} onClick={() => onFilterChange("all")}>
-        All <span className={filter === "all" ? "text-white/50 mx-0.5" : "text-text-muted mx-0.5"}>·</span> {totalCount}
+        All <span className={`mx-1 ${filter === "all" ? "text-white/50" : "text-text-muted"}`}>·</span> {totalCount}
       </Pill>
       {SPECIALTIES.map((s) => {
         const active = filter === s;
         return (
           <Pill key={s} active={active} onClick={() => onFilterChange(s)}>
-            {SPECIALTY_LABELS[s]}{" "}
-            <span className={active ? "text-white/50 mx-0.5" : "text-text-muted mx-0.5"}>·</span>{" "}
+            {SPECIALTY_LABELS[s]}
+            <span className={`mx-1 ${active ? "text-white/50" : "text-text-muted"}`}>·</span>
             {counts[s] ?? 0}
           </Pill>
         );
