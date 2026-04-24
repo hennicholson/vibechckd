@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users, verificationTokens } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { emails } from "@/lib/email";
+import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -19,6 +20,24 @@ export async function POST(req: Request) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Enforce two rate limits, but ALWAYS return success to avoid leaking
+    // which emails exist in our user table. If either limit is exceeded we
+    // simply skip the email dispatch.
+    // 1. 3 requests per IP per 10 minutes.
+    const ipRl = checkRateLimit(
+      rateLimitKey(req, "forgot-password:ip"),
+      3,
+      10 * 60 * 1000
+    );
+    // 2. 3 requests per email address per hour.
+    const emailRl = checkRateLimit(
+      `forgot-password:email:${normalizedEmail}`,
+      3,
+      60 * 60 * 1000
+    );
+
+    const shouldSend = ipRl.allowed && emailRl.allowed;
+
     // Look up user — but always return success to avoid leaking user existence
     const [user] = await db
       .select()
@@ -26,7 +45,7 @@ export async function POST(req: Request) {
       .where(eq(users.email, normalizedEmail))
       .limit(1);
 
-    if (user) {
+    if (user && shouldSend) {
       // Delete any existing reset tokens for this email
       await db
         .delete(verificationTokens)

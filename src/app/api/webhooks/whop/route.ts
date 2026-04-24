@@ -18,12 +18,12 @@ function verifySignature(body: string, headers: Headers): boolean {
   const msgId = headers.get("webhook-id");
   const timestamp = headers.get("webhook-timestamp");
 
-  // If Whop does not send standard-webhook headers, we cannot verify the
-  // signature but should still process the event. Only reject when the
-  // headers ARE present but the signature does not match.
+  // SECURITY: If Whop does not send standard-webhook headers, we cannot verify
+  // the signature and MUST reject the request. Accepting unsigned webhooks
+  // would let any attacker forge events.
   if (!sigHeader || !msgId || !timestamp) {
-    console.warn("Webhook: standard-webhook headers absent (signature:", sigHeader, "id:", msgId, "timestamp:", timestamp, ") — allowing through without verification");
-    return true;
+    console.warn("Webhook: standard-webhook headers absent (signature:", sigHeader, "id:", msgId, "timestamp:", timestamp, ") — rejecting");
+    return false;
   }
 
   // Reject timestamps older than 5 minutes (replay protection)

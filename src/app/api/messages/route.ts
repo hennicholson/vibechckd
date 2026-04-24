@@ -2,7 +2,19 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { messages, users, projectMembers } from "@/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
+import { parseBody, z } from "@/lib/validation";
+
+const messagePostSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    content: z.string().min(1).max(10_000),
+    messageType: z
+      .enum(["text", "file", "system", "ai"])
+      .optional(),
+    fileUrl: z.string().url().max(2048).nullable().optional(),
+  })
+  .strict();
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -12,13 +24,19 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get("projectId");
-
   if (!projectId) {
     return Response.json(
       { error: "projectId is required" },
       { status: 400 }
     );
   }
+
+  // Pagination: ?limit=N (default 50, cap 100) and ?cursor=<messageId>
+  // Cursor semantics: return messages created strictly before the cursor
+  // message's createdAt. Ordering is DESC (newest first).
+  const rawLimit = parseInt(searchParams.get("limit") || "50", 10);
+  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
+  const cursor = searchParams.get("cursor");
 
   // SECURITY: Verify the requesting user is a member of this project
   const [membership] = await db
@@ -36,6 +54,22 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // If a cursor was supplied, fetch that message's createdAt to anchor the
+  // window. Missing/invalid cursors degrade gracefully (ignored).
+  let cursorAt: Date | null = null;
+  if (cursor) {
+    const [cursorMsg] = await db
+      .select({ createdAt: messages.createdAt })
+      .from(messages)
+      .where(eq(messages.id, cursor))
+      .limit(1);
+    if (cursorMsg) cursorAt = cursorMsg.createdAt;
+  }
+
+  const where = cursorAt
+    ? and(eq(messages.projectId, projectId), lt(messages.createdAt, cursorAt))
+    : eq(messages.projectId, projectId);
+
   const rows = await db
     .select({
       id: messages.id,
@@ -49,8 +83,9 @@ export async function GET(request: NextRequest) {
     })
     .from(messages)
     .leftJoin(users, eq(messages.senderId, users.id))
-    .where(eq(messages.projectId, projectId))
-    .orderBy(asc(messages.createdAt));
+    .where(where)
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
 
   return Response.json(rows);
 }
@@ -61,15 +96,15 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { projectId, content, messageType, fileUrl } = body;
-
-  if (!projectId || !content) {
+  const rawBody = await request.json().catch(() => null);
+  const parsed = parseBody(messagePostSchema, rawBody);
+  if (!parsed.ok) {
     return Response.json(
-      { error: "projectId and content are required" },
+      { error: "Invalid input", details: parsed.error },
       { status: 400 }
     );
   }
+  const { projectId, content, messageType, fileUrl } = parsed.data;
 
   // SECURITY: Verify the requesting user is a member of this project
   const [postMembership] = await db

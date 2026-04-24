@@ -1,9 +1,26 @@
 import { NextResponse } from "next/server";
+import { createHash, randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/db";
-import { users, coderProfiles, clientProfiles } from "@/db/schema";
+import {
+  users,
+  coderProfiles,
+  clientProfiles,
+  emailVerificationTokens,
+} from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { emails } from "@/lib/email";
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+// 24-hour email verification token window
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+function baseUrl(): string {
+  return process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+}
 
 export async function POST(req: Request) {
   try {
@@ -37,9 +54,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email already registered" }, { status: 409 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 13);
 
-    // Create user
+    // Create user (emailVerified is intentionally left null; login is gated
+    // on verification in src/lib/auth.ts).
     const [user] = await db
       .insert(users)
       .values({
@@ -80,6 +98,10 @@ export async function POST(req: Request) {
       // Extract onboarding data for coder profile
       const specialties = onboarding?.specialties || [];
       const websiteUrl = onboarding?.portfolioUrl || null;
+      const experience =
+        typeof onboarding?.experience === "string" && onboarding.experience.trim()
+          ? onboarding.experience.trim()
+          : null;
 
       await db.insert(coderProfiles).values({
         userId: user.id,
@@ -87,6 +109,7 @@ export async function POST(req: Request) {
         status: "draft",
         specialties: specialties.length > 0 ? specialties : null,
         websiteUrl,
+        experience,
       });
     }
 
@@ -101,8 +124,26 @@ export async function POST(req: Request) {
       });
     }
 
-    // Fire-and-forget welcome email
-    emails.welcome(normalizedEmail, name).catch(() => {});
+    // Issue an email verification token and fire the verification email
+    // non-blockingly. The token is 32 random bytes (64 hex chars); only the
+    // sha256 hash is persisted server-side.
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
+
+    await db.insert(emailVerificationTokens).values({
+      userId: user.id,
+      tokenHash,
+      email: normalizedEmail,
+      expiresAt,
+    });
+
+    const verifyUrl = `${baseUrl()}/verify-email?token=${rawToken}&email=${encodeURIComponent(
+      normalizedEmail
+    )}`;
+
+    // Fire-and-forget — do not block the response on email delivery.
+    emails.emailVerification(normalizedEmail, verifyUrl).catch(() => {});
 
     return NextResponse.json({ success: true, userId: user.id });
   } catch (error) {

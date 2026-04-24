@@ -8,6 +8,16 @@ import {
   users,
 } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
+import { parseBody, z } from "@/lib/validation";
+
+const dmPostSchema = z
+  .object({
+    threadId: z.string().uuid(),
+    content: z.string().min(1).max(5000),
+    messageType: z.enum(["text", "file", "system", "ai"]).optional(),
+    fileUrl: z.string().url().max(2048).nullable().optional(),
+  })
+  .strict();
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -65,15 +75,15 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { threadId, content, messageType, fileUrl } = body;
-
-  if (!threadId || !content) {
+  const rawBody = await request.json().catch(() => null);
+  const parsed = parseBody(dmPostSchema, rawBody);
+  if (!parsed.ok) {
     return Response.json(
-      { error: "threadId and content are required" },
+      { error: "Invalid input", details: parsed.error },
       { status: 400 }
     );
   }
+  const { threadId, content, messageType, fileUrl } = parsed.data;
 
   // Verify user is a participant of this thread
   const [participation] = await db

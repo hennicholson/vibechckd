@@ -3,6 +3,15 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { coderProfiles, portfolioItems } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { parseBody, z } from "@/lib/validation";
+
+const portfolioPutSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(5000).nullable().optional(),
+    thumbnailUrl: z.string().url().max(2048).nullable().optional(),
+  })
+  .strict();
 
 export async function PUT(
   req: Request,
@@ -14,7 +23,15 @@ export async function PUT(
   }
 
   const { id } = await params;
-  const body = await req.json();
+  const rawBody = await req.json().catch(() => null);
+  const parsed = parseBody(portfolioPutSchema, rawBody);
+  if (!parsed.ok) {
+    return NextResponse.json(
+      { error: "Invalid input", details: parsed.error },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
 
   // Find the user's coder profile
   const [profile] = await db

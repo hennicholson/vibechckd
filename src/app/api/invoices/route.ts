@@ -5,6 +5,47 @@ import { invoices, invoiceSplits, messages, projectMembers, users } from "@/db/s
 import { eq, and, ne, desc } from "drizzle-orm";
 import { createInvoice } from "@/lib/whop";
 import { emails } from "@/lib/email";
+import { parseBody, z } from "@/lib/validation";
+
+// Local HTML escape helper — duplicated intentionally (src/lib/email.ts is
+// owned by another agent and out-of-scope for this edit).
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const lineItemSchema = z
+  .object({
+    label: z.string().min(1).max(500),
+    quantity: z.number().int().positive().max(10_000),
+    unitPrice: z.number().int().nonnegative().max(10_000_000),
+  })
+  .strict();
+
+const splitSchema = z
+  .object({
+    userId: z.string().uuid(),
+    amountCents: z.number().int().positive().max(10_000_000),
+  })
+  .strict();
+
+const invoicePostSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    description: z.string().min(1).max(2000),
+    amount: z.number().int().positive().max(10_000_000), // cents
+    dueDate: z.string().datetime().optional(),
+    lineItems: z.array(lineItemSchema).max(50).optional(),
+    splits: z.array(splitSchema).max(20).optional(),
+    customerEmail: z.string().email().max(320).optional(),
+    customerName: z.string().max(200).optional(),
+    recipientEmail: z.string().email().max(320).optional(),
+  })
+  .strict();
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -13,7 +54,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const rawBody = await request.json().catch(() => null);
+    const validated = parseBody(invoicePostSchema, rawBody);
+    if (!validated.ok) {
+      return Response.json(
+        { error: "Invalid input", details: validated.error },
+        { status: 400 }
+      );
+    }
     const {
       customerEmail,
       customerName,
@@ -24,22 +72,7 @@ export async function POST(request: NextRequest) {
       projectId,
       splits,
       recipientEmail,
-    } = body;
-
-    if (!projectId || !description || !amount) {
-      return Response.json(
-        { error: "projectId, description, and amount are required" },
-        { status: 400 }
-      );
-    }
-
-    // SECURITY: Validate amount is a positive integer (cents)
-    if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
-      return Response.json(
-        { error: "amount must be a positive integer (cents)" },
-        { status: 400 }
-      );
-    }
+    } = validated.data;
 
     // SECURITY: Verify the user is a member of this project
     const [senderMembership] = await db
@@ -97,7 +130,7 @@ export async function POST(request: NextRequest) {
       description,
       amount: amountDollars,
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      lineItems: lineItems?.map((li: any) => ({ ...li, unitPrice: li.unitPrice / 100 })),
+      lineItems: lineItems?.map((li) => ({ ...li, unitPrice: li.unitPrice / 100 })),
       saveDraft,
     });
 
@@ -155,11 +188,11 @@ export async function POST(request: NextRequest) {
 
     // Insert splits if provided
     let insertedSplits: typeof invoiceSplits.$inferSelect[] = [];
-    if (splits && Array.isArray(splits) && splits.length > 0) {
+    if (splits && splits.length > 0) {
       insertedSplits = await db
         .insert(invoiceSplits)
         .values(
-          splits.map((s: { userId: string; amountCents: number }) => ({
+          splits.map((s) => ({
             invoiceId: invoice.id,
             userId: s.userId,
             amountCents: s.amountCents,
@@ -168,10 +201,15 @@ export async function POST(request: NextRequest) {
         .returning();
     }
 
-    // Fire-and-forget invoice notification email
+    // Fire-and-forget invoice notification email.
+    // Escape the description before sending — assumes the email template may
+    // embed `description` in HTML without its own escaping.
     if (email) {
       const displayAmountEmail = "$" + (amount / 100).toFixed(2);
-      emails.invoiceCreated(email, description, displayAmountEmail, whopInvoice.paymentUrl).catch(() => {});
+      const safeDescription = escapeHtml(description);
+      emails
+        .invoiceCreated(email, safeDescription, displayAmountEmail, whopInvoice.paymentUrl)
+        .catch(() => {});
     }
 
     return Response.json({

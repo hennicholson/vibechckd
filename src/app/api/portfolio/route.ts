@@ -3,6 +3,29 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { coderProfiles, portfolioItems, portfolioAssets } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { parseBody, z } from "@/lib/validation";
+
+const assetTypeEnumZ = z.enum(["pdf", "image", "video", "live_preview", "figma"]);
+
+const assetSchema = z
+  .object({
+    assetType: assetTypeEnumZ,
+    title: z.string().min(1).max(200),
+    fileUrl: z.string().url().max(2048).nullable().optional(),
+    thumbnailUrl: z.string().url().max(2048).nullable().optional(),
+    displayOrder: z.number().int().nonnegative().max(10_000).optional(),
+  })
+  .strict();
+
+const portfolioPostSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(5000).nullable().optional(),
+    thumbnailUrl: z.string().url().max(2048).nullable().optional(),
+    sortOrder: z.number().int().nonnegative().max(10_000).optional(),
+    assets: z.array(assetSchema).max(50).optional(),
+  })
+  .strict();
 
 export async function GET() {
   const session = await auth();
@@ -47,7 +70,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  const rawBody = await req.json().catch(() => null);
+  const parsed = parseBody(portfolioPostSchema, rawBody);
+  if (!parsed.ok) {
+    return NextResponse.json(
+      { error: "Invalid input", details: parsed.error },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
 
   // Find or create coder profile
   let [profile] = await db

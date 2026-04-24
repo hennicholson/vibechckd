@@ -3,6 +3,22 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { projects, projectMembers, messages, users } from "@/db/schema";
 import { eq, desc, sql, and, ne } from "drizzle-orm";
+import { parseBody, z } from "@/lib/validation";
+
+const projectMemberSchema = z
+  .object({
+    userId: z.string().uuid(),
+    roleLabel: z.string().min(1).max(100),
+  })
+  .strict();
+
+const projectPostSchema = z
+  .object({
+    title: z.string().min(1).max(200).trim(),
+    description: z.string().max(5000).optional(),
+    members: z.array(projectMemberSchema).max(50).optional(),
+  })
+  .strict();
 
 export async function GET(req: Request) {
   try {
@@ -103,25 +119,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { title, description, members } = body as {
-      title: string;
-      description?: string;
-      members?: { userId: string; roleLabel: string }[];
-    };
-
-    if (!title || typeof title !== "string" || !title.trim()) {
+    const rawBody = await req.json().catch(() => null);
+    const parsed = parseBody(projectPostSchema, rawBody);
+    if (!parsed.ok) {
       return NextResponse.json(
-        { error: "Title is required" },
+        { error: "Invalid input", details: parsed.error },
         { status: 400 }
       );
     }
+    const { title, description, members } = parsed.data;
 
     // Create the project
     const [project] = await db
       .insert(projects)
       .values({
-        title: title.trim(),
+        title,
         description: description?.trim() || null,
         status: "active",
       })

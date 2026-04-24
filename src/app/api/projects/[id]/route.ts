@@ -3,6 +3,39 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { projects, projectMembers, users, coderProfiles, messages } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { parseBody, z } from "@/lib/validation";
+
+const projectStatusEnumZ = z.enum([
+  "draft",
+  "proposal",
+  "active",
+  "review",
+  "completed",
+  "cancelled",
+]);
+
+// PATCH body — only fields the handler actually uses.
+const projectPatchSchema = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    status: projectStatusEnumZ.optional(),
+    description: z.string().max(5000).nullable().optional(),
+    tags: z.array(z.string().min(1).max(60)).max(30).optional(),
+    budget: z.union([z.string().max(50), z.number()]).nullable().optional(),
+    startDate: z.string().datetime().nullable().optional(),
+    endDate: z.string().datetime().nullable().optional(),
+  })
+  .strict();
+
+// Roles that may edit / delete a project. Matches roleLabel values inserted
+// elsewhere in the codebase ("Client" is the creator role; "Lead" is used
+// for senior collaborators). The match is case-insensitive to tolerate
+// small inconsistencies in member seeding.
+const PRIVILEGED_ROLES = new Set(["owner", "lead", "client"]);
+function isPrivileged(roleLabel: string | null | undefined): boolean {
+  if (!roleLabel) return false;
+  return PRIVILEGED_ROLES.has(roleLabel.trim().toLowerCase());
+}
 
 export async function GET(
   _req: Request,
@@ -97,9 +130,17 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await req.json();
+    const rawBody = await req.json().catch(() => null);
+    const parsed = parseBody(projectPatchSchema, rawBody);
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
 
-    // Verify membership
+    // Verify membership AND that the actor holds a privileged project role.
     const [membership] = await db
       .select()
       .from(projectMembers)
@@ -114,6 +155,9 @@ export async function PATCH(
     if (!membership) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (!isPrivileged(membership.roleLabel)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // Get current project for change detection
     const [current] = await db
@@ -122,14 +166,20 @@ export async function PATCH(
       .where(eq(projects.id, id))
       .limit(1);
 
+    // Build the updates object from the validated schema only — never spread
+    // raw body into the DB layer. Whitelists each field explicitly.
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (body.title !== undefined) updates.title = body.title;
     if (body.status !== undefined) updates.status = body.status;
     if (body.description !== undefined) updates.description = body.description;
     if (body.tags !== undefined) updates.tags = body.tags;
-    if (body.budget !== undefined) updates.budget = body.budget;
-    if (body.startDate !== undefined) updates.startDate = body.startDate ? new Date(body.startDate) : null;
-    if (body.endDate !== undefined) updates.endDate = body.endDate ? new Date(body.endDate) : null;
+    if (body.budget !== undefined) {
+      updates.budget = body.budget === null ? null : String(body.budget);
+    }
+    if (body.startDate !== undefined)
+      updates.startDate = body.startDate ? new Date(body.startDate) : null;
+    if (body.endDate !== undefined)
+      updates.endDate = body.endDate ? new Date(body.endDate) : null;
 
     const [updated] = await db
       .update(projects)
@@ -192,7 +242,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verify membership
+    // Verify membership AND privileged role (Owner/Lead/Client).
     const [membership] = await db
       .select()
       .from(projectMembers)
@@ -206,6 +256,9 @@ export async function DELETE(
 
     if (!membership) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (!isPrivileged(membership.roleLabel)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Only allow deleting draft projects
