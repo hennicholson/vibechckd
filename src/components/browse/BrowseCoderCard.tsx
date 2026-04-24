@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * BrowseCoderCard — Editorial card for a single coder.
+ * BrowseCoderCard — Compact card for a single coder.
  *
  * Layout (top to bottom):
- *  1. 16:9 image area (gifPreview > avatar > generated placeholder)
+ *  1. 16:10 image area (gifPreview > avatar > generated placeholder)
  *     - absolute top-right: "N projects" badge when project count > 0
  *  2. Info row: avatar + name (+ verified check), availability dot + rate
  *  3. Sub-row: specialty · location
- *  4. Skill chips: first 3, outlined, small
+ *  4. Skill chips: first 3, rounded-md, 11px
  *
- * Placeholder strategy: when no meaningful image is available, render a soft
- * monochrome gradient with the coder's large initial centered — matches the
- * reference's restrained silhouette aesthetic without hallucinating photos.
+ * Card chrome matches dashboard cards:
+ *  - rounded-[10px], border-border, p-4, no shadow
+ *  - hover: border-border-hover only (clean)
  */
 
 import { motion } from "framer-motion";
@@ -24,8 +24,6 @@ function isRealUrl(url: string | undefined | null): url is string {
 }
 
 function isImageAssetReachable(url: string | undefined | null): boolean {
-  // Accept absolute http(s) OR a public path starting with / that does NOT look
-  // like a mock placeholder (all /pfp/*.jpeg mocks are reachable in this repo).
   if (!url) return false;
   return url.startsWith("http") || url.startsWith("/pfp/");
 }
@@ -62,16 +60,16 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
   return (
     <motion.button
       layout
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.025, 0.25), ease: [0.2, 0, 0, 1] }}
+      transition={{ duration: 0.3, delay: Math.min(index * 0.02, 0.2), ease: [0.2, 0, 0, 1] }}
       onClick={onClick}
-      className="group text-left bg-white border border-border rounded-[10px] overflow-hidden hover:border-border-hover hover:shadow-[0_4px_14px_-6px_rgba(0,0,0,0.08)] transition-[border-color,box-shadow,transform] duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-text-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="group text-left bg-background border border-border rounded-[10px] overflow-hidden hover:border-border-hover transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-text-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`View profile for ${coder.displayName}`}
     >
       {/* Hero image area */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-background-alt">
+      <div className="relative aspect-[16/10] overflow-hidden bg-surface-muted">
         {heroUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -79,19 +77,10 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
               src={heroUrl}
               alt={coder.displayName}
               loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover grayscale-[12%] group-hover:grayscale-0 group-hover:scale-[1.02] transition-all duration-[600ms] ease-out"
-            />
-            {/* editorial vignette */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(120% 80% at 50% 100%, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0) 55%)",
-              }}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
             />
           </>
         ) : (
-          // Placeholder: gradient + large initial
           <div
             className="absolute inset-0 flex items-center justify-center"
             style={{
@@ -99,40 +88,32 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
                 "linear-gradient(135deg, #f5f5f5 0%, #ededed 45%, #e5e5e5 100%)",
             }}
           >
-            <span className="text-[72px] font-semibold text-text-muted/40 tracking-[-0.05em] select-none">
+            <span className="text-[64px] font-semibold text-text-muted/40 tracking-[-0.05em] select-none">
               {initial}
             </span>
-            {/* soft noise overlay */}
-            <div
-              className="absolute inset-0 mix-blend-multiply opacity-[0.35] pointer-events-none"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.02) 2px 3px)",
-              }}
-            />
           </div>
         )}
 
-        {/* Project count badge — only show when data is real */}
+        {/* Project count badge — only when data is real */}
         {projectCount > 0 && (
-          <span className="absolute top-2.5 right-2.5 inline-flex items-center h-6 px-2 rounded-full bg-black/75 backdrop-blur-sm text-[10px] font-medium text-white tracking-[0.02em] tabular-nums">
+          <span className="absolute top-2 right-2 inline-flex items-center h-5 px-1.5 rounded-md bg-text-primary/80 backdrop-blur-sm text-[10px] font-mono text-white tabular-nums">
             {projectCount} project{projectCount !== 1 ? "s" : ""}
           </span>
         )}
       </div>
 
       {/* Info section */}
-      <div className="px-4 py-3.5">
-        <div className="flex items-center gap-2.5">
+      <div className="p-4">
+        <div className="flex items-center gap-2">
           {/* Avatar */}
-          <div className="w-7 h-7 rounded-full bg-[#0a0a0a] flex items-center justify-center text-[11px] font-medium text-white flex-shrink-0">
+          <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0 overflow-hidden">
             {hasAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={coder.avatarUrl}
                 alt=""
                 loading="lazy"
-                className="w-full h-full object-cover rounded-full"
+                className="w-full h-full object-cover"
               />
             ) : (
               initial
@@ -140,7 +121,7 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
           </div>
           {/* Name + verified */}
           <div className="flex-1 min-w-0 flex items-center gap-1">
-            <span className="text-[13.5px] font-medium text-text-primary truncate tracking-[-0.01em]">
+            <span className="text-[13px] font-medium text-text-primary truncate">
               {coder.displayName}
             </span>
             {coder.verified && <Badge variant="verified" />}
@@ -153,15 +134,15 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
               title={availabilityLabel[coder.availability]}
             />
             {coder.hourlyRate && (
-              <span className="text-[11.5px] text-text-secondary tabular-nums tracking-[-0.01em]">
-                {coder.hourlyRate.replace("/hr", "")}
+              <span className="text-[11px] font-mono text-text-muted tabular-nums">
+                {coder.hourlyRate}
               </span>
             )}
           </div>
         </div>
 
         {/* Specialty · Location */}
-        <p className="mt-1 text-[12px] text-text-muted truncate pl-[38px]">
+        <p className="mt-1.5 text-[11px] font-mono text-text-muted truncate pl-8">
           {specialty} <span className="mx-1 text-text-muted/60">·</span> {location}
         </p>
 
@@ -171,7 +152,7 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
             {skills.map((skill) => (
               <span
                 key={skill}
-                className="inline-flex items-center h-[22px] px-2 rounded-full border border-border text-[11px] text-text-secondary bg-white whitespace-nowrap"
+                className="inline-flex items-center h-[20px] px-1.5 rounded-md border border-border text-[11px] text-text-secondary bg-background whitespace-nowrap"
               >
                 {skill}
               </span>

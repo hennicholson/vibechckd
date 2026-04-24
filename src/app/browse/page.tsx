@@ -93,7 +93,7 @@ function SortDropdown({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[10px] font-medium text-text-muted hover:text-text-primary uppercase tracking-[0.14em] transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 h-7 px-2 text-[11px] font-mono uppercase tracking-wider text-text-muted hover:text-text-primary transition-colors cursor-pointer"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -116,7 +116,7 @@ function SortDropdown({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full mt-1.5 min-w-[180px] bg-white border border-border rounded-md shadow-[0_6px_24px_-8px_rgba(0,0,0,0.12)] py-1 z-30"
+            className="absolute right-0 top-full mt-1.5 min-w-[180px] bg-background border border-border rounded-md shadow-[0_6px_24px_-8px_rgba(0,0,0,0.08)] py-1 z-30"
             role="listbox"
           >
             {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
@@ -126,9 +126,9 @@ function SortDropdown({
                     onChange(key);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-1.5 text-[12.5px] transition-colors cursor-pointer ${
+                  className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors cursor-pointer ${
                     value === key
-                      ? "text-text-primary font-medium bg-background-alt"
+                      ? "text-text-primary font-medium bg-surface-muted"
                       : "text-text-secondary hover:bg-background-alt hover:text-text-primary"
                   }`}
                   role="option"
@@ -166,11 +166,9 @@ function MobileTopBar({
 
   return (
     <div className="md:hidden sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
-      <div className="h-[52px] flex items-center justify-between px-4">
-        <Link href="/" className="inline-flex items-center gap-1.5">
-          <span className="text-[15px] font-semibold text-text-primary tracking-[-0.02em]">
-            vibechckd
-          </span>
+      <div className="h-[48px] flex items-center justify-between px-4">
+        <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
+          vibechckd
           <VerifiedSeal size="sm" />
         </Link>
         <button
@@ -196,25 +194,25 @@ function MobileTopBar({
             transition={{ duration: 0.18 }}
             className="border-t border-border overflow-hidden"
           >
-            <div className="px-4 py-3 space-y-1.5">
-              <Link href="/browse" onClick={() => setDrawerOpen(false)} className="block py-2 text-[14px] text-text-primary font-medium">
+            <div className="px-4 py-3 space-y-1">
+              <Link href="/browse" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-primary font-medium bg-surface-muted">
                 Browse
               </Link>
-              <Link href="/dashboard/teams/new" onClick={() => setDrawerOpen(false)} className="block py-2 text-[14px] text-text-secondary">
+              <Link href="/dashboard/teams/new" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-muted hover:text-text-primary">
                 Build a Team
               </Link>
-              <Link href="/dashboard/projects" onClick={() => setDrawerOpen(false)} className="block py-2 text-[14px] text-text-secondary">
+              <Link href="/dashboard/projects" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-muted hover:text-text-primary">
                 Projects
               </Link>
-              <Link href="/dashboard/inbox" onClick={() => setDrawerOpen(false)} className="block py-2 text-[14px] text-text-secondary">
+              <Link href="/dashboard/inbox" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-muted hover:text-text-primary">
                 Messages
               </Link>
-              <div className="border-t border-border pt-2 mt-2">
-                <p className="text-[10px] font-medium text-text-muted uppercase tracking-[0.14em] mb-2">Filter</p>
+              <div className="border-t border-border pt-3 mt-3">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-2">Filter</p>
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => { onFilterChange("all"); setDrawerOpen(false); }}
-                    className={`h-8 px-3 rounded-full text-[12px] font-medium ${filter === "all" ? "bg-[#0a0a0a] text-white" : "bg-background-alt text-text-primary border border-border"}`}
+                    className={`h-8 px-2.5 rounded-md text-[11px] font-medium ${filter === "all" ? "bg-text-primary text-white" : "bg-background text-text-primary border border-border"}`}
                   >
                     All · {totalCount}
                   </button>
@@ -222,7 +220,7 @@ function MobileTopBar({
                     <button
                       key={s}
                       onClick={() => { onFilterChange(s); setDrawerOpen(false); }}
-                      className={`h-8 px-3 rounded-full text-[12px] font-medium ${filter === s ? "bg-[#0a0a0a] text-white" : "bg-background-alt text-text-primary border border-border"}`}
+                      className={`h-8 px-2.5 rounded-md text-[11px] font-medium ${filter === s ? "bg-text-primary text-white" : "bg-background text-text-primary border border-border"}`}
                     >
                       {SPECIALTY_LABELS[s]} · {counts[s] ?? 0}
                     </button>
@@ -230,12 +228,12 @@ function MobileTopBar({
                 </div>
               </div>
               {session?.user ? (
-                <div className="border-t border-border pt-3 mt-3 space-y-1">
-                  <Link href="/dashboard" onClick={() => setDrawerOpen(false)} className="block py-1.5 text-[13px] text-text-muted">Dashboard</Link>
-                  <Link href="/dashboard/profile" onClick={() => setDrawerOpen(false)} className="block py-1.5 text-[13px] text-text-muted">Profile</Link>
+                <div className="border-t border-border pt-3 mt-3 space-y-0.5">
+                  <Link href="/dashboard" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary">Dashboard</Link>
+                  <Link href="/dashboard/profile" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary">Profile</Link>
                   <button
                     onClick={() => { setDrawerOpen(false); signOut({ callbackUrl: "/" }); }}
-                    className="block py-1.5 text-[13px] text-text-muted cursor-pointer"
+                    className="block w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary cursor-pointer"
                   >
                     Sign out
                   </button>
@@ -245,14 +243,14 @@ function MobileTopBar({
                   <Link
                     href="/login"
                     onClick={() => setDrawerOpen(false)}
-                    className="flex-1 text-center py-2 text-[13px] text-text-primary border border-border rounded-full"
+                    className="flex-1 text-center py-1.5 text-[12px] text-text-primary border border-border rounded-md"
                   >
                     Log in
                   </Link>
                   <Link
                     href="/apply"
                     onClick={() => setDrawerOpen(false)}
-                    className="flex-1 text-center py-2 text-[13px] text-white bg-[#0a0a0a] rounded-full"
+                    className="flex-1 text-center py-1.5 text-[12px] font-medium text-white bg-text-primary rounded-md"
                   >
                     Apply
                   </Link>
@@ -273,19 +271,19 @@ function MobileTopBar({
 // ── Skeleton card matching final card dimensions ──
 function SkeletonCard() {
   return (
-    <div className="rounded-[10px] overflow-hidden border border-border bg-white">
+    <div className="rounded-[10px] overflow-hidden border border-border bg-background">
       <div className="aspect-[16/10] bg-surface-muted animate-pulse" />
       <div className="p-4 space-y-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-surface-muted animate-pulse flex-shrink-0" />
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-surface-muted animate-pulse flex-shrink-0" />
           <div className="h-3 bg-surface-muted animate-pulse rounded w-28" />
           <div className="h-3 bg-surface-muted animate-pulse rounded w-14 ml-auto" />
         </div>
-        <div className="h-2.5 bg-surface-muted animate-pulse rounded w-40 ml-[38px]" />
+        <div className="h-2.5 bg-surface-muted animate-pulse rounded w-40 ml-8" />
         <div className="flex gap-1.5">
-          <div className="h-5 w-14 bg-surface-muted animate-pulse rounded-full" />
-          <div className="h-5 w-16 bg-surface-muted animate-pulse rounded-full" />
-          <div className="h-5 w-12 bg-surface-muted animate-pulse rounded-full" />
+          <div className="h-5 w-14 bg-surface-muted animate-pulse rounded-md" />
+          <div className="h-5 w-16 bg-surface-muted animate-pulse rounded-md" />
+          <div className="h-5 w-12 bg-surface-muted animate-pulse rounded-md" />
         </div>
       </div>
     </div>
@@ -385,14 +383,14 @@ export default function BrowsePage() {
   }, [searchFiltered, filter, sort]);
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex md:overflow-hidden">
       <BrowseSidebar
         filter={filter}
         onFilterChange={setFilter}
         counts={specialtyCounts}
       />
 
-      <main className="flex-1 min-w-0 flex flex-col">
+      <main className="flex-1 min-w-0 flex flex-col md:h-full md:overflow-y-auto">
         <MobileTopBar
           filter={filter}
           onFilterChange={setFilter}
@@ -402,28 +400,41 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        <div className="flex-1 px-4 sm:px-6 md:px-8 lg:px-10 py-5 md:py-7 max-w-[1440px] w-full mx-auto">
-          {/* Desktop search — hidden on mobile since top bar has its own */}
-          <div className="hidden md:block">
-            <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
-          </div>
-
-          {/* Header row: VERIFIED ✓ {n} coders    ·    SORT */}
-          <div className="mt-5 md:mt-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[10px] font-medium text-text-muted uppercase tracking-[0.14em]">
-                Verified
-              </span>
-              <VerifiedSeal size="sm" />
-              <span className="text-[10px] font-medium text-text-muted uppercase tracking-[0.14em] tabular-nums">
+        <div className="max-w-5xl w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
+          {/* Page header: title + sort */}
+          <div className="hidden md:flex items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
+                  Browse talent
+                </h1>
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-muted px-1.5 py-0.5 rounded">
+                  <VerifiedSeal size="xs" />
+                  Verified
+                </span>
+              </div>
+              <p className="text-[11px] font-mono text-text-muted mt-1 tabular-nums">
                 {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
-              </span>
+              </p>
             </div>
             <SortDropdown value={sort} onChange={setSort} />
           </div>
 
+          {/* Desktop search — hidden on mobile since top bar has its own */}
+          <div className="hidden md:block mb-4">
+            <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
+          </div>
+
+          {/* Mobile sort row */}
+          <div className="md:hidden flex items-center justify-between mb-3 mt-3">
+            <p className="text-[11px] font-mono text-text-muted tabular-nums">
+              {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
+            </p>
+            <SortDropdown value={sort} onChange={setSort} />
+          </div>
+
           {/* Filter pills */}
-          <div className="mt-4">
+          <div className="mb-4">
             <BrowseFilterPills
               filter={filter}
               onFilterChange={setFilter}
@@ -433,56 +444,56 @@ export default function BrowsePage() {
           </div>
 
           {/* Stats */}
-          <div className="mt-5">
+          <div className="mb-6">
             <BrowseStats coders={filteredCoders} />
           </div>
 
           {/* Grid */}
-          <div className="mt-6 md:mt-7">
+          <div>
             {fetchError ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="w-12 h-12 rounded-full bg-[#fef2f2] flex items-center justify-center mb-4">
-                  <svg className="w-5 h-5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]">
+                <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
+                  <svg className="w-5 h-5 text-negative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                 </div>
-                <p className="text-[14px] font-medium text-text-primary mb-1">Failed to load coders</p>
-                <p className="text-[13px] text-text-muted mb-4">Something went wrong. Please try again.</p>
+                <p className="text-[13px] font-medium text-text-primary mb-1">Failed to load coders</p>
+                <p className="text-[11px] text-text-muted mb-3">Something went wrong. Please try again.</p>
                 <button
                   onClick={loadCoders}
-                  className="px-4 h-10 text-[13px] font-medium text-text-primary border border-border rounded-full hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
+                  className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
                 >
                   Retry
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
               </div>
             ) : filteredCoders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="w-12 h-12 rounded-full bg-surface-muted flex items-center justify-center mb-4">
+              <div className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]">
+                <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
                   <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                <p className="text-[14px] font-medium text-text-primary mb-1">No coders found</p>
-                <p className="text-[13px] text-text-muted mb-4">Try adjusting your search or filters.</p>
+                <p className="text-[13px] font-medium text-text-primary mb-1">No coders found</p>
+                <p className="text-[11px] text-text-muted mb-3">Try adjusting your search or filters.</p>
                 <button
                   onClick={() => {
                     setSearchQuery("");
                     setFilter("all");
                   }}
-                  className="px-4 h-10 text-[13px] font-medium text-text-primary border border-border rounded-full hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
+                  className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
                 >
                   Reset filters
                 </button>
               </div>
             ) : (
               <LayoutGroup>
-                <motion.div layout className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                <motion.div layout className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   <AnimatePresence mode="popLayout">
                     {filteredCoders.map((coder, i) => (
                       <BrowseCoderCard
