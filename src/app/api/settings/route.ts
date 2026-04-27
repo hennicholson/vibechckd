@@ -30,15 +30,10 @@ const settingsPutSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    // Enforce that a password change requires currentPassword to avoid session
-    // hijack → silent password rotation. This mirrors the UX in the settings UI.
-    if (data.password && !data.currentPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["currentPassword"],
-        message: "Current password is required to change password",
-      });
-    }
+    // Whether `currentPassword` is required depends on the user's DB state
+    // (Whop-SSO users have no passwordHash and are setting one for the first
+    // time). The presence/absence check therefore happens imperatively in the
+    // PUT handler. We still enforce that new != current when both are given.
     if (data.password && data.currentPassword && data.password === data.currentPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -60,7 +55,11 @@ export async function GET() {
   }
 
   const [user] = await db
-    .select({ email: users.email })
+    .select({
+      email: users.email,
+      passwordHash: users.passwordHash,
+      whopUserId: users.whopUserId,
+    })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
@@ -78,6 +77,8 @@ export async function GET() {
     email: user?.email ?? null,
     availability: profile?.availability ?? null,
     profileStatus: profile?.status ?? null,
+    hasPassword: !!user?.passwordHash,
+    whopLinked: !!user?.whopUserId,
   });
 }
 
@@ -122,29 +123,35 @@ export async function PUT(request: Request) {
   }
 
   // Update password if provided.
-  // Proof-of-possession: verify currentPassword against stored bcrypt hash.
-  // bcrypt cost=13 per current policy (tradeoff: ~1s per hash on modern CPU).
-  if (password && currentPassword) {
+  // Two paths:
+  //  - User already has a password → require `currentPassword` (rotation).
+  //  - User has none (Whop-SSO-only account) → set initial password without
+  //    proof-of-possession; the live next-auth session is itself the proof.
+  if (password) {
     const [user] = await db
       .select({ passwordHash: users.passwordHash })
       .from(users)
       .where(eq(users.id, session.user.id))
       .limit(1);
 
-    if (!user || !user.passwordHash) {
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 400 }
-      );
-    }
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) {
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 400 }
-      );
-    }
+    const hasPassword = !!user?.passwordHash;
 
+    if (hasPassword) {
+      if (!currentPassword) {
+        return NextResponse.json(
+          { error: "Current password is required to change password" },
+          { status: 400 }
+        );
+      }
+      const valid = await bcrypt.compare(currentPassword, user!.passwordHash!);
+      if (!valid) {
+        return NextResponse.json(
+          { error: "Current password is incorrect" },
+          { status: 400 }
+        );
+      }
+    }
+    // bcrypt cost=13 per policy (~1s/hash on modern CPU).
     const hash = await bcrypt.hash(password, 13);
     await db
       .update(users)

@@ -34,23 +34,23 @@ function roundToFive(n: number): number {
 function StatCard({
   label,
   value,
-  accent,
+  valueAccent,
 }: {
   label: string;
   value: React.ReactNode;
-  accent?: React.ReactNode;
+  valueAccent?: React.ReactNode;
 }) {
   return (
-    <div className="border border-border rounded-[10px] p-4">
-      <div className="flex items-center gap-1.5 mb-1">
-        {accent}
-        <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-          {label}
+    <div className="border border-border rounded-[10px] p-5">
+      <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted mb-2">
+        {label}
+      </p>
+      <div className="flex items-center gap-2">
+        {valueAccent}
+        <p className="text-[28px] font-semibold text-text-primary tabular-nums leading-none">
+          {value}
         </p>
       </div>
-      <p className="text-[22px] font-semibold text-text-primary tabular-nums leading-tight">
-        {value}
-      </p>
     </div>
   );
 }
@@ -74,12 +74,12 @@ export default function BrowseStats({ coders }: BrowseStatsProps) {
   );
   const regionCount = regions.size;
 
-  const stats: Array<{ label: string; value: React.ReactNode; accent?: React.ReactNode }> = [
+  const stats: Array<{ label: string; value: React.ReactNode; valueAccent?: React.ReactNode }> = [
     { label: "Verified", value: verifiedCount },
     {
       label: "Available",
       value: availableCount,
-      accent: <span className="w-[6px] h-[6px] rounded-full bg-positive flex-shrink-0" />,
+      valueAccent: <span className="w-[8px] h-[8px] rounded-full bg-positive flex-shrink-0" />,
     },
   ];
   if (avgRate !== null) {
@@ -97,7 +97,7 @@ export default function BrowseStats({ coders }: BrowseStatsProps) {
   return (
     <div className={`grid grid-cols-2 ${gridCols} gap-3`}>
       {stats.map((s) => (
-        <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent} />
+        <StatCard key={s.label} label={s.label} value={s.value} valueAccent={s.valueAccent} />
       ))}
     </div>
   );

@@ -400,29 +400,25 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        <div className="max-w-5xl w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
-          {/* Page header: title + sort */}
-          <div className="hidden md:flex items-center justify-between gap-3 mb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
-                  Browse talent
-                </h1>
-                <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-muted px-1.5 py-0.5 rounded">
-                  <VerifiedSeal size="xs" />
-                  Verified
-                </span>
-              </div>
-              <p className="text-[11px] font-mono text-text-muted mt-1 tabular-nums">
-                {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <SortDropdown value={sort} onChange={setSort} />
-          </div>
-
-          {/* Desktop search — hidden on mobile since top bar has its own */}
+        <div className="max-w-[1320px] w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
+          {/* Desktop search — sits above the header row */}
           <div className="hidden md:block mb-4">
             <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
+          </div>
+
+          {/* Desktop header row: VERIFIED · N coders   /   SORT */}
+          <div className="hidden md:flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-text-muted">
+              <span className="inline-flex items-center gap-1.5 text-text-primary">
+                Verified
+                <VerifiedSeal size="xs" />
+              </span>
+              <span className="text-text-muted/60">·</span>
+              <span className="tabular-nums">
+                {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <SortDropdown value={sort} onChange={setSort} />
           </div>
 
           {/* Mobile sort row */}

@@ -41,7 +41,7 @@ export default function BrowseSearchBar({
   return (
     <div className="relative group">
       <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-text-muted pointer-events-none"
+        className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -55,10 +55,10 @@ export default function BrowseSearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-9 pl-9 pr-16 text-[13px] text-text-primary bg-background border border-border rounded-md placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors duration-150"
+        className="w-full h-12 pl-10 pr-20 text-[14px] text-text-primary bg-background border border-border rounded-lg placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors duration-150"
         aria-label="Search coders"
       />
-      <div className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 items-center pointer-events-none">
+      <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center pointer-events-none">
         {value ? (
           <button
             type="button"
@@ -67,13 +67,13 @@ export default function BrowseSearchBar({
             className="pointer-events-auto text-text-muted hover:text-text-primary transition-colors cursor-pointer p-1"
             aria-label="Clear search"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         ) : (
-          <kbd className="inline-flex items-center gap-0.5 h-[20px] px-1.5 text-[10px] font-mono text-text-muted bg-surface-muted border border-border rounded">
-            <span className="text-[11px] leading-none">⌘</span>
+          <kbd className="inline-flex items-center gap-0.5 h-[22px] px-1.5 text-[11px] font-mono text-text-muted bg-surface-muted border border-border rounded">
+            <span className="text-[12px] leading-none">⌘</span>
             <span>K</span>
           </kbd>
         )}

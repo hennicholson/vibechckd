@@ -4,13 +4,68 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { verifyHandoff } from "@/lib/whop-auth";
+
+// When the app runs inside the Whop iframe (whop.com → localhost), the session
+// cookie has to be `SameSite=None; Secure` or the browser will drop it on the
+// cross-site iframe POST that completes signIn. We opt-in to that mode via the
+// AUTH_IFRAME_COOKIES env flag — set it for HTTPS dev / production behind Whop.
+const iframeCookies = process.env.AUTH_IFRAME_COOKIES === "1";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
+  trustHost: true,
+  cookies: iframeCookies
+    ? {
+        sessionToken: {
+          name: "__Secure-authjs.session-token",
+          options: {
+            httpOnly: true,
+            sameSite: "none",
+            secure: true,
+            path: "/",
+          },
+        },
+        callbackUrl: {
+          name: "__Secure-authjs.callback-url",
+          options: { sameSite: "none", secure: true, path: "/" },
+        },
+        csrfToken: {
+          name: "__Host-authjs.csrf-token",
+          options: { httpOnly: true, sameSite: "none", secure: true, path: "/" },
+        },
+      }
+    : undefined,
   pages: {
     signIn: "/login",
   },
   providers: [
+    Credentials({
+      id: "whop",
+      name: "Whop",
+      credentials: {
+        handoff: { label: "Handoff", type: "text" },
+      },
+      async authorize(credentials) {
+        const handoff = credentials?.handoff;
+        if (typeof handoff !== "string") return null;
+        const verified = verifyHandoff(handoff);
+        if (!verified) return null;
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, verified.userId))
+          .limit(1);
+        if (!user) return null;
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          role: user.role,
+        };
+      },
+    }),
     Credentials({
       name: "credentials",
       credentials: {

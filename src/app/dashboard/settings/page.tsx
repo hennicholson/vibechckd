@@ -67,6 +67,11 @@ export default function SettingsPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSubmitting, setPwSubmitting] = useState(false);
+  // Whether the user already has a password. Whop-SSO accounts arrive with
+  // `passwordHash = null`; in that case we render a "Set password" CTA instead
+  // of "Change password" and skip the current-password input.
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  const [whopLinked, setWhopLinked] = useState(false);
 
   // ── Email change section ──
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -104,14 +109,21 @@ export default function SettingsPage() {
   }, []);
 
   // Load current availability + profile status from the server.
-  // /api/settings GET is the single source of truth for both fields.
+  // /api/settings GET is the single source of truth for both fields and also
+  // tells us whether this user has set a password yet (Whop-SSO accounts have
+  // none) and whether their account is linked to Whop.
   useEffect(() => {
-    if (!isCreator) return;
     let cancelled = false;
     fetch("/api/settings")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return;
+        if (typeof data?.hasPassword === "boolean") setHasPassword(data.hasPassword);
+        if (typeof data?.whopLinked === "boolean") setWhopLinked(data.whopLinked);
+        if (!isCreator) {
+          setProfileVisibleLoaded(true);
+          return;
+        }
         if (data?.availability) {
           const label =
             (data.availability as string).charAt(0).toUpperCase() +
@@ -142,7 +154,9 @@ export default function SettingsPage() {
     e.preventDefault();
     setPwError(null);
 
-    if (!currentPassword) {
+    const isInitialSet = hasPassword === false;
+
+    if (!isInitialSet && !currentPassword) {
       setPwError("Enter your current password");
       return;
     }
@@ -150,7 +164,7 @@ export default function SettingsPage() {
       setPwError("New password must be at least 8 characters");
       return;
     }
-    if (newPassword === currentPassword) {
+    if (!isInitialSet && newPassword === currentPassword) {
       setPwError("New password must differ from current password");
       return;
     }
@@ -161,10 +175,12 @@ export default function SettingsPage() {
 
     setPwSubmitting(true);
     try {
+      const body: Record<string, string> = { password: newPassword };
+      if (!isInitialSet) body.currentPassword = currentPassword;
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, password: newPassword }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -172,7 +188,8 @@ export default function SettingsPage() {
         toast(data?.error || "Failed to update password", "error");
         return;
       }
-      toast("Password updated", "success");
+      toast(isInitialSet ? "Password set" : "Password updated", "success");
+      setHasPassword(true);
       setShowPasswordForm(false);
       setCurrentPassword("");
       setNewPassword("");
@@ -367,26 +384,40 @@ export default function SettingsPage() {
           </div>
 
           {!showPasswordForm ? (
-            <button
-              type="button"
-              onClick={() => {
-                setShowPasswordForm(true);
-                setPwError(null);
-              }}
-              className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150 cursor-pointer"
-            >
-              Change password
-            </button>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordForm(true);
+                  setPwError(null);
+                }}
+                className="self-start text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150 cursor-pointer"
+              >
+                {hasPassword === false ? "Set a password" : "Change password"}
+              </button>
+              {hasPassword === false && whopLinked && (
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  Your account is signed in via Whop. Set a password to also access vibechckd from
+                  outside Whop (vibechckd.cc directly).
+                </p>
+              )}
+            </div>
           ) : (
             <form onSubmit={submitPasswordChange} className="space-y-3 mt-3">
-              <PasswordInput
-                label="Current password"
-                value={currentPassword}
-                onChange={setCurrentPassword}
-                show={showCurrent}
-                onToggleShow={() => setShowCurrent((s) => !s)}
-                autoComplete="current-password"
-              />
+              {hasPassword !== false ? (
+                <PasswordInput
+                  label="Current password"
+                  value={currentPassword}
+                  onChange={setCurrentPassword}
+                  show={showCurrent}
+                  onToggleShow={() => setShowCurrent((s) => !s)}
+                  autoComplete="current-password"
+                />
+              ) : (
+                <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+                  Setting password for the first time
+                </p>
+              )}
               <PasswordInput
                 label="New password"
                 value={newPassword}

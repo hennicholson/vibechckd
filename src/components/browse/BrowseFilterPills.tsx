@@ -37,7 +37,7 @@ function Pill({
   return (
     <button
       onClick={onClick}
-      className={`flex-shrink-0 h-8 px-2.5 rounded-md text-[11px] font-medium transition-colors duration-150 cursor-pointer snap-start whitespace-nowrap inline-flex items-center ${
+      className={`flex-shrink-0 h-9 px-3 rounded-[10px] text-[12px] font-medium transition-colors duration-150 cursor-pointer snap-start whitespace-nowrap inline-flex items-center ${
         active
           ? "bg-text-primary text-white border border-text-primary"
           : "bg-background text-text-primary border border-border hover:border-border-hover hover:bg-background-alt"
@@ -53,9 +53,9 @@ function GhostPill({ children }: { children: React.ReactNode }) {
     <button
       disabled
       title="Coming soon"
-      className="flex-shrink-0 h-8 px-2.5 rounded-md text-[11px] font-medium text-text-muted bg-transparent border border-dashed border-border hover:border-border-hover hover:text-text-secondary transition-colors cursor-not-allowed snap-start whitespace-nowrap inline-flex items-center gap-1"
+      className="flex-shrink-0 h-9 px-3 rounded-[10px] text-[12px] font-medium text-text-muted bg-transparent border border-dashed border-border hover:border-border-hover hover:text-text-secondary transition-colors cursor-not-allowed snap-start whitespace-nowrap inline-flex items-center gap-1"
     >
-      <span className="text-[12px] leading-none">+</span>
+      <span className="text-[13px] leading-none">+</span>
       {children}
     </button>
   );

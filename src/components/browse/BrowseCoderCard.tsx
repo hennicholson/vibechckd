@@ -96,7 +96,7 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
 
         {/* Project count badge — only when data is real */}
         {projectCount > 0 && (
-          <span className="absolute top-2 right-2 inline-flex items-center h-5 px-1.5 rounded-md bg-text-primary/80 backdrop-blur-sm text-[10px] font-mono text-white tabular-nums">
+          <span className="absolute top-2 right-2 inline-flex items-center h-5 px-2 rounded-md bg-text-primary text-[10px] font-mono text-white tabular-nums">
             {projectCount} project{projectCount !== 1 ? "s" : ""}
           </span>
         )}

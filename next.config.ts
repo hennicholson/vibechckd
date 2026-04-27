@@ -22,32 +22,37 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["framer-motion"],
   },
+  // Allow ngrok / Whop to load the dev server without "cross-origin request"
+  // warnings. Wildcard so any rotating ngrok subdomain is accepted.
+  allowedDevOrigins: ["*.ngrok-free.app", "*.ngrok.app", "*.whop.com"],
   turbopack: {
     root: path.resolve(__dirname),
   },
   async headers() {
-    // Baseline security headers applied to every route.
-    // TODO: add a strict Content-Security-Policy once sources are audited
-    // (inline scripts/styles, third-party domains, etc.). Rolling out a
-    // broken CSP can take the whole app down, so leaving this out for now.
-    return [
+    // Whop wraps the entire app in their iframe (xxx.apps.whop.com), so once a
+    // user signs in via /whop they navigate freely into /browse, /dashboard,
+    // /coders/*, etc. — every route must be embeddable inside Whop. We use
+    // `frame-ancestors` CSP everywhere (the modern directive that supersedes
+    // X-Frame-Options) restricted to self + whop.com so other origins still
+    // can't embed us. localhost entries cover dev access through the proxy.
+    const frameAncestors =
+      "frame-ancestors 'self' https://whop.com https://*.whop.com http://localhost:* http://127.0.0.1:*;";
+
+    const baseHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
-        source: "/:path*",
-        headers: [
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-        ],
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
       },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
+      },
+      { key: "Content-Security-Policy", value: frameAncestors },
     ];
+
+    return [{ source: "/:path*", headers: baseHeaders }];
   },
 };
 

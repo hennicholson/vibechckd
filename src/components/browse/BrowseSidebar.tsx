@@ -95,18 +95,20 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer ${
+      className={`relative w-full text-left flex items-center justify-between gap-2 pl-3 pr-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer ${
         active
-          ? "text-text-primary font-medium bg-surface-muted"
+          ? "text-text-primary font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:bg-text-primary before:rounded-full"
           : "text-text-muted hover:text-text-primary hover:bg-background-alt"
       }`}
     >
-      <span className="truncate">{label}</span>
-      {count !== undefined && (
-        <span className="text-[11px] font-mono text-text-muted tabular-nums flex-shrink-0">
-          {count}
-        </span>
-      )}
+      <span className="truncate">
+        {label}
+        {count !== undefined && (
+          <span className={`ml-1 font-mono tabular-nums ${active ? "text-text-muted" : "text-text-muted/70"}`}>
+            ({count})
+          </span>
+        )}
+      </span>
     </button>
   );
 }
@@ -168,7 +170,7 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
         {status === "authenticated" && session?.user ? (
           <div className="px-3 py-3">
             <div className="flex items-center gap-2 px-2 mb-2">
-              <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0">
+              <div className="w-7 h-7 rounded-full bg-surface-muted flex items-center justify-center text-[11px] font-medium text-text-muted flex-shrink-0">
                 {session.user.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
               <span className="text-[13px] text-text-primary truncate">
