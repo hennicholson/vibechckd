@@ -39,7 +39,7 @@ export const navItems: NavItem[] = [
   {
     href: "/browse",
     label: "Browse Talent",
-    roles: ["client"],
+    roles: ["client", "creator"], // creators benefit too — see the marketplace, peer profiles
     matchPrefixes: ["/whop", "/coders"],
     icon: (
       <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">

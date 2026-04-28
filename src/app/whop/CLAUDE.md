@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10290 | 7:38 PM | 🔴 | Fixed WhopBoundary vertical centering in iframe | ~274 |
 | #10246 | 6:13 PM | 🟣 | First-visit role picker for Whop SSO users | ~412 |
 | #10245 | " | 🔄 | Whop authentication refactored to dedicated SSO route handler | ~415 |

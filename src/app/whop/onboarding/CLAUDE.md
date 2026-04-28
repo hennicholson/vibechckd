@@ -7,5 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10277 | 6:52 PM | 🔴 | Fixed creator onboarding form height for iframe embedding | ~298 |
 </claude-mem-context>

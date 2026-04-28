@@ -156,13 +156,19 @@ export async function findOrCreateWhopUser(profile: WhopUserProfile) {
       .limit(1);
     if (byEmail) {
       // Link the existing account to this Whop identity.
+      //
+      // We deliberately do NOT auto-stamp `emailVerified` here. If the
+      // existing account is an unverified email-signup (passwordHash set,
+      // emailVerified null), automatically marking it verified would let
+      // anyone who can sign into a Whop account with email X take over an
+      // unverified vibechckd account that registered with the same email.
+      // That account-takeover risk is small but real — make the user click
+      // the magic link instead.
       await db
         .update(users)
         .set({
           whopUserId: profile.whopUserId,
           ...(profile.whopCompanyId ? { whopCompanyId: profile.whopCompanyId } : {}),
-          // Mark the email verified — Whop SSO is itself proof of ownership.
-          ...(byEmail.emailVerified ? {} : { emailVerified: new Date() }),
         })
         .where(eq(users.id, byEmail.id));
       return { id: byEmail.id, role: byEmail.role, isNew: false as const };

@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10281 | 6:53 PM | 🟣 | Added password-setting detection logic for Whop SSO users in BrowseSidebar | ~524 |
 | #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
 </claude-mem-context>

@@ -53,8 +53,9 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    // `userId` from the body is intentionally ignored — see SECURITY note
+    // below. We extract everything else.
     const {
-      userId,
       name,
       email,
       specialties,
@@ -70,10 +71,16 @@ export async function POST(req: Request) {
       ...(sampleProjectUrls || []),
     ];
 
+    // SECURITY: Always trust session over client-supplied userId. A logged-in
+    // submitter implicitly owns their own application; an anonymous submitter
+    // gets a userId=null orphan (admin can later link by email if needed).
+    const session = await auth();
+    const trustedUserId = session?.user?.id ?? null;
+
     const [application] = await db
       .insert(applications)
       .values({
-        userId: userId || null,
+        userId: trustedUserId,
         name,
         email,
         specialties: specialties || [],

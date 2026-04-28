@@ -20,6 +20,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10294 | 7:41 PM | 🔄 | Removed duplicate navigation array from DashboardSidebar component | ~430 |
 | #10276 | 6:52 PM | 🟣 | Added Application navigation item to creator dashboard | ~258 |
 | #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |

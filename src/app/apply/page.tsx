@@ -7,7 +7,8 @@ import PageShell from "@/components/PageShell";
 import ApplicationForm from "@/components/ApplicationForm";
 
 export default function ApplyPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const isSignedIn = status === "authenticated" && !!session?.user;
 
   return (
     <PageShell>
@@ -30,17 +31,49 @@ export default function ApplyPage() {
           </p>
         </motion.div>
 
+        {/* Sign-in nudge for anonymous applicants — without an account we can't
+            link the application to a user, so they can't track their status. */}
+        {status !== "loading" && !isSignedIn && (
+          <div className="mb-6 border border-border rounded-[10px] p-4 bg-background-alt">
+            <p className="text-[13px] text-text-primary font-medium mb-1">
+              Create an account to track your application
+            </p>
+            <p className="text-[12px] text-text-muted leading-relaxed mb-3">
+              Sign up as a creator first so you can check your application status anytime, and we can let you know when you're approved.
+            </p>
+            <div className="flex gap-2">
+              <Link
+                href="/register?role=coder"
+                className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+              >
+                Create account
+              </Link>
+              <Link
+                href="/login?next=/apply"
+                className="inline-flex items-center h-8 px-3 rounded-md border border-border text-[12px] text-text-secondary hover:bg-background transition-colors"
+              >
+                Sign in
+              </Link>
+            </div>
+          </div>
+        )}
+
         <ApplicationForm
           initialName={session?.user?.name || ""}
           initialEmail={session?.user?.email || ""}
         />
 
-        <p className="text-[12px] text-text-muted text-center mt-8">
-          Already applied?{" "}
-          <Link href="/dashboard" className="text-text-secondary hover:text-text-primary transition-colors underline underline-offset-2">
-            Check your application status
-          </Link>
-        </p>
+        {isSignedIn && (
+          <p className="text-[12px] text-text-muted text-center mt-8">
+            Already applied?{" "}
+            <Link
+              href="/dashboard/application"
+              className="text-text-secondary hover:text-text-primary transition-colors underline underline-offset-2"
+            >
+              Check your application status
+            </Link>
+          </p>
+        )}
       </div>
     </PageShell>
   );

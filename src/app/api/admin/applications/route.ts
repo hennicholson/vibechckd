@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { applications, coderProfiles } from "@/db/schema";
+import { applications, coderProfiles, users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { emails } from "@/lib/email";
+import { ensureCoderProfile } from "@/lib/whop-auth";
 
 export async function GET() {
   try {
@@ -75,24 +76,32 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // When approved, activate the coder profile
+    // When approved:
+    //   1. Make sure the user's role is "coder" (they may have applied while
+    //      registered as a client — register-creator path always sets coder,
+    //      but a client could submit /apply too).
+    //   2. Make sure a coderProfile row exists (ensureCoderProfile is
+    //      idempotent — creates a draft if missing). Without this an
+    //      application from an account-less submitter, or from a client who
+    //      never went through any coder onboarding, would have nothing to
+    //      activate.
+    //   3. Activate the profile (status=active + verifiedAt).
     if (status === "approved" && updatedApp.userId) {
-      const [profile] = await db
-        .select()
-        .from(coderProfiles)
-        .where(eq(coderProfiles.userId, updatedApp.userId))
-        .limit(1);
+      await db
+        .update(users)
+        .set({ role: "coder" })
+        .where(eq(users.id, updatedApp.userId));
 
-      if (profile) {
-        await db
-          .update(coderProfiles)
-          .set({
-            status: "active",
-            verifiedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(coderProfiles.id, profile.id));
-      }
+      const profileId = await ensureCoderProfile(updatedApp.userId);
+
+      await db
+        .update(coderProfiles)
+        .set({
+          status: "active",
+          verifiedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(coderProfiles.id, profileId));
     }
 
     // When rejected, suspend the coder profile

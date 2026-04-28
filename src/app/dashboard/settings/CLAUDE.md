@@ -25,6 +25,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
 | #10127 | 1:05 AM | ✅ | Settings page UI updated to track Whop account state | ~223 |
 </claude-mem-context>

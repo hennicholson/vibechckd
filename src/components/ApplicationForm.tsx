@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -53,9 +53,39 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>({
     ...initialFormData,
-    name: initialName || "",
-    email: initialEmail || "",
+    name: initialName || session?.user?.name || "",
+    email: initialEmail || session?.user?.email || "",
   });
+
+  // Pre-fill specialties + portfolio URL from any existing coderProfile
+  // (e.g. Whop creator who already filled the mini-form on /whop/onboarding,
+  // or email-signup creator who filled register Step 3). Saves typing the
+  // same answers twice and signals the platform "remembers" them.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p: { specialties?: string[]; websiteUrl?: string; displayName?: string } | null) => {
+        if (!p) return;
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name || p.displayName || prev.name,
+          specialties:
+            prev.specialties.length > 0
+              ? prev.specialties
+              : ((p.specialties || []) as Specialty[]).filter((s) =>
+                  SPECIALTIES.includes(s)
+                ),
+          portfolioLinks:
+            prev.portfolioLinks.length > 0
+              ? prev.portfolioLinks
+              : p.websiteUrl
+                ? [p.websiteUrl]
+                : [],
+        }));
+      })
+      .catch(() => {});
+  }, [session?.user?.id]);
   const [submitted, setSubmitted] = useState(false);
   const [direction, setDirection] = useState(1);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
