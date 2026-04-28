@@ -29,12 +29,16 @@ export default function DashboardSidebar() {
   }, [session?.user, rawRole]);
   const role = uiRole(rawRole);
 
+  // When role is undefined (typically a brief render before the session
+  // hydrates) we DELIBERATELY render no items rather than leaking every
+  // role's nav at once. The "real" role-aware list lights up as soon as
+  // SessionProvider's initial server-rendered session takes over.
   const filteredItems: NavItem[] = role
     ? [
         ...navItems.filter((item) => item.roles.includes(role)),
         ...(rawRole === "admin" ? [adminItem] : []),
       ]
-    : navItems;
+    : [];
 
   const isActive = (item: NavItem) => isItemActive(item, pathname);
 

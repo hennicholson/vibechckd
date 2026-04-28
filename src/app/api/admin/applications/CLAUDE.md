@@ -8,4 +8,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #10018 | 12:37 AM | 🟣 | Comprehensive security hardening across API routes, authentication, and infrastructure | ~1087 |
+
+### Apr 27, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10312 | 8:34 PM | 🔴 | Platform signup and application flow bug fixes | ~508 |
 </claude-mem-context>

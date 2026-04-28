@@ -130,6 +130,11 @@ export default function ClientOnboardingForm({ defaultName }: Props) {
             </button>
           </div>
         </form>
+
+        <p className="text-[11px] text-text-muted text-center mt-5 leading-relaxed">
+          You&apos;re signed in via Whop. Add a password later from Settings if
+          you want to also sign in directly at vibechckd.cc.
+        </p>
       </div>
     </main>
   );

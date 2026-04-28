@@ -14,6 +14,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10313 | 8:55 PM | 🔵 | Root cause identified for Whop iframe authentication bugs | ~534 |
 | #10239 | 6:03 PM | 🟣 | Implemented cookie-less Whop authentication via middleware JWT minting | ~738 |
 | #10202 | 4:47 PM | 🔵 | Production deployment architecture on Netlify with Whop iframe integration | ~607 |
 | #10178 | 3:46 PM | 🔄 | Removed Whop token rewrite logic from middleware | ~349 |

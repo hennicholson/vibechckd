@@ -43,6 +43,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10313 | 8:55 PM | 🔵 | Root cause identified for Whop iframe authentication bugs | ~534 |
+| #10312 | 8:34 PM | 🔴 | Platform signup and application flow bug fixes | ~508 |
 | #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10247 | 6:14 PM | 🔴 | TypeScript type errors resolved, production build now passing | ~372 |
 | #10223 | 5:24 PM | 🔴 | Resolved Whop User type casting for production builds | ~347 |

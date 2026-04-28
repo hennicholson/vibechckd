@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
 import { ToastProvider } from "@/components/Toast";
+import { auth } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -34,11 +35,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Pull the session server-side and pass it as `SessionProvider`'s initial
+  // value. Without this, `useSession()` triggers a client-side fetch to
+  // `/api/auth/session`, which fails inside the Whop iframe because Chrome
+  // drops the SameSite=None;Secure session cookie before that fetch runs
+  // (third-party cookie blocking). Server-rendering the session means the
+  // first render already has the user logged in, so role-aware sidebars and
+  // footer CTAs work even when client cookies don't survive.
+  //
+  // We also disable the periodic + window-focus refetches so a downstream
+  // failed fetch can't downgrade an authenticated session to unauthenticated
+  // mid-session.
+  const initialSession = await auth();
+
   return (
     <html lang="en" className="h-full antialiased">
       <head>
@@ -48,7 +62,13 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col font-body bg-background text-text-primary">
-        <SessionProvider><ToastProvider>{children}</ToastProvider></SessionProvider>
+        <SessionProvider
+          session={initialSession}
+          refetchOnWindowFocus={false}
+          refetchInterval={0}
+        >
+          <ToastProvider>{children}</ToastProvider>
+        </SessionProvider>
       </body>
     </html>
   );
