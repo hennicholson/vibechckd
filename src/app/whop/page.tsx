@@ -12,6 +12,10 @@ interface SearchParams {
   whop_dev_email?: string;
   whop_dev_name?: string;
   sso_error?: string;
+  // Set to "1" by /api/whop/sso when it redirects back. If we see this AND
+  // still have no session, the session cookie didn't survive the redirect
+  // (browser blocked third-party cookies, etc.) — break the loop, show error.
+  from_sso?: string;
 }
 
 // Whop sets the iframe user token via either a request header (production) or
@@ -47,6 +51,19 @@ export default async function WhopAppPage({
   // re-entering the redirect loop.
   if (params.sso_error) {
     return <WhopBoundary handoff={null} error={params.sso_error} />;
+  }
+
+  // We just came back from /api/whop/sso (it set Set-Cookie + Location:/whop)
+  // but there's still no session here. That means the cookie didn't survive
+  // the round-trip — almost always the browser blocking third-party cookies
+  // for the Whop iframe origin. Break the loop and explain.
+  if (params.from_sso === "1") {
+    return (
+      <WhopBoundary
+        handoff={null}
+        error="Your browser blocked the session cookie for this iframe (third-party cookie restrictions). Open vibechckd.cc directly to sign in, or enable cross-site cookies for whop.com."
+      />
+    );
   }
 
   const whopToken = await resolveWhopToken();

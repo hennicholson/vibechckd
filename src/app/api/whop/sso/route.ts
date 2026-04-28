@@ -55,7 +55,11 @@ export async function GET(request: NextRequest) {
     return relativeRedirect(`/whop?${params}`);
   }
 
-  return relativeRedirect("/whop");
+  // `from_sso=1` lets /whop detect when a redirect-loop is happening because
+  // the session cookie didn't survive the round-trip (browser blocking
+  // third-party cookies in the iframe), and bail with a clear message
+  // instead of looping back into /api/whop/sso forever.
+  return relativeRedirect("/whop?from_sso=1");
 }
 
 // `NextResponse.redirect` requires an absolute URL, which forces us to guess
