@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface Job {
@@ -36,10 +37,13 @@ const statusTone: Record<Applicant["status"], string> = {
 };
 
 export default function JobDetailClient({ id }: { id: string }) {
+  const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [projectError, setProjectError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -90,6 +94,48 @@ export default function JobDetailClient({ id }: { id: string }) {
     // Hiring flips the parent job to "filled" server-side — refetch so the
     // header reflects the new status + the Close button disappears.
     if (next === "hired") load();
+  };
+
+  // Spin up a project from this job with all currently-hired applicants
+  // attached as members. The job's title + description seed the project;
+  // each hired creator's first specialty becomes their roleLabel (defaults
+  // to "Creator" if none). After creation, route to the project workspace.
+  const startProjectFromJob = async () => {
+    if (!job) return;
+    const hired = applicants.filter((a) => a.status === "hired");
+    if (hired.length === 0) {
+      setProjectError("Hire at least one creator first.");
+      return;
+    }
+    setCreatingProject(true);
+    setProjectError(null);
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: job.title,
+        description: job.description ?? undefined,
+        members: hired.map((a) => ({
+          userId: a.creatorId,
+          roleLabel:
+            (a.creatorSpecialties && a.creatorSpecialties[0])
+              ? a.creatorSpecialties[0]
+                  .split("-")
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(" ")
+              : "Creator",
+        })),
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setProjectError(data?.error || "Couldn't create project");
+      setCreatingProject(false);
+      return;
+    }
+    const data = (await res.json()) as { id: string };
+    router.push(`/dashboard/projects/${data.id}`);
+    router.refresh();
   };
 
   if (loading) {
@@ -145,6 +191,46 @@ export default function JobDetailClient({ id }: { id: string }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+        {/* Hire-to-project banner — surfaces once at least one applicant is
+            marked "hired". Lets the client spin up a project workspace with
+            all hired creators attached as members. */}
+        {(() => {
+          const hired = applicants.filter((a) => a.status === "hired");
+          if (hired.length === 0) return null;
+          return (
+            <div className="border border-positive/30 bg-positive/5 rounded-[10px] p-4 mb-6">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-text-primary mb-1">
+                    Ready to start a project?
+                  </p>
+                  <p className="text-[12px] text-text-muted leading-relaxed">
+                    {hired.length} hired creator{hired.length === 1 ? "" : "s"} —
+                    {" "}
+                    {hired.map((h) => h.creatorName || "Unnamed").join(", ")}.
+                    {" "}Spin up a project workspace and we&apos;ll attach
+                    everyone, seed it with this job&apos;s details, and open
+                    a shared inbox thread.
+                  </p>
+                </div>
+                <button
+                  onClick={startProjectFromJob}
+                  disabled={creatingProject}
+                  className="flex-shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-60 transition-opacity cursor-pointer"
+                >
+                  {creatingProject ? "Creating…" : "Start project"}
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              {projectError && (
+                <p className="text-[12px] text-negative font-mono mt-2">{projectError}</p>
+              )}
+            </div>
+          );
+        })()}
+
         {job.description && (
           <section className="border border-border rounded-[10px] p-5 mb-6 bg-background">
             <p className="text-[13px] text-text-primary whitespace-pre-wrap leading-relaxed">{job.description}</p>
