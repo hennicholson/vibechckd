@@ -94,20 +94,19 @@ export async function verifyWhopUserTokenDetailed(
     throw new Error(`Whop user fetch failed: ${msg}`);
   }
 
-  const username =
-    (user as { username?: unknown }).username && typeof (user as { username?: unknown }).username === "string"
-      ? ((user as { username: string }).username)
-      : null;
-  const name =
-    typeof (user as { name?: unknown }).name === "string"
-      ? ((user as { name: string }).name)
-      : username;
-  const email =
-    typeof (user as { email?: unknown }).email === "string"
-      ? ((user as { email: string }).email)
-      : null;
-  const profilePicture = (user as { profile_picture?: { source_url?: string } }).profile_picture;
-  const image = profilePicture?.source_url ?? null;
+  // The Whop SDK's User type is intentionally narrow; the live response has
+  // more fields than the type declares (username, email, profile_picture).
+  // Cast once through `unknown` to a loose shape so we can read them safely.
+  const u = user as unknown as {
+    username?: string;
+    name?: string;
+    email?: string;
+    profile_picture?: { source_url?: string };
+  };
+  const username = typeof u.username === "string" ? u.username : null;
+  const name = typeof u.name === "string" ? u.name : username;
+  const email = typeof u.email === "string" ? u.email : null;
+  const image = u.profile_picture?.source_url ?? null;
 
   return {
     source: "whop-jwt",
