@@ -13,5 +13,9 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10332 | 10:21 PM | 🟣 | Tabbed profile interface for Personal and Company sections | ~135 |
+| #10331 | 10:20 PM | ✅ | Company profile page refactored to support personal and company tabs | ~350 |
+| #10328 | 9:15 PM | 🟣 | Added tabbed Personal/Company profile interface for client dashboard | ~610 |
+| #10324 | 9:12 PM | 🔴 | Fixed missing TabButton component definition in CompanyClient | ~308 |
 | #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
 </claude-mem-context>

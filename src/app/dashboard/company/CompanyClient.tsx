@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/Toast";
+import PersonalProfileForm from "./PersonalProfileForm";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,6 +98,7 @@ export default function CompanyPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState<"personal" | "company">("personal");
   const [initialData, setInitialData] = useState<CompanyData | null>(null);
   const [form, setForm] = useState<CompanyData>(buildFormState());
   const [loading, setLoading] = useState(true);
@@ -181,13 +183,17 @@ export default function CompanyPage() {
   return (
     <div className="max-w-2xl h-full flex flex-col">
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
-        <div className="flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-0">
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Company Profile</h1>
-            <p className="text-[12px] text-text-muted mt-0.5">Tell creators about your brand and what you're building</p>
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Profile</h1>
+            <p className="text-[12px] text-text-muted mt-0.5">
+              {activeTab === "personal"
+                ? "How you appear to creators on vibechckd"
+                : "Tell creators about your brand and what you're building"}
+            </p>
           </div>
-          {isDirty && (
+          {activeTab === "company" && isDirty && (
             <div className="flex items-center gap-2">
               <button
                 onClick={handleDiscard}
@@ -205,14 +211,28 @@ export default function CompanyPage() {
             </div>
           )}
         </div>
+
+        {/* Tabs — Personal vs Company */}
+        <div className="flex items-center gap-1 mt-4 -mb-px">
+          <TabButton active={activeTab === "personal"} onClick={() => setActiveTab("personal")}>
+            Personal
+          </TabButton>
+          <TabButton active={activeTab === "company"} onClick={() => setActiveTab("company")}>
+            Company
+          </TabButton>
+        </div>
+        <div className="border-b border-border" />
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-4">
 
-      {/* Completion bar */}
-      {completion < 100 && (
+      {/* Personal tab */}
+      {activeTab === "personal" && <PersonalProfileForm />}
+
+      {/* Company tab — completion bar */}
+      {activeTab === "company" && completion < 100 && (
         <div className="border border-border rounded-[10px] p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-medium text-text-primary">Profile completeness</span>
@@ -227,7 +247,8 @@ export default function CompanyPage() {
         </div>
       )}
 
-      {/* Company Name */}
+      {/* Company tab — form sections */}
+      {activeTab === "company" && (
       <div className="space-y-6">
         <div className="border border-border rounded-[10px] p-5">
           <h2 className="text-[14px] font-medium text-text-primary mb-4">About your company</h2>
@@ -417,7 +438,33 @@ export default function CompanyPage() {
           </div>
         )}
       </div>
+      )}
       </div>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+        active ? "text-text-primary" : "text-text-muted hover:text-text-primary"
+      }`}
+    >
+      {children}
+      {active && (
+        <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-text-primary" />
+      )}
+    </button>
   );
 }
