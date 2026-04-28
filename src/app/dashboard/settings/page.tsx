@@ -384,21 +384,39 @@ export default function SettingsPage() {
           </div>
 
           {!showPasswordForm ? (
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPasswordForm(true);
-                  setPwError(null);
-                }}
-                className="self-start text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150 cursor-pointer"
-              >
-                {hasPassword === false ? "Set a password" : "Change password"}
-              </button>
+            <div className="flex flex-col gap-2">
+              {hasPassword === false ? (
+                // No password yet — render the CTA as a primary button so
+                // Whop SSO users see clearly that they should set one to
+                // unlock direct sign-in at vibechckd.cc.
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordForm(true);
+                    setPwError(null);
+                  }}
+                  className="self-start inline-flex items-center gap-2 h-9 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Set a password
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordForm(true);
+                    setPwError(null);
+                  }}
+                  className="self-start text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150 cursor-pointer underline underline-offset-2"
+                >
+                  Change password
+                </button>
+              )}
               {hasPassword === false && whopLinked && (
                 <p className="text-[11px] text-text-muted leading-relaxed">
-                  Your account is signed in via Whop. Set a password to also access vibechckd from
-                  outside Whop (vibechckd.cc directly).
+                  You're signed in via Whop. Set a password to also access vibechckd directly at vibechckd.cc.
                 </p>
               )}
             </div>

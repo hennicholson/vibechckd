@@ -18,9 +18,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import VerifiedSeal from "@/components/VerifiedSeal";
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
+import {
+  navItems,
+  adminItem,
+  uiRole,
+  isItemActive,
+} from "@/lib/dashboard-nav";
 
 type Filter = "all" | Specialty;
 
@@ -29,32 +36,6 @@ interface BrowseSidebarProps {
   onFilterChange: (f: Filter) => void;
   counts: Record<string, number>;
 }
-
-const iconBase = "w-4 h-4 flex-shrink-0";
-
-const SearchIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-  </svg>
-);
-
-const FolderIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-  </svg>
-);
-
-const ChatIcon = () => (
-  <svg className={iconBase} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-  </svg>
-);
 
 function NavItem({
   href,
@@ -115,10 +96,17 @@ function FilterButton({
 }
 
 export default function BrowseSidebar({ filter, onFilterChange, counts }: BrowseSidebarProps) {
+  const pathname = usePathname();
   const { data: session, status } = useSession();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  const isCreator = role === "coder" || role === "admin";
-  const isClient = role === "client";
+  const rawRole = (session?.user as { role?: string } | undefined)?.role;
+  const role = uiRole(rawRole);
+
+  const filteredNav = role
+    ? [
+        ...navItems.filter((item) => item.roles.includes(role)),
+        ...(rawRole === "admin" ? [adminItem] : []),
+      ]
+    : navItems.filter((item) => item.href === "/browse");
 
   // Whop SSO users have no passwordHash → can't sign in directly at
   // vibechckd.cc/login. Surface a "Set a password" link so they know there's
@@ -147,25 +135,24 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
         </Link>
       </div>
 
-      {/* Primary nav */}
+      {/* Primary nav — same items, ordering, and role-gating as the dashboard
+          rail so transitions /whop ↔ /dashboard don't visually jolt. */}
       <div className="px-3 py-3 space-y-0.5">
-        <NavItem href="/browse" active icon={<SearchIcon />}>
-          Browse
-        </NavItem>
-        <NavItem href="/dashboard/teams/new" icon={<UsersIcon />}>
-          Build a Team
-        </NavItem>
-        <NavItem href="/dashboard/projects" icon={<FolderIcon />}>
-          Projects
-        </NavItem>
-        <NavItem href="/dashboard/inbox" icon={<ChatIcon />}>
-          Messages
-        </NavItem>
+        {filteredNav.map((item) => (
+          <NavItem
+            key={item.href}
+            href={item.href}
+            active={isItemActive(item, pathname)}
+            icon={item.icon}
+          >
+            {item.label}
+          </NavItem>
+        ))}
       </div>
 
-      {/* Filter section */}
-      <div className="px-3 pt-2 pb-1">
-        <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-1">
+      {/* Filter section — only meaningful here (not on /dashboard pages) */}
+      <div className="px-3 pt-2 pb-1 border-t border-border mt-1">
+        <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-1 mt-2">
           Filter
         </p>
         <div className="space-y-0.5">
@@ -186,54 +173,30 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
         </div>
       </div>
 
-      {/* User footer */}
+      {/* User footer — matches DashboardSidebar's footer shape so the rail
+          looks identical on /browse, /whop, and /dashboard/*. The only extras
+          are the role-aware "Set a password" prompt for cookieless Whop users. */}
       <div className="mt-auto border-t border-border">
         {status === "authenticated" && session?.user ? (
           <div className="px-3 py-3">
             <div className="flex items-center gap-2 px-2 mb-2">
-              <div className="w-7 h-7 rounded-full bg-surface-muted flex items-center justify-center text-[11px] font-medium text-text-muted flex-shrink-0">
+              <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0">
                 {session.user.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
-              <span className="text-[13px] text-text-primary truncate">
-                {session.user.name}
-              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[12px] text-text-primary truncate">{session.user.name}</span>
+                <span className="text-[10px] font-mono text-text-muted">
+                  {role === "creator" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <VerifiedSeal size="xs" />
+                      Creator
+                    </span>
+                  ) : role === "client" ? (
+                    "Client"
+                  ) : null}
+                </span>
+              </div>
             </div>
-            <Link
-              href="/dashboard"
-              className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-            >
-              Dashboard
-            </Link>
-            {isCreator && (
-              <>
-                <Link
-                  href="/dashboard/profile"
-                  className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-                >
-                  Profile
-                </Link>
-                <Link
-                  href="/dashboard/portfolio"
-                  className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-                >
-                  Portfolio
-                </Link>
-                <Link
-                  href="/dashboard/application"
-                  className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-                >
-                  Application
-                </Link>
-              </>
-            )}
-            {isClient && (
-              <Link
-                href="/dashboard/company"
-                className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-              >
-                Company
-              </Link>
-            )}
             {showSetPassword && (
               <Link
                 href="/dashboard/settings"

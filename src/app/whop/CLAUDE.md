@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10290 | 7:38 PM | 🔴 | Fixed WhopBoundary vertical centering in iframe | ~274 |
 | #10246 | 6:13 PM | 🟣 | First-visit role picker for Whop SSO users | ~412 |
 | #10245 | " | 🔄 | Whop authentication refactored to dedicated SSO route handler | ~415 |
 | #10234 | 5:53 PM | 🟣 | Error page for third-party cookie blocking in Whop iframe | ~314 |

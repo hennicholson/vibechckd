@@ -52,7 +52,7 @@ export default function WhopBoundary({ handoff, error: serverError, alreadySigne
   }, [handoff, error, alreadySignedIn, router]);
 
   return (
-    <main className="min-h-full flex items-center justify-center bg-background px-6 py-10">
+    <main className="min-h-screen flex items-center justify-center bg-background px-6 py-10">
       <div className="w-full max-w-sm text-center">
         <div className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-text-primary mb-6">
           <span>vibechckd</span>
