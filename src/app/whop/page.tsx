@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import WhopBoundary from "./WhopBoundary";
+import WhopStartCard from "./WhopStartCard";
 import BrowsePage from "@/app/browse/page";
 
 export const runtime = "nodejs";
@@ -38,10 +42,25 @@ export default async function WhopAppPage({
   searchParams: Promise<SearchParams>;
 }) {
   const session = await auth();
-  if (session?.user) {
-    // Already signed in — render the marketplace inline. We stay on /whop so
-    // we keep the iframe-friendly CSP; navigating to /browse would hit the
-    // global X-Frame-Options: DENY and break inside Whop's iframe.
+  if (session?.user?.id) {
+    // Look up the user's onboarding state. Whop SSO leaves `emailVerified`
+    // null until the user picks one of the three options (Client / Creator /
+    // Browse) on the first-visit picker — we use that null as our "show the
+    // picker" flag. Once they pick, the API stamps `emailVerified` and they
+    // see BrowsePage on subsequent loads.
+    const [u] = await db
+      .select({ emailVerified: users.emailVerified, name: users.name })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+
+    if (u && !u.emailVerified) {
+      return <WhopStartCard defaultName={u.name} />;
+    }
+
+    // Picked a path already — render the marketplace inline. We stay on /whop
+    // so we keep the iframe-friendly CSP; navigating to /browse would still
+    // work but the URL changing path can confuse the Whop wrapper.
     return <BrowsePage />;
   }
 

@@ -170,7 +170,11 @@ export async function findOrCreateWhopUser(profile: WhopUserProfile) {
   }
 
   // Create a fresh user. Default role: client (Whop creators arriving via the
-  // marketplace are buyers by default). Coders can change this from settings.
+  // marketplace are buyers by default). The first-visit picker on /whop will
+  // confirm their actual intent (Client / Creator / Browse) and update from
+  // there. We deliberately leave `emailVerified` null on creation — the
+  // /whop server uses that null as the "show first-time picker" signal, and
+  // setting it later (from the picker) marks them as ready to use the app.
   const placeholderEmail =
     profile.email || `whop_${profile.whopUserId}@vibechckd.local`;
 
@@ -182,8 +186,6 @@ export async function findOrCreateWhopUser(profile: WhopUserProfile) {
       image: profile.image,
       whopUserId: profile.whopUserId,
       whopCompanyId: profile.whopCompanyId,
-      // Whop SSO IS verification — skip the email-link gate.
-      emailVerified: new Date(),
       role: "client",
     })
     .returning({ id: users.id, role: users.role });
