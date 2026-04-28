@@ -16,7 +16,10 @@ export default function FavoriteButton({
   size = "md",
   className = "",
 }: Props) {
-  const dim = size === "sm" ? "w-7 h-7" : "w-9 h-9";
+  // Larger touch target — 36px minimum to satisfy mobile tap-target heuristics
+  // (44px would be ideal but pinches the card visually). On the popup we keep
+  // size="sm" but the popup is desktop-leaning anyway.
+  const dim = size === "sm" ? "w-8 h-8" : "w-10 h-10";
   const iconDim = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
   return (
     <button
@@ -28,10 +31,10 @@ export default function FavoriteButton({
       }}
       aria-pressed={favorited}
       aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-      className={`${dim} rounded-full flex items-center justify-center bg-background/85 backdrop-blur-sm border border-border hover:border-text-primary transition-colors cursor-pointer ${className}`}
+      className={`${dim} rounded-full flex items-center justify-center bg-background/85 backdrop-blur-sm border border-border hover:border-text-primary active:scale-90 transition-all cursor-pointer ${className}`}
     >
       <svg
-        className={`${iconDim} ${favorited ? "fill-negative stroke-negative" : "fill-none stroke-text-primary"} transition-colors`}
+        className={`${iconDim} ${favorited ? "fill-negative stroke-negative scale-110" : "fill-none stroke-text-primary scale-100"} transition-all duration-150`}
         viewBox="0 0 24 24"
         strokeWidth={favorited ? 0 : 1.7}
         strokeLinecap="round"

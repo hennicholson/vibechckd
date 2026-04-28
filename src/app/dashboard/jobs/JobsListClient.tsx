@@ -17,9 +17,22 @@ interface JobRow {
 
 const statusTone: Record<JobRow["status"], string> = {
   open: "text-positive bg-positive/10",
-  closed: "text-text-muted bg-surface-muted",
-  filled: "text-text-primary bg-surface-muted",
+  closed: "text-negative bg-negative/10",
+  filled: "text-text-primary bg-text-primary/10",
 };
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
 
 export default function JobsListClient() {
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
@@ -108,6 +121,9 @@ export default function JobsListClient() {
                       {j.applicantCount} applicant{j.applicantCount === 1 ? "" : "s"}
                     </span>
                   </div>
+                  <p className="text-[10px] font-mono text-text-muted mt-1.5">
+                    Posted {relativeTime(j.createdAt)}
+                  </p>
                 </Link>
               </li>
             ))}

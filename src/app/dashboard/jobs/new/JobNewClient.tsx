@@ -69,7 +69,7 @@ export default function JobNewClient() {
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
         <form onSubmit={submit} className="space-y-5 border border-border rounded-[10px] p-5 bg-background">
-          <Field label="Title">
+          <Field label="Title" required>
             <input
               type="text"
               value={title}
@@ -77,6 +77,7 @@ export default function JobNewClient() {
               placeholder="e.g. Landing page + dashboard for new SaaS"
               className="w-full h-10 px-3 rounded-md border border-border bg-background text-[14px] text-text-primary outline-none focus:border-text-primary"
             />
+            <p className="text-[10px] text-text-muted text-right mt-1">{title.length}/160</p>
           </Field>
 
           <Field label="Description" hint="What you're building, scope, problems to solve. Optional.">
@@ -127,7 +128,7 @@ function Pills({
   onSelect: (v: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {options.map((o) => (
         <button
           key={o}
@@ -146,11 +147,22 @@ function Pills({
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <p className="block text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1.5">
         {label}
+        {required && <span className="text-negative ml-0.5">*</span>}
       </p>
       {children}
       {hint && <p className="text-[11px] text-text-muted mt-1">{hint}</p>}

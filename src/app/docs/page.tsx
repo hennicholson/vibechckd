@@ -9,6 +9,7 @@ const tocSections = [
   { id: "for-clients", label: "For Clients" },
   { id: "vetting-process", label: "Vetting Process" },
   { id: "team-builder", label: "Team Builder" },
+  { id: "job-boards", label: "Job Boards" },
   { id: "project-management", label: "Project Management" },
   { id: "portfolio", label: "Portfolio" },
   { id: "chat-communication", label: "Chat & Communication" },
@@ -349,6 +350,39 @@ export default function DocsPage() {
             </h3>
             <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px]">
               Once all desired slots are filled, you can create a project directly from the team builder. This populates the project dashboard with your selected team members and their assigned roles.
+            </p>
+          </section>
+
+          {/* Job Boards */}
+          <section id="job-boards" className="border-t border-border pt-8 mt-8">
+            <h2 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-4">
+              Job Boards
+            </h2>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px] mb-4">
+              Job Boards are the primary way clients reach our vetted creators. Clients post a brief; verified creators apply with one click. Because every applicant has already passed our vetting, clients save the time they&apos;d spend evaluating unknowns and only see quality work.
+            </p>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">For clients — posting a job</h3>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li>Open <Code>Jobs</Code> from your dashboard sidebar.</li>
+              <li>Click <Code>Post a job</Code> and fill in title, description, project type, budget, and timeline.</li>
+              <li>The job goes live on the creator job board immediately. Verified creators see it and can apply.</li>
+              <li>Each application surfaces the creator&apos;s full profile (portfolio, specialties, rate) plus an optional pitch — no extra forms to read.</li>
+              <li>Shortlist, message, or hire from the job&apos;s detail page.</li>
+            </ul>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">For creators — applying</h3>
+            <ul className="text-[13px] text-text-secondary leading-[1.7] pl-4 list-disc space-y-1.5 max-w-[600px] mb-6">
+              <li>Open <Code>Job board</Code> from your dashboard sidebar.</li>
+              <li>Browse open jobs; jobs you&apos;ve already applied to are marked.</li>
+              <li>Click <Code>Apply with one click</Code>. Your existing profile is sent automatically — no re-filling forms.</li>
+              <li>Add an optional short pitch about why you&apos;re a fit.</li>
+              <li>Track each application&apos;s status from <Code>Application</Code> in your dashboard.</li>
+            </ul>
+
+            <h3 className="text-[15px] font-semibold text-text-primary mb-2">How vetting unlocks Job Boards</h3>
+            <p className="text-[14px] text-text-secondary leading-[1.7] max-w-[600px]">
+              Only creators with an approved application (status: active) can apply to jobs. Clients trust that every applicant has already passed our craft, taste, and code-quality checks. New creators are gently routed to <Code>/apply</Code> until they&apos;re verified.
             </p>
           </section>
 

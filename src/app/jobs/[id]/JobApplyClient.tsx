@@ -60,7 +60,10 @@ export default function JobApplyClient({ id }: { id: string }) {
       return;
     }
     setSubmitting(false);
-    router.push("/dashboard/application");
+    // Flip into the already-applied state inline so the user keeps the
+    // back-to-jobs nav. They can also click through to /dashboard/application
+    // from the success banner if they want full status tracking.
+    setExisting({ id: "pending", status: "applied" });
     router.refresh();
   }
 

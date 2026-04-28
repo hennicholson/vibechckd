@@ -29,10 +29,10 @@ interface Applicant {
 }
 
 const statusTone: Record<Applicant["status"], string> = {
-  applied: "text-text-muted bg-surface-muted",
+  applied: "text-text-secondary bg-surface-muted",
   shortlisted: "text-positive bg-positive/10",
   rejected: "text-negative bg-negative/10",
-  hired: "text-text-primary bg-text-primary text-white",
+  hired: "text-white bg-text-primary",
 };
 
 export default function JobDetailClient({ id }: { id: string }) {
