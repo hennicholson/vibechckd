@@ -2,15 +2,19 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, clientProfiles } from "@/db/schema";
 import { ensureCoderProfile } from "@/lib/whop-auth";
 import { parseBody, z } from "@/lib/validation";
 
 // First-visit picker submit handler. Called from <WhopStartCard /> when a
-// freshly-SSO'd Whop user picks Client / Creator / Browse on the welcome
-// card at /whop. Marks them as "ready to use the app" by stamping
-// `emailVerified` (we treat that timestamp as the chose-a-path flag for
-// Whop SSO users — see `findOrCreateWhopUser`).
+// freshly-SSO'd Whop user picks Client / Creator / Browse.
+//
+// Path semantics, with the existing `users.emailVerified` column reused as
+// the "fully onboarded" flag for Whop SSO users:
+//   - Client / Creator → seed an empty profile row, leave emailVerified null,
+//     redirect to /whop/onboarding so they finish role-specific setup.
+//   - Browse → no profile row, stamp emailVerified now (skip onboarding).
+//     They can still pick a role later from /dashboard.
 const startSchema = z
   .object({ choice: z.enum(["client", "creator", "browse"]) })
   .strict();
@@ -31,26 +35,33 @@ export async function POST(request: Request) {
   }
   const { choice } = parsed.data;
 
-  // Map the picker choice to a (role, redirect target). Browse keeps the
-  // default `client` role — they didn't commit, but role has to be a valid
-  // value, and clients see the marketplace by default.
-  const role = choice === "creator" ? "coder" : "client";
-  const next =
-    choice === "creator" ? "/apply" : "/whop";
-
-  await db
-    .update(users)
-    .set({
-      role,
-      emailVerified: new Date(),
-    })
-    .where(eq(users.id, session.user.id));
-
-  // Creators also get a draft coderProfiles row so /apply can fill it in
-  // (matches the email-signup creator flow). Idempotent.
-  if (choice === "creator") {
-    await ensureCoderProfile(session.user.id);
+  if (choice === "browse") {
+    // Browse → just confirm we showed them the picker; no profile row.
+    await db
+      .update(users)
+      .set({ role: "client", emailVerified: new Date() })
+      .where(eq(users.id, session.user.id));
+    return NextResponse.json({ success: true, next: "/whop" });
   }
 
-  return NextResponse.json({ success: true, next });
+  if (choice === "client") {
+    await db.update(users).set({ role: "client" }).where(eq(users.id, session.user.id));
+    // Seed an empty clientProfile so /whop knows they've picked client and
+    // routes them to the client onboarding form (vs. the start picker).
+    // Idempotent — `userId` is unique on the table.
+    const [existing] = await db
+      .select({ id: clientProfiles.id })
+      .from(clientProfiles)
+      .where(eq(clientProfiles.userId, session.user.id))
+      .limit(1);
+    if (!existing) {
+      await db.insert(clientProfiles).values({ userId: session.user.id });
+    }
+    return NextResponse.json({ success: true, next: "/whop/onboarding" });
+  }
+
+  // choice === "creator"
+  await db.update(users).set({ role: "coder" }).where(eq(users.id, session.user.id));
+  await ensureCoderProfile(session.user.id);
+  return NextResponse.json({ success: true, next: "/whop/onboarding" });
 }

@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, clientProfiles, coderProfiles } from "@/db/schema";
 import WhopBoundary from "./WhopBoundary";
 import WhopStartCard from "./WhopStartCard";
 import BrowsePage from "@/app/browse/page";
@@ -43,11 +43,14 @@ export default async function WhopAppPage({
 }) {
   const session = await auth();
   if (session?.user?.id) {
-    // Look up the user's onboarding state. Whop SSO leaves `emailVerified`
-    // null until the user picks one of the three options (Client / Creator /
-    // Browse) on the first-visit picker — we use that null as our "show the
-    // picker" flag. Once they pick, the API stamps `emailVerified` and they
-    // see BrowsePage on subsequent loads.
+    // Whop SSO sequence is recorded as:
+    //   1. fresh user, no clientProfile/coderProfile, emailVerified=null
+    //      → show <WhopStartCard /> (pick Client / Creator / Browse)
+    //   2. picked Client/Creator → /api/whop/start seeded a profile row but
+    //      emailVerified is still null → bounce to /whop/onboarding for the
+    //      role-specific form
+    //   3. completed onboarding (or picked Browse) → emailVerified is set →
+    //      render BrowsePage.
     const [u] = await db
       .select({ emailVerified: users.emailVerified, name: users.name })
       .from(users)
@@ -55,12 +58,20 @@ export default async function WhopAppPage({
       .limit(1);
 
     if (u && !u.emailVerified) {
+      const [client] = await db
+        .select({ id: clientProfiles.id })
+        .from(clientProfiles)
+        .where(eq(clientProfiles.userId, session.user.id))
+        .limit(1);
+      const [coder] = await db
+        .select({ id: coderProfiles.id })
+        .from(coderProfiles)
+        .where(eq(coderProfiles.userId, session.user.id))
+        .limit(1);
+      if (client || coder) redirect("/whop/onboarding");
       return <WhopStartCard defaultName={u.name} />;
     }
 
-    // Picked a path already — render the marketplace inline. We stay on /whop
-    // so we keep the iframe-friendly CSP; navigating to /browse would still
-    // work but the URL changing path can confuse the Whop wrapper.
     return <BrowsePage />;
   }
 
