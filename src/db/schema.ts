@@ -9,6 +9,7 @@ import {
   pgEnum,
   primaryKey,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ── Enums ──
@@ -22,6 +23,8 @@ export const taskStatusEnum = pgEnum("task_status", ["todo", "in_progress", "don
 export const deliverableStatusEnum = pgEnum("deliverable_status", ["pending", "submitted", "approved", "revision_requested"]);
 export const messageTypeEnum = pgEnum("message_type", ["text", "file", "system", "ai"]);
 export const applicationStatusEnum = pgEnum("application_status", ["applied", "under_review", "interview", "approved", "rejected"]);
+export const jobStatusEnum = pgEnum("job_status", ["open", "closed", "filled"]);
+export const jobApplicationStatusEnum = pgEnum("job_application_status", ["applied", "shortlisted", "rejected", "hired"]);
 
 // ── Auth Tables (NextAuth v5 / Drizzle Adapter) ──
 
@@ -337,3 +340,66 @@ export const applications = pgTable("applications", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   reviewedAt: timestamp("reviewed_at", { mode: "date" }),
 });
+
+// ── Jobs ──
+//
+// Clients post jobs; verified creators (coderProfiles.status === "active")
+// browse and apply with one click. Application opens a conversation thread
+// (see `conversations.jobId` below). When the client picks a creator, status
+// flips to "hired" and the job moves to "filled".
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clientId: uuid("client_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    projectType: text("project_type"),
+    budgetRange: text("budget_range"),
+    timeline: text("timeline"),
+    status: jobStatusEnum("status").default("open").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("jobs_client_id_idx").on(t.clientId),
+    index("jobs_status_idx").on(t.status),
+  ]
+);
+
+export const jobApplications = pgTable(
+  "job_applications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobId: uuid("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+    creatorId: uuid("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    pitch: text("pitch"),
+    status: jobApplicationStatusEnum("status").default("applied").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("job_applications_job_creator_uq").on(t.jobId, t.creatorId),
+    index("job_applications_creator_id_idx").on(t.creatorId),
+  ]
+);
+
+// ── Favorites ──
+//
+// Users (typically clients) can favorite coderProfiles. The Team Builder
+// surfaces a "Favorites only" filter to assemble a shortlist quickly.
+
+export const userFavorites = pgTable(
+  "user_favorites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    coderProfileId: uuid("coder_profile_id").notNull().references(() => coderProfiles.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("user_favorites_user_coder_uq").on(t.userId, t.coderProfileId),
+    index("user_favorites_coder_idx").on(t.coderProfileId),
+  ]
+);

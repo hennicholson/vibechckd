@@ -17,6 +17,8 @@
 
 import { motion } from "framer-motion";
 import Badge from "@/components/Badge";
+import FavoriteButton from "@/components/FavoriteButton";
+import { useFavorites } from "@/lib/use-favorites";
 import { SPECIALTY_LABELS, type Coder } from "@/lib/mock-data";
 
 function isRealUrl(url: string | undefined | null): url is string {
@@ -47,6 +49,7 @@ const availabilityLabel: Record<Coder["availability"], string> = {
 };
 
 export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCardProps) {
+  const { isFavorited, toggle } = useFavorites();
   const hasGif = isRealUrl(coder.gifPreviewUrl);
   const hasAvatar = isImageAssetReachable(coder.avatarUrl);
   const heroUrl = hasGif ? coder.gifPreviewUrl : hasAvatar ? coder.avatarUrl : null;
@@ -100,6 +103,15 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
             {projectCount} project{projectCount !== 1 ? "s" : ""}
           </span>
         )}
+
+        {/* Favorite heart — top-left so it doesn't collide with project badge */}
+        <div className="absolute top-2 left-2">
+          <FavoriteButton
+            favorited={isFavorited(coder.id)}
+            onClick={() => toggle(coder.id)}
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* Info section */}

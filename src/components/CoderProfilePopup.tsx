@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import Badge from "./Badge";
 import Tag from "./Tag";
 import Button from "./Button";
+import FavoriteButton from "./FavoriteButton";
+import { useFavorites } from "@/lib/use-favorites";
 import type { Coder, PortfolioItem, PortfolioAsset } from "@/lib/mock-data";
 import { SPECIALTY_LABELS } from "@/lib/mock-data";
 
@@ -262,6 +264,7 @@ function ProjectThumb({
 export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupProps) {
   const [activeProject, setActiveProject] = useState<PortfolioItem | null>(null);
   const { status: authStatus } = useSession();
+  const { isFavorited, toggle: toggleFavorite } = useFavorites();
   const [initiating, setInitiating] = useState<string | null>(null);
 
   const portfolio = useMemo(() => coder?.portfolio || [], [coder]);
@@ -404,6 +407,12 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
                           {coder.displayName}
                         </h2>
                         {coder.verified && <Badge variant="verified" />}
+                        <FavoriteButton
+                          favorited={isFavorited(coder.id)}
+                          onClick={() => toggleFavorite(coder.id)}
+                          size="sm"
+                          className="ml-1"
+                        />
                       </div>
                       <p className="text-[12px] font-mono text-text-muted mt-1 truncate">
                         {metaParts.join(" · ")}

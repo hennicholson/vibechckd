@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10349 | 10:52 PM | 🟣 | Added favorite button to coder browse cards | ~357 |
 | #10313 | 8:55 PM | 🔵 | Root cause identified for Whop iframe authentication bugs | ~534 |
 | #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10281 | 6:53 PM | 🟣 | Added password-setting detection logic for Whop SSO users in BrowseSidebar | ~524 |
