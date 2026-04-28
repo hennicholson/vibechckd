@@ -119,7 +119,9 @@ export async function PUT(request: NextRequest) {
       emails.applicationApproved(updatedApp.email, updatedApp.name).catch(() => {});
     }
     if (status === "rejected" && updatedApp.email) {
-      emails.applicationRejected(updatedApp.email, updatedApp.name).catch(() => {});
+      emails
+        .applicationRejected(updatedApp.email, updatedApp.name, updatedApp.reviewerNotes)
+        .catch(() => {});
     }
 
     return NextResponse.json({ success: true, application: updatedApp });

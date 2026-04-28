@@ -9,4 +9,25 @@
 |----|------|---|-------|------|
 | #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |
 | #8905 | 1:10 PM | 🟣 | User settings API endpoint created | ~310 |
+
+### Apr 23, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10024 | 12:40 AM | 🔴 | Added old password verification requirement for password changes in settings | ~622 |
+| #10018 | 12:37 AM | 🟣 | Comprehensive security hardening across API routes, authentication, and infrastructure | ~1087 |
+| #10005 | 12:21 AM | 🔴 | Implemented Zod validation and mass assignment protection for settings endpoint | ~580 |
+| #9971 | 12:05 AM | 🔵 | Security audit identified critical vulnerabilities in vibecheck application | ~721 |
+
+### Apr 26, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10115 | 11:33 PM | 🟣 | Whop SSO integration with handoff authentication | ~542 |
+
+### Apr 27, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10126 | 1:05 AM | ✅ | Settings API password validation relaxed for Whop-SSO users | ~250 |
 </claude-mem-context>

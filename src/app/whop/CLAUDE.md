@@ -7,6 +7,9 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10246 | 6:13 PM | 🟣 | First-visit role picker for Whop SSO users | ~412 |
+| #10245 | " | 🔄 | Whop authentication refactored to dedicated SSO route handler | ~415 |
+| #10234 | 5:53 PM | 🟣 | Error page for third-party cookie blocking in Whop iframe | ~314 |
 | #10170 | 1:56 AM | 🔄 | Removed unused Whop auth imports from page component | ~269 |
 | #10163 | 1:53 AM | 🔄 | Removed unused signIn import from Whop page | ~168 |
 | #10164 | " | 🔵 | Whop SSO authentication flow implementation in /whop page | ~505 |

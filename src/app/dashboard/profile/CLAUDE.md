@@ -15,4 +15,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #9848 | 1:15 PM | 🔄 | Refined portfolio preview hover overlay with subtle darkening effect | ~353 |
+
+### Apr 27, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
 </claude-mem-context>

@@ -23,4 +23,32 @@
 |----|------|---|-------|------|
 | #9299 | 12:29 AM | 🔴 | Fixed Whop listInvoices company ID reference | ~254 |
 | #9296 | 12:28 AM | ✅ | Added saveDraft parameter extraction in Whop invoice creation | ~224 |
+
+### Apr 23, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10018 | 12:37 AM | 🟣 | Comprehensive security hardening across API routes, authentication, and infrastructure | ~1087 |
+| #9996 | 12:20 AM | 🔴 | Escaped user-controlled variables in email template body content | ~130 |
+| #9991 | 12:19 AM | 🔴 | Added HTML escaping to email template parameters to prevent injection attacks | ~139 |
+| #9971 | 12:05 AM | 🔵 | Security audit identified critical vulnerabilities in vibecheck application | ~721 |
+
+### Apr 26, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10115 | 11:33 PM | 🟣 | Whop SSO integration with handoff authentication | ~542 |
+
+### Apr 27, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10247 | 6:14 PM | 🔴 | TypeScript type errors resolved, production build now passing | ~372 |
+| #10223 | 5:24 PM | 🔴 | Resolved Whop User type casting for production builds | ~347 |
+| #10211 | 5:09 PM | 🔵 | Whop integration security controls verified | ~364 |
+| #10201 | 4:47 PM | 🟣 | NextAuth configured for cross-site iframe cookie support | ~344 |
+| #10157 | 1:47 AM | 🔄 | Relaxed Whop JWT audience validation in development | ~553 |
+| #10156 | 1:46 AM | 🔵 | Whop SDK client implemented as singleton pattern | ~315 |
+| #10151 | 1:39 AM | 🟣 | Whop authentication library with JWT verification and account linking | ~686 |
+| #10125 | 1:05 AM | 🟣 | Whop authentication handoff integration | ~228 |
 </claude-mem-context>

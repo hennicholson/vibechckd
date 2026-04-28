@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import Input from "./Input";
@@ -48,6 +49,7 @@ type FieldErrors = {
 
 export default function ApplicationForm({ initialName, initialEmail }: { initialName?: string; initialEmail?: string } = {}) {
   const { data: session } = useSession();
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>({
     ...initialFormData,
@@ -179,6 +181,14 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
       }
 
       setSubmitted(true);
+      // Signed-in creators get a status page they can come back to. We
+      // briefly show the inline "submitted" confirmation, then push them.
+      if (session?.user?.id) {
+        setTimeout(() => {
+          router.push("/dashboard/application");
+          router.refresh();
+        }, 1500);
+      }
     } catch {
       setSubmitError("Something went wrong. Please try again.");
       setSubmitting(false);

@@ -7,5 +7,18 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #9250 | 10:48 PM | 🟣 | Public profile viewing and navigation for creators/admins | ~470 |
+| #9214 | 7:12 PM | 🟣 | Mobile Hamburger Navigation Menu for Browse Page | ~514 |
+| #9164 | 4:39 PM | 🔴 | Fixed creator card sticky positioning in CoderOverlay | ~243 |
+| #9155 | 4:37 PM | ✅ | Adjusted grid responsive breakpoints for earlier two-column layout | ~239 |
+| #9150 | 4:32 PM | 🟣 | Browse page UX enhancements with loading states and mobile filters | ~507 |
+| #9141 | 4:30 PM | 🟣 | Enhanced coder card UI with project count, hover effects, and skills preview | ~570 |
+| #9127 | 3:46 PM | 🔄 | Replaced inline verified seal SVG with VerifiedSeal component | ~107 |
+| #9083 | 3:13 PM | 🟣 | Browse page redesigned to show coder cards instead of work items | ~517 |
+| #9027 | 2:40 PM | 🟣 | Profile and Portfolio API Database Integration | ~524 |
+| #8990 | 2:26 PM | ✅ | Subtle hover shadow added to browse gallery work items | ~182 |
+| #8989 | " | 🟣 | Specialty filter counts added to browse page sidebar | ~283 |
 | #8877 | 2:48 AM | ✅ | VibeCheck deployed to Netlify production | ~233 |
+| #8868 | 2:37 AM | 🔄 | Simplified masonry grid container styling | ~240 |
+| #8867 | 2:33 AM | 🟣 | Added "Verified" header to browse page masonry grid | ~289 |
 </claude-mem-context>

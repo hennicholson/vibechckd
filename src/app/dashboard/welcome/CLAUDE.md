@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
 | #10182 | 3:48 PM | 🟣 | Welcome form for Whop SSO user onboarding | ~540 |
 | #10181 | 3:47 PM | 🟣 | Welcome page for Whop SSO user onboarding | ~428 |
 </claude-mem-context>

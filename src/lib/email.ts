@@ -110,19 +110,25 @@ export const emails = {
     sendEmail({
       to,
       subject: "You're in! Application approved -- vibechckd",
-      heading: `Congratulations, ${name}`,
+      heading: `Congratulations, ${escapeHtml(name)}`,
       body: "Your application has been approved! You're now a verified creator on vibechckd. Set up your profile and portfolio to start getting discovered by clients.",
-      ctaText: "Set up your profile",
-      ctaUrl: "https://vibechckd.cc/dashboard/profile",
+      ctaText: "View your status",
+      ctaUrl: "https://vibechckd.cc/dashboard/application",
     }),
 
-  applicationRejected: (to: string, name: string) =>
-    sendEmail({
+  applicationRejected: (to: string, name: string, reviewerNotes?: string | null) => {
+    const notesBlock = reviewerNotes
+      ? `<p style="margin-top:16px;color:#525252;"><em>Reviewer notes:</em><br/>${escapeHtml(reviewerNotes)}</p>`
+      : "";
+    return sendEmail({
       to,
       subject: "Application update -- vibechckd",
       heading: "Application update",
-      body: `Hi ${escapeHtml(name)}, thanks for your interest in vibechckd. After reviewing your application, we're not able to approve it at this time. You're welcome to reapply in the future with updated work samples.`,
-    }),
+      body: `Hi ${escapeHtml(name)}, thanks for your interest in vibechckd. After reviewing your application, we're not able to approve it at this time. You're welcome to reapply in the future with updated work samples.${notesBlock}`,
+      ctaText: "Re-apply",
+      ctaUrl: "https://vibechckd.cc/apply",
+    });
+  },
 
   invoiceCreated: (to: string, description: string, amount: string, payUrl?: string) =>
     sendEmail({

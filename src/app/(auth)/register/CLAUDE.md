@@ -15,4 +15,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #9645 | 1:45 AM | 🔴 | Registration email normalization and double-submit prevention | ~359 |
+
+### Apr 23, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10032 | 12:41 AM | 🟣 | Disabled automatic sign-in after registration to enforce email verification | ~469 |
 </claude-mem-context>

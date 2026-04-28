@@ -54,7 +54,7 @@ export default function CreatorOnboardingForm({ defaultName }: Props) {
   const firstName = defaultName ? defaultName.split(" ")[0] : null;
 
   return (
-    <main className="min-h-screen flex items-start justify-center bg-background-alt px-5 py-10">
+    <main className="min-h-full flex items-start justify-center bg-background-alt px-5 py-10">
       <div className="w-full max-w-md">
         <div className="mb-7">
           <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-2">
@@ -99,7 +99,7 @@ export default function CreatorOnboardingForm({ defaultName }: Props) {
           </Field>
 
           <Field label="Experience level">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {EXPERIENCE.map((e) => (
                 <Pill
                   key={e}

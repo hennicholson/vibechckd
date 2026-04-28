@@ -10,4 +10,11 @@
 | #9084 | 3:13 PM | 🟣 | Portfolio CRUD fully wired to Neon database | ~602 |
 | #9073 | 3:11 PM | 🟣 | Portfolio page refactored to fetch real data from API endpoint | ~426 |
 | #8918 | 1:15 PM | 🟣 | Portfolio dashboard page created | ~170 |
+
+### Apr 27, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10272 | 6:50 PM | 🟣 | Coder application status dashboard page | ~354 |
+| #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
 </claude-mem-context>

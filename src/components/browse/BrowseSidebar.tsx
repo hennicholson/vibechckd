@@ -17,6 +17,7 @@
  */
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import VerifiedSeal from "@/components/VerifiedSeal";
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
@@ -115,6 +116,26 @@ function FilterButton({
 
 export default function BrowseSidebar({ filter, onFilterChange, counts }: BrowseSidebarProps) {
   const { data: session, status } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const isCreator = role === "coder" || role === "admin";
+  const isClient = role === "client";
+
+  // Whop SSO users have no passwordHash → can't sign in directly at
+  // vibechckd.cc/login. Surface a "Set a password" link so they know there's
+  // a way to escape the iframe. /api/settings already returns these flags.
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  const [whopLinked, setWhopLinked] = useState(false);
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (typeof d?.hasPassword === "boolean") setHasPassword(d.hasPassword);
+        if (typeof d?.whopLinked === "boolean") setWhopLinked(d.whopLinked);
+      })
+      .catch(() => {});
+  }, [status]);
+  const showSetPassword = whopLinked && hasPassword === false;
 
   return (
     <aside className="hidden md:flex flex-col w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background">
@@ -183,18 +204,44 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
             >
               Dashboard
             </Link>
-            <Link
-              href="/dashboard/profile"
-              className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-            >
-              Profile
-            </Link>
-            <Link
-              href="/dashboard/portfolio"
-              className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
-            >
-              Portfolio
-            </Link>
+            {isCreator && (
+              <>
+                <Link
+                  href="/dashboard/profile"
+                  className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+                >
+                  Profile
+                </Link>
+                <Link
+                  href="/dashboard/portfolio"
+                  className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+                >
+                  Portfolio
+                </Link>
+                <Link
+                  href="/dashboard/application"
+                  className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+                >
+                  Application
+                </Link>
+              </>
+            )}
+            {isClient && (
+              <Link
+                href="/dashboard/company"
+                className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+              >
+                Company
+              </Link>
+            )}
+            {showSetPassword && (
+              <Link
+                href="/dashboard/settings"
+                className="block px-2 py-1.5 text-[12px] text-text-primary hover:opacity-80 transition-opacity"
+              >
+                Set a password →
+              </Link>
+            )}
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"

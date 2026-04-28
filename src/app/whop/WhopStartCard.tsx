@@ -36,7 +36,7 @@ export default function WhopStartCard({ defaultName }: Props) {
   const firstName = defaultName ? defaultName.split(" ")[0] : null;
 
   return (
-    <main className="min-h-screen flex items-start justify-center bg-background-alt px-5 py-10">
+    <main className="min-h-full flex items-start justify-center bg-background-alt px-5 py-10">
       <div className="w-full max-w-md">
         <div className="mb-7 text-center">
           <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-2">

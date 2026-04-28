@@ -5,13 +5,22 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 
 // Used by dashboard pages to gate access on completion of the first-run
-// flow. Whop SSO creates accounts with a placeholder email and no password —
-// we send those users to /dashboard/welcome until they pick real credentials,
-// so they can also sign in directly outside the Whop iframe.
+// flow. Whop SSO users complete onboarding via the iframe picker on /whop
+// (which stamps `emailVerified` on submit). Non-Whop email users complete
+// it via /register + the magic-link verification.
 //
-// Call this at the top of any dashboard page server component that should
-// require onboarding (the home page, primarily). Pages that don't call it
-// (the welcome page itself) render normally even for first-time users.
+// Rule:
+//   - No session → no-op (page-level auth gate handles it).
+//   - Whop SSO user (whopUserId set):
+//       - emailVerified set     → onboarded (don't redirect; password +
+//                                 real email are optional, set later from
+//                                 /dashboard/settings).
+//       - emailVerified null    → still on the start picker; bounce to
+//                                 /whop instead of /dashboard/welcome so
+//                                 they finish the iframe flow.
+//   - Non-Whop user:
+//       - placeholder email or no password → /dashboard/welcome.
+//       - otherwise → onboarded.
 export async function requireOnboarded(currentPath: string = "/dashboard") {
   const session = await auth();
   if (!session?.user?.id) return;
@@ -21,15 +30,23 @@ export async function requireOnboarded(currentPath: string = "/dashboard") {
       email: users.email,
       passwordHash: users.passwordHash,
       whopUserId: users.whopUserId,
+      emailVerified: users.emailVerified,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
 
-  if (!user?.whopUserId) return; // Not an SSO user — nothing to onboard.
+  if (!user) return;
 
+  if (user.whopUserId) {
+    // Whop SSO path: onboarded === picked a path on /whop (emailVerified set).
+    if (user.emailVerified) return;
+    redirect("/whop");
+  }
+
+  // Email/password path.
   const placeholderEmail = user.email?.endsWith("@vibechckd.local") ?? false;
-  if (user.passwordHash && !placeholderEmail) return; // Already onboarded.
+  if (user.passwordHash && !placeholderEmail) return;
 
   redirect(`/dashboard/welcome?next=${encodeURIComponent(currentPath)}`);
 }
