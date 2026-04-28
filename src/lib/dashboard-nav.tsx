@@ -69,6 +69,20 @@ export const navItems: NavItem[] = [
     ),
   },
   {
+    // Creators see the public job board where verified members apply
+    // with one click. Lives at /jobs (not under /dashboard) so it can
+    // be linked from elsewhere too.
+    href: "/jobs",
+    label: "Job board",
+    roles: ["creator"],
+    matchPrefixes: ["/jobs"],
+    icon: (
+      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path {...stroke} d="M21 13.255A23.93 23.93 0 0 1 12 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2m4 6h.01M5 20h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
+      </svg>
+    ),
+  },
+  {
     // Client's "Profile" — actually their company info; relabeled so both
     // roles share the same word in the nav rail.
     href: "/dashboard/company",
