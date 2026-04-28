@@ -25,17 +25,22 @@ export const applicationStatusEnum = pgEnum("application_status", ["applied", "u
 
 // ── Auth Tables (NextAuth v5 / Drizzle Adapter) ──
 
-export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name"),
-  email: text("email").unique().notNull(),
-  emailVerified: timestamp("email_verified", { mode: "date" }),
-  image: text("image"),
-  passwordHash: text("password_hash"),
-  role: userRoleEnum("role").default("coder").notNull(),
-  whopCompanyId: text("whop_company_id"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name"),
+    email: text("email").unique().notNull(),
+    emailVerified: timestamp("email_verified", { mode: "date" }),
+    image: text("image"),
+    passwordHash: text("password_hash"),
+    role: userRoleEnum("role").default("coder").notNull(),
+    whopUserId: text("whop_user_id"),
+    whopCompanyId: text("whop_company_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("users_whop_user_id_uq").on(t.whopUserId)]
+);
 
 export const accounts = pgTable(
   "accounts",
