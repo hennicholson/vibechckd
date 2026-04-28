@@ -12,6 +12,9 @@ interface Job {
   budgetRange: string | null;
   timeline: string | null;
   status: "open" | "closed" | "filled";
+  // Set once the client has started a project from this job; lets us
+  // swap "Start project" for an "Open project" link.
+  projectId: string | null;
   createdAt: string;
 }
 
@@ -97,36 +100,13 @@ export default function JobDetailClient({ id }: { id: string }) {
   };
 
   // Spin up a project from this job with all currently-hired applicants
-  // attached as members. The job's title + description seed the project;
-  // each hired creator's first specialty becomes their roleLabel (defaults
-  // to "Creator" if none). After creation, route to the project workspace.
+  // attached as members. Idempotent on the server — if a project was
+  // already created from this job, the endpoint just returns its id.
   const startProjectFromJob = async () => {
     if (!job) return;
-    const hired = applicants.filter((a) => a.status === "hired");
-    if (hired.length === 0) {
-      setProjectError("Hire at least one creator first.");
-      return;
-    }
     setCreatingProject(true);
     setProjectError(null);
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: job.title,
-        description: job.description ?? undefined,
-        members: hired.map((a) => ({
-          userId: a.creatorId,
-          roleLabel:
-            (a.creatorSpecialties && a.creatorSpecialties[0])
-              ? a.creatorSpecialties[0]
-                  .split("-")
-                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(" ")
-              : "Creator",
-        })),
-      }),
-    });
+    const res = await fetch(`/api/jobs/${id}/start-project`, { method: "POST" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setProjectError(data?.error || "Couldn't create project");
@@ -191,10 +171,37 @@ export default function JobDetailClient({ id }: { id: string }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
-        {/* Hire-to-project banner — surfaces once at least one applicant is
-            marked "hired". Lets the client spin up a project workspace with
-            all hired creators attached as members. */}
+        {/* Hire-to-project banner. Two states:
+            (a) Project already started for this job → "Open project" link.
+            (b) At least one applicant hired but no project yet → "Start project". */}
         {(() => {
+          if (job.projectId) {
+            return (
+              <div className="border border-positive/30 bg-positive/5 rounded-[10px] p-4 mb-6">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-medium text-text-primary mb-1">
+                      Project in progress
+                    </p>
+                    <p className="text-[12px] text-text-muted leading-relaxed">
+                      You&apos;ve already started a project from this job.
+                      Pick up tasks, deliverables, and messages there.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dashboard/projects/${job.projectId}`}
+                    className="flex-shrink-0 inline-flex items-center gap-2 h-9 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Open project
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
+            );
+          }
+
           const hired = applicants.filter((a) => a.status === "hired");
           if (hired.length === 0) return null;
           return (

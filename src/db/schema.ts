@@ -359,6 +359,11 @@ export const jobs = pgTable(
     budgetRange: text("budget_range"),
     timeline: text("timeline"),
     status: jobStatusEnum("status").default("open").notNull(),
+    // Set when the client spins up a project workspace from this job
+    // (see /api/jobs/[id]/start-project). Lets the UI swap "Start
+    // project" for "Open project →" on subsequent visits, and keeps
+    // the lineage so we can navigate back from a project to its job.
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
