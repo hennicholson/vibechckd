@@ -68,6 +68,30 @@ export default function JobDetailClient({ id }: { id: string }) {
     load();
   };
 
+  // Optimistic status update for an applicant. Reconciled on success
+  // via load(); rolls back on failure.
+  const mutateApplicantStatus = async (
+    appId: string,
+    next: Applicant["status"]
+  ) => {
+    const prev = applicants;
+    setApplicants((curr) =>
+      curr.map((a) => (a.applicationId === appId ? { ...a, status: next } : a))
+    );
+    const res = await fetch(`/api/jobs/${id}/applications/${appId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    if (!res.ok) {
+      setApplicants(prev);
+      return;
+    }
+    // Hiring flips the parent job to "filled" server-side — refetch so the
+    // header reflects the new status + the Close button disappears.
+    if (next === "hired") load();
+  };
+
   if (loading) {
     return (
       <div className="max-w-3xl px-4 md:px-8 py-6">
@@ -165,11 +189,10 @@ export default function JobDetailClient({ id }: { id: string }) {
                       <p className="text-[13px] font-medium text-text-primary truncate">
                         {a.creatorName || "Unnamed"}
                       </p>
-                      <span
-                        className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ${statusTone[a.status]}`}
-                      >
-                        {a.status}
-                      </span>
+                      <StatusMenu
+                        current={a.status}
+                        onChange={(next) => mutateApplicantStatus(a.applicationId, next)}
+                      />
                     </div>
                     {a.creatorTagline && (
                       <p className="text-[11px] text-text-muted truncate mb-1">{a.creatorTagline}</p>
@@ -199,6 +222,37 @@ export default function JobDetailClient({ id }: { id: string }) {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatusMenu({
+  current,
+  onChange,
+}: {
+  current: Applicant["status"];
+  onChange: (next: Applicant["status"]) => void;
+}) {
+  const order: Applicant["status"][] = ["applied", "shortlisted", "rejected", "hired"];
+  return (
+    <div className="relative inline-block flex-shrink-0">
+      <select
+        value={current}
+        onChange={(e) => onChange(e.target.value as Applicant["status"])}
+        className={`appearance-none cursor-pointer text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 pr-5 rounded border-0 outline-none focus:ring-1 focus:ring-text-primary ${statusTone[current]}`}
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>\")",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right 4px center",
+        }}
+      >
+        {order.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

@@ -1,9 +1,49 @@
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { jobs, jobApplications, coderProfiles } from "@/db/schema";
+import {
+  jobs,
+  jobApplications,
+  coderProfiles,
+  users,
+  directMessageThreads,
+  directMessageParticipants,
+  directMessages,
+} from "@/db/schema";
 import { parseBody, z } from "@/lib/validation";
+
+// Find an existing 1:1 DM thread between two users (a thread that has
+// EXACTLY these two participants, no more), or create a new one and add
+// them. Returns the threadId.
+async function findOrCreateThread(userA: string, userB: string): Promise<string> {
+  // Threads that contain BOTH users…
+  const candidate = await db.execute<{ thread_id: string }>(sql`
+    SELECT thread_id FROM direct_message_participants
+    WHERE user_id IN (${userA}, ${userB})
+    GROUP BY thread_id
+    HAVING COUNT(DISTINCT user_id) = 2
+  `);
+  // …filter to threads with exactly 2 participants total.
+  for (const row of candidate as unknown as { thread_id: string }[]) {
+    const counted = await db.execute<{ n: number }>(sql`
+      SELECT COUNT(*)::int AS n FROM direct_message_participants
+      WHERE thread_id = ${row.thread_id}
+    `);
+    const total = (counted as unknown as { n: number }[])[0]?.n ?? 0;
+    if (total === 2) return row.thread_id;
+  }
+  // Create a new thread + add both participants.
+  const [thread] = await db
+    .insert(directMessageThreads)
+    .values({})
+    .returning({ id: directMessageThreads.id });
+  await db.insert(directMessageParticipants).values([
+    { threadId: thread.id, userId: userA },
+    { threadId: thread.id, userId: userB },
+  ]);
+  return thread.id;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +85,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const { id: jobId } = await ctx.params;
   const [job] = await db
-    .select({ id: jobs.id, status: jobs.status })
+    .select({
+      id: jobs.id,
+      status: jobs.status,
+      clientId: jobs.clientId,
+      title: jobs.title,
+    })
     .from(jobs)
     .where(eq(jobs.id, jobId))
     .limit(1);
@@ -94,5 +139,33 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       status: "applied",
     })
     .returning({ id: jobApplications.id });
+
+  // Open (or reuse) a 1:1 DM thread between client and creator + post a
+  // system-style message announcing the application. Both parties see
+  // this in /dashboard/inbox via the existing direct-message UI.
+  // Failures here are non-fatal — the application itself is the source
+  // of truth for the apply action.
+  try {
+    const [creator] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    const creatorName = creator?.name || "A creator";
+    const threadId = await findOrCreateThread(job.clientId, session.user.id);
+    const lines = [
+      `${creatorName} applied to your job: "${job.title}".`,
+      pitch ? `\nTheir pitch:\n${pitch}` : null,
+    ].filter(Boolean);
+    await db.insert(directMessages).values({
+      threadId,
+      senderId: session.user.id,
+      content: lines.join(""),
+      messageType: "system",
+    });
+  } catch {
+    // swallow — application created successfully regardless
+  }
+
   return NextResponse.json({ success: true, applicationId: created.id, updated: false });
 }

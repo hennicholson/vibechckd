@@ -11,6 +11,20 @@ const TIMELINE: { id: AppStatus; label: string; description: string }[] = [
   { id: "approved", label: "Approved", description: "You're verified — your profile is live in the gallery." },
 ];
 
+type JobAppStatus = "applied" | "shortlisted" | "rejected" | "hired";
+
+interface JobApp {
+  applicationId: string;
+  jobId: string;
+  status: JobAppStatus;
+  pitch: string | null;
+  createdAt: string;
+  jobTitle: string;
+  jobStatus: "open" | "closed" | "filled";
+  jobBudget: string | null;
+  jobProjectType: string | null;
+}
+
 interface Props {
   application: {
     id: string;
@@ -21,9 +35,22 @@ interface Props {
   } | null;
   profileVerified: boolean;
   profileStatus: string | null;
+  jobApplications?: JobApp[];
 }
 
-export default function ApplicationStatusClient({ application, profileVerified, profileStatus }: Props) {
+const jobAppStatusTone: Record<JobAppStatus, string> = {
+  applied: "text-text-secondary bg-surface-muted",
+  shortlisted: "text-positive bg-positive/10",
+  rejected: "text-negative bg-negative/10",
+  hired: "text-white bg-text-primary",
+};
+
+export default function ApplicationStatusClient({
+  application,
+  profileVerified,
+  profileStatus,
+  jobApplications = [],
+}: Props) {
   if (!application) {
     return (
       <main className="h-full overflow-y-auto px-4 md:px-8 pt-6 pb-10">
@@ -44,6 +71,7 @@ export default function ApplicationStatusClient({ application, profileVerified, 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>
+          <JobApplicationsSection items={jobApplications} />
         </div>
       </main>
     );
@@ -167,8 +195,84 @@ export default function ApplicationStatusClient({ application, profileVerified, 
             </svg>
           </Link>
         )}
+
+        <JobApplicationsSection items={jobApplications} />
       </div>
     </main>
+  );
+}
+
+function JobApplicationsSection({ items }: { items: JobApp[] }) {
+  return (
+    <section className="mt-10 pt-8 border-t border-border">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-[14px] font-medium text-text-primary">Job applications</h2>
+        <Link
+          href="/jobs"
+          className="text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors"
+        >
+          Browse jobs →
+        </Link>
+      </div>
+      {items.length === 0 ? (
+        <div className="border border-border rounded-[10px] p-5 text-center">
+          <p className="text-[13px] font-medium text-text-primary mb-1">
+            No job applications yet
+          </p>
+          <p className="text-[12px] text-text-muted mb-3">
+            Apply to open jobs from the job board to start filling this list.
+          </p>
+          <Link
+            href="/jobs"
+            className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+          >
+            Browse open jobs
+          </Link>
+        </div>
+      ) : (
+        <ul className="space-y-2.5">
+          {items.map((j) => (
+            <li
+              key={j.applicationId}
+              className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors"
+            >
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <Link
+                  href={`/jobs/${j.jobId}`}
+                  className="text-[13px] font-medium text-text-primary truncate hover:underline underline-offset-2"
+                >
+                  {j.jobTitle}
+                </Link>
+                <span
+                  className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0 ${jobAppStatusTone[j.status]}`}
+                >
+                  {j.status}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted mb-1">
+                {j.jobProjectType && <span>{j.jobProjectType}</span>}
+                {j.jobBudget && <span>· {j.jobBudget}</span>}
+                <span className="ml-auto">
+                  Applied {formatDate(j.createdAt)}
+                </span>
+              </div>
+              {j.jobStatus !== "open" && (
+                <p className="text-[11px] text-text-muted mt-1">
+                  This job is {j.jobStatus}.
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-[11px] text-text-muted mt-3 text-center">
+        Conversations with the client about each application appear in your{" "}
+        <Link href="/dashboard/inbox" className="underline underline-offset-2 hover:text-text-primary">
+          inbox
+        </Link>
+        .
+      </p>
+    </section>
   );
 }
 
