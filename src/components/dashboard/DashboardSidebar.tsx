@@ -19,14 +19,18 @@ export default function DashboardSidebar() {
   const { data: session } = useSession();
   const [profileSlug, setProfileSlug] = useState<string | null>(null);
   const rawRole = (session?.user as any)?.role as string | undefined;
+  // Track userId, not the full user object — SessionProvider can swap object
+  // identity on every render, which made this effect re-fire on each parent
+  // re-render and re-hit /api/profile on every nav click.
+  const userId = session?.user?.id;
 
   useEffect(() => {
-    if (!session?.user || rawRole === "client") return;
+    if (!userId || rawRole === "client") return;
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data?.slug) setProfileSlug(data.slug); })
       .catch(() => {});
-  }, [session?.user, rawRole]);
+  }, [userId, rawRole]);
   const role = uiRole(rawRole);
 
   // When role is undefined (typically a brief render before the session

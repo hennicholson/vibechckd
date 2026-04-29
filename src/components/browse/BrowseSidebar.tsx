@@ -111,18 +111,24 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
   // Whop SSO users have no passwordHash → can't sign in directly at
   // vibechckd.cc/login. Surface a "Set a password" link so they know there's
   // a way to escape the iframe. /api/settings already returns these flags.
+  // Once we've fetched once for a given user we don't refetch on every nav —
+  // tied to userId (a stable primitive) instead of the session.user object.
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [whopLinked, setWhopLinked] = useState(false);
+  const userId = session?.user?.id;
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !userId) return;
+    let cancelled = false;
     fetch("/api/settings")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
+        if (cancelled) return;
         if (typeof d?.hasPassword === "boolean") setHasPassword(d.hasPassword);
         if (typeof d?.whopLinked === "boolean") setWhopLinked(d.whopLinked);
       })
       .catch(() => {});
-  }, [status]);
+    return () => { cancelled = true; };
+  }, [status, userId]);
   const showSetPassword = whopLinked && hasPassword === false;
 
   return (
