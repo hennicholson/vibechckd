@@ -135,6 +135,19 @@ html, body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Marquee — used by the BrowseStats ticker. We render the stat list
+   twice in a row so this -50% translation creates a seamless loop. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Subtle "live" pulse on the leading dot of the ticker. */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
 .pfp-static:hover::after {
   background: repeating-linear-gradient(
     0deg,
