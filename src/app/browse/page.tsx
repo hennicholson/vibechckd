@@ -463,7 +463,7 @@ export default function BrowsePage() {
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
@@ -489,7 +489,7 @@ export default function BrowsePage() {
               </div>
             ) : (
               <LayoutGroup>
-                <motion.div layout className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                <motion.div layout className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
                   <AnimatePresence mode="popLayout">
                     {filteredCoders.map((coder, i) => (
                       <BrowseCoderCard

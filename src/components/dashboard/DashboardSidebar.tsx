@@ -92,41 +92,49 @@ export default function DashboardSidebar() {
         </div>
       </nav>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen">
+      {/* Desktop sidebar — collapses to icons-only between md (768px) and
+          nav (1100px) so the dashboard reads cleanly inside the Whop iframe
+          which often renders at 800–1100px. Above nav: full 200px rail with
+          labels. Item `title` attrs surface the label on hover at compact
+          widths. */}
+      <aside className="hidden md:flex flex-col w-[52px] nav:w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen transition-[width] duration-150">
         {/* Logo */}
-        <div className="px-4 h-[48px] flex items-center border-b border-border">
-          <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
-            vibechckd
+        <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border">
+          <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1" title="vibechckd">
+            <span className="hidden nav:inline">vibechckd</span>
             <VerifiedSeal size="sm" />
           </Link>
         </div>
 
         {/* Nav */}
-        <div className="px-3 py-3 space-y-0.5 flex-1">
+        <div className="px-2 nav:px-3 py-3 space-y-0.5 flex-1">
           {filteredItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+              title={item.label}
+              className={`flex items-center gap-2 px-2 max-nav:px-0 max-nav:justify-center py-1.5 rounded-md text-[13px] transition-colors ${
                 isActive(item)
                   ? "text-text-primary font-medium bg-surface-muted"
                   : "text-text-muted hover:text-text-primary hover:bg-background-alt"
               }`}
             >
               {item.icon}
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1 max-nav:hidden">{item.label}</span>
             </Link>
           ))}
         </div>
 
         {/* User */}
-        <div className="px-3 py-3 border-t border-border">
-          <div className="flex items-center gap-2 px-2 mb-2">
-            <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
+        <div className="px-2 nav:px-3 py-3 border-t border-border">
+          <div className="flex items-center gap-2 px-1 nav:px-2 mb-2 max-nav:justify-center">
+            <div
+              className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted"
+              title={session?.user?.name || undefined}
+            >
               {session?.user?.name?.charAt(0) || "?"}
             </div>
-            <div className="flex flex-col min-w-0">
+            <div className="hidden nav:flex flex-col min-w-0">
               <span className="text-[12px] text-text-primary truncate">{session?.user?.name || "User"}</span>
               <span className="text-[10px] font-mono text-text-muted">
                 {rawRole === "admin" ? (
@@ -152,16 +160,23 @@ export default function DashboardSidebar() {
           {profileSlug && (
             <Link
               href={`/coders/${profileSlug}`}
-              className="block px-2 py-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
+              className="hidden nav:block px-2 py-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
             >
               View public profile
             </Link>
           )}
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
-            className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+            title="Sign out"
+            className="w-full text-left max-nav:text-center px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
           >
-            Sign out
+            <span className="hidden nav:inline">Sign out</span>
+            <span className="nav:hidden inline-flex items-center justify-center w-full" aria-hidden>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </span>
+            <span className="sr-only nav:hidden">Sign out</span>
           </button>
         </div>
       </aside>

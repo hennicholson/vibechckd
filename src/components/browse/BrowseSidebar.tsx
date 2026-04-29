@@ -48,17 +48,22 @@ function NavItem({
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // Label text is hidden between md and nav (compact-desktop / Whop iframe
+  // widths) so the rail collapses to icons-only and frees ~150px for content.
+  // `title` provides the affordance for what the icon means on hover.
+  const label = typeof children === "string" ? children : undefined;
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+      title={label}
+      className={`flex items-center gap-2 px-2 py-1.5 nav:px-2 max-nav:justify-center max-nav:px-0 rounded-md text-[13px] transition-colors ${
         active
           ? "text-text-primary font-medium bg-surface-muted"
           : "text-text-muted hover:text-text-primary hover:bg-background-alt"
       }`}
     >
       {icon}
-      <span className="flex-1">{children}</span>
+      <span className="flex-1 max-nav:hidden">{children}</span>
     </Link>
   );
 }
@@ -132,18 +137,19 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
   const showSetPassword = whopLinked && hasPassword === false;
 
   return (
-    <aside className="hidden md:flex flex-col w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background">
-      {/* Logo */}
-      <div className="px-4 h-[48px] flex items-center border-b border-border">
-        <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1">
-          vibechckd
+    <aside className="hidden md:flex flex-col w-[52px] nav:w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background transition-[width] duration-150">
+      {/* Logo — at compact widths show only the verified seal so the rail
+          stays tight; full wordmark returns at nav (1100px+). */}
+      <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border">
+        <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1" title="vibechckd">
+          <span className="hidden nav:inline">vibechckd</span>
           <VerifiedSeal size="sm" />
         </Link>
       </div>
 
       {/* Primary nav — same items, ordering, and role-gating as the dashboard
           rail so transitions /whop ↔ /dashboard don't visually jolt. */}
-      <div className="px-3 py-3 space-y-0.5">
+      <div className="px-2 nav:px-3 py-3 space-y-0.5">
         {filteredNav.map((item) => (
           <NavItem
             key={item.href}
@@ -156,8 +162,9 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
         ))}
       </div>
 
-      {/* Filter section — only meaningful here (not on /dashboard pages) */}
-      <div className="px-3 pt-2 pb-1 border-t border-border mt-1">
+      {/* Filter section — full list visible only above nav. At compact widths
+          the BrowseFilterPills row at the top of the page does the filtering. */}
+      <div className="hidden nav:block px-3 pt-2 pb-1 border-t border-border mt-1">
         <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-1 mt-2">
           Filter
         </p>
@@ -184,12 +191,15 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
           are the role-aware "Set a password" prompt for cookieless Whop users. */}
       <div className="mt-auto border-t border-border">
         {status === "authenticated" && session?.user ? (
-          <div className="px-3 py-3">
-            <div className="flex items-center gap-2 px-2 mb-2">
-              <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0">
+          <div className="px-2 nav:px-3 py-3">
+            <div className="flex items-center gap-2 px-1 nav:px-2 mb-2 max-nav:justify-center">
+              <div
+                className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0"
+                title={session.user.name || undefined}
+              >
                 {session.user.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
-              <div className="flex flex-col min-w-0">
+              <div className="hidden nav:flex flex-col min-w-0">
                 <span className="text-[12px] text-text-primary truncate">{session.user.name}</span>
                 <span className="text-[10px] font-mono text-text-muted">
                   {role === "creator" ? (
@@ -206,29 +216,38 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
             {showSetPassword && (
               <Link
                 href="/dashboard/settings"
-                className="block px-2 py-1.5 text-[12px] text-text-primary hover:opacity-80 transition-opacity"
+                className="hidden nav:block px-2 py-1.5 text-[12px] text-text-primary hover:opacity-80 transition-opacity"
               >
                 Set a password →
               </Link>
             )}
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              title="Sign out"
+              className="w-full text-left max-nav:text-center px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             >
-              Sign out
+              <span className="hidden nav:inline">Sign out</span>
+              <span className="nav:hidden inline-flex items-center justify-center w-full" aria-hidden>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </span>
+              <span className="sr-only nav:hidden">Sign out</span>
             </button>
           </div>
         ) : (
-          <div className="px-3 py-3 space-y-1.5">
+          <div className="px-2 nav:px-3 py-3 space-y-1.5">
             <Link
               href="/apply"
-              className="block w-full text-center px-3 py-1.5 text-[12px] font-medium text-white bg-text-primary rounded-md hover:bg-accent-hover transition-colors"
+              title="Apply to join"
+              className="block w-full text-center px-2 nav:px-3 py-1.5 text-[12px] font-medium text-white bg-text-primary rounded-md hover:bg-accent-hover transition-colors"
             >
-              Apply to join
+              <span className="hidden nav:inline">Apply to join</span>
+              <span className="nav:hidden">Apply</span>
             </Link>
             <Link
               href="/login"
-              className="block w-full text-center px-2 py-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+              className="hidden nav:block w-full text-center px-2 py-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
             >
               Log in
             </Link>

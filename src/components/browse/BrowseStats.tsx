@@ -123,55 +123,22 @@ export default function BrowseStats({ coders }: BrowseStatsProps) {
     </div>
   );
 
-  // Bidirectional fade via CSS mask. Wide fade zones (~160px each side)
-  // make the dissolve obviously gradual instead of looking like a clipped
-  // edge. We use rgba() instead of `transparent` because the named keyword
-  // maps to rgba(0,0,0,0) — fine for an alpha mask but ambiguous to read,
-  // and explicitly `mask-mode: alpha` so Chrome / Safari both treat the
-  // gradient as alpha-only (no luminance fallback).
-  const mask =
-    "linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,0) 40px, rgba(0,0,0,1) 200px, rgba(0,0,0,1) calc(100% - 200px), rgba(0,0,0,0) calc(100% - 40px), rgba(0,0,0,0) 100%)";
-
   return (
     <div
-      className="relative h-10 border-y border-border bg-background-alt overflow-hidden"
+      className="relative h-10 overflow-hidden edge-fade-x"
+      style={{ ["--fade" as string]: "44px" }}
       role="status"
       aria-label="Live marketplace stats"
     >
-      {/* Masked viewport — applies the alpha fade to the moving strip. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          maskImage: mask,
-          WebkitMaskImage: mask,
-          maskMode: "alpha",
-          WebkitMaskMode: "alpha",
-        }}
-      >
-        <div
-          className="flex w-max h-full items-center"
-          style={{ animation: `marquee ${duration}s linear infinite` }}
-        >
-          <Strip />
-          <Strip ariaHidden />
-        </div>
-      </div>
+      {/* Bar surface — its own layer so the outer mask fades the bg + borders
+          together. Border-y on the inner element ensures the rules also fade
+          out at the edges (a wrapper border would render outside the mask). */}
+      <div className="absolute inset-0 bg-background-alt border-y border-border" />
 
-      {/* LIVE pill — sits on top, with its own bg gradient that crossfades
-          to transparent over the same range where the strip mask is fading
-          the text *in*. The two transitions line up, so there's no visible
-          boundary between the pill and the ticker. We use rgba(250,250,250)
-          (the literal value of --color-background-alt) so the gradient
-          interpolates within one color rather than through transparent
-          black — the latter produces a muddy mid-grey halo. */}
-      <div
-        className="absolute left-0 top-0 bottom-0 z-20 flex items-center gap-1.5 pl-4 pr-3 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to right, rgba(250,250,250,1) 0, rgba(250,250,250,1) 90px, rgba(250,250,250,0) 200px)",
-          width: "200px",
-        }}
-      >
+      {/* LIVE pill — pinned left, sits over the bar. Crossfades with the
+          ticker via the same outer mask. Background matches the bar so there
+          is no visible seam where it meets the moving strip. */}
+      <div className="absolute left-0 top-0 bottom-0 z-20 flex items-center gap-1.5 pl-4 pr-3 bg-background-alt">
         <span
           className="w-[6px] h-[6px] rounded-full bg-negative"
           style={{ animation: "livePulse 1.6s ease-in-out infinite" }}
@@ -179,6 +146,21 @@ export default function BrowseStats({ coders }: BrowseStatsProps) {
         <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
           Live
         </span>
+      </div>
+
+      {/* Inner crossfade between the LIVE pill and the moving strip — keeps
+          the strip from butting hard against the pill on first render. */}
+      <div className="absolute left-[68px] top-0 bottom-0 w-8 bg-gradient-to-r from-background-alt to-transparent z-10 pointer-events-none" />
+
+      {/* Moving rail — padded left to clear the LIVE pill before animation. */}
+      <div className="absolute inset-y-0 left-[80px] right-0 flex items-center">
+        <div
+          className="flex w-max"
+          style={{ animation: `marquee ${duration}s linear infinite` }}
+        >
+          <Strip />
+          <Strip ariaHidden />
+        </div>
       </div>
     </div>
   );

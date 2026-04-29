@@ -100,8 +100,8 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
     return (
       <PageShell>
         <div className="max-w-[960px] mx-auto px-4 md:px-6 py-8 md:py-12">
-          <div className="flex flex-col md:flex-row gap-10 animate-pulse">
-            <div className="w-full md:w-[320px] flex-shrink-0">
+          <div className="flex flex-col nav:flex-row gap-6 nav:gap-10 animate-pulse">
+            <div className="w-full nav:w-[320px] flex-shrink-0">
               <div className="w-[120px] h-[120px] rounded-[10px] bg-[#f5f5f5]" />
               <div className="h-5 w-40 bg-[#f5f5f5] rounded mt-4" />
               <div className="h-3 w-32 bg-[#f5f5f5] rounded mt-2" />
@@ -170,13 +170,15 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
     <PageShell>
       <div className="max-w-[960px] mx-auto px-4 md:px-6 py-8 md:py-12">
         <motion.div
-          className="flex flex-col md:flex-row gap-10"
+          className="flex flex-col nav:flex-row gap-6 nav:gap-10"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          {/* Left column -- Profile info (sticky on desktop) */}
-          <div className="w-full md:w-[320px] flex-shrink-0 md:sticky md:top-[80px] md:self-start">
+          {/* Left column -- Profile info. Stacks vertically until nav (1100px)
+              so narrow desktop / Whop iframe widths get a single readable
+              column instead of a 320px aside that crushes the right pane. */}
+          <div className="w-full nav:w-[320px] flex-shrink-0 nav:sticky nav:top-[80px] nav:self-start">
             {/* Avatar */}
             <div className="w-[120px] h-[120px] rounded-[10px] overflow-hidden bg-[#f5f5f5] pfp-static">
               {coder.avatarUrl ? (

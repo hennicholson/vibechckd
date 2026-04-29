@@ -68,26 +68,43 @@ export default function BrowseFilterPills({
   totalCount,
 }: BrowseFilterPillsProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 py-0.5 snap-x snap-proximity">
-      <Pill active={filter === "all"} onClick={() => onFilterChange("all")}>
-        All <span className={`mx-1 ${filter === "all" ? "text-white/50" : "text-text-muted"}`}>·</span> {totalCount}
-      </Pill>
-      {SPECIALTIES.map((s) => {
-        const active = filter === s;
-        return (
-          <Pill key={s} active={active} onClick={() => onFilterChange(s)}>
-            {SPECIALTY_LABELS[s]}
-            <span className={`mx-1 ${active ? "text-white/50" : "text-text-muted"}`}>·</span>
-            {counts[s] ?? 0}
-          </Pill>
-        );
-      })}
-      {/* Subtle separator */}
-      <div className="flex-shrink-0 w-px self-center h-5 bg-border mx-0.5" aria-hidden />
-      {/* Refinement pills — placeholder filters */}
-      <GhostPill>rate</GhostPill>
-      <GhostPill>timezone</GhostPill>
-      <GhostPill>availability</GhostPill>
+    // Wrapper provides the edge-fade so partially-visible pills (e.g.
+    // "+ availability" at narrow Whop widths) dissolve into the page bg
+    // instead of getting clipped mid-character. Inner row scrolls
+    // horizontally; thumb swipe + trackpad scroll work natively.
+    <div
+      className="-mx-1 px-1 edge-fade-x"
+      style={{ ["--fade" as string]: "20px" }}
+    >
+      <div
+        className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5 snap-x snap-proximity"
+        role="group"
+        aria-label="Filter coders"
+      >
+        <Pill active={filter === "all"} onClick={() => onFilterChange("all")}>
+          All <span className={`mx-1 ${filter === "all" ? "text-white/50" : "text-text-muted"}`}>·</span> {totalCount}
+        </Pill>
+        {SPECIALTIES.map((s) => {
+          const active = filter === s;
+          return (
+            <Pill key={s} active={active} onClick={() => onFilterChange(s)}>
+              {SPECIALTY_LABELS[s]}
+              <span className={`mx-1 ${active ? "text-white/50" : "text-text-muted"}`}>·</span>
+              {counts[s] ?? 0}
+            </Pill>
+          );
+        })}
+        {/* Subtle separator */}
+        <div className="flex-shrink-0 w-px self-center h-5 bg-border mx-0.5" aria-hidden />
+        {/* Refinement pills — placeholder filters */}
+        <GhostPill>rate</GhostPill>
+        <GhostPill>timezone</GhostPill>
+        <GhostPill>availability</GhostPill>
+        {/* Trailing spacer ensures the last pill's right edge sits inside the
+            scrollable area (so it can be reached) and the mask has space to
+            fade out without truncating the pill mid-character. */}
+        <div className="flex-shrink-0 w-2" aria-hidden />
+      </div>
     </div>
   );
 }

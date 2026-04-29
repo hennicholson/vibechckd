@@ -43,6 +43,12 @@
   /* Easing */
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-entrance: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Custom breakpoint for the "compact desktop" zone the Whop iframe lives
+     in. Below this, the dashboard sidebar collapses to icons-only and the
+     coder grid drops from 3 → 2 columns. Above this, the rail expands and
+     content gets the third column. Used heavily on /browse + /dashboard. */
+  --breakpoint-nav: 1100px;
 }
 
 ::selection {
@@ -117,6 +123,28 @@ html, body {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Edge-fade an entire element (background + borders + content) to transparent
+   on the left/right. Unlike a gradient overlay, mask-image works on the
+   element itself — so the bar genuinely "dissolves" into the page background
+   at narrow widths instead of showing a hard edge. Tunable via `--fade`. */
+.edge-fade-x {
+  --fade: 28px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade),
+    #000 calc(100% - var(--fade)),
+    transparent 100%
+  );
+          mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade),
+    #000 calc(100% - var(--fade)),
+    transparent 100%
+  );
 }
 
 /* Typing indicator dots */
