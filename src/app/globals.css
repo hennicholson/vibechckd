@@ -32,11 +32,13 @@
   --color-negative: #ef4444;
   --color-warning: #f59e0b;
 
-  /* Fonts */
-  --font-display: "Geist", system-ui, -apple-system, sans-serif;
-  --font-body: "Geist", system-ui, -apple-system, sans-serif;
-  --font-mono: "Geist Mono", monospace;
-  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+  /* Fonts — bound to next/font CSS variables set on <html> in layout.tsx,
+     with system fallback for the brief moment before the self-hosted woff2
+     hits the cache. */
+  --font-display: var(--font-geist), system-ui, -apple-system, sans-serif;
+  --font-body: var(--font-geist), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-sans: var(--font-geist), system-ui, -apple-system, sans-serif;
 
   /* Easing */
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);

@@ -1,8 +1,24 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { ToastProvider } from "@/components/Toast";
 import { auth } from "@/lib/auth";
 import "./globals.css";
+
+// Self-hosted fonts via next/font — eliminates the render-blocking
+// fonts.googleapis.com stylesheet request on every cold load and ships
+// a CSS variable bound to the existing Geist token in globals.css.
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "vibechckd — The Most Vetted Vibe Coders in the Game",
@@ -54,13 +70,10 @@ export default async function RootLayout({
   const initialSession = await auth();
 
   return (
-    <html lang="en" className="h-full antialiased">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="en"
+      className={`h-full antialiased ${geist.variable} ${geistMono.variable}`}
+    >
       <body className="min-h-full flex flex-col font-body bg-background text-text-primary">
         <SessionProvider
           session={initialSession}
