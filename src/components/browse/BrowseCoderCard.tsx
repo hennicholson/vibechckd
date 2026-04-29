@@ -15,6 +15,7 @@
  *  - hover: border-border-hover only (clean)
  */
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import Badge from "@/components/Badge";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -74,15 +75,18 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
       {/* Hero image area */}
       <div className="relative aspect-[16/10] overflow-hidden bg-surface-muted">
         {heroUrl ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={heroUrl}
-              alt={coder.displayName}
-              loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
-            />
-          </>
+          <Image
+            src={heroUrl}
+            alt={coder.displayName}
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            // GIFs are passed through unoptimized so they keep animating —
+            // the optimizer doesn't re-encode GIFs anyway. Static images
+            // (JPEG/PNG/WebP) go through the optimizer for AVIF/WebP +
+            // responsive srcSet, which is the actual cold-load win.
+            unoptimized={heroUrl.toLowerCase().endsWith(".gif")}
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+          />
         ) : (
           <div
             className="absolute inset-0 flex items-center justify-center"
@@ -118,14 +122,14 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
       <div className="p-4">
         <div className="flex items-center gap-2">
           {/* Avatar */}
-          <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0 overflow-hidden">
+          <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0 overflow-hidden relative">
             {hasAvatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={coder.avatarUrl}
                 alt=""
-                loading="lazy"
-                className="w-full h-full object-cover"
+                fill
+                sizes="24px"
+                className="object-cover"
               />
             ) : (
               initial
