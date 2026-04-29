@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import PageShell from "@/components/PageShell";
@@ -20,7 +21,8 @@ function ensureHttps(url: string): string {
 
 export default function CoderProfilePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const { data: session, status: authStatus } = useSession();
+  const router = useRouter();
+  const { status: authStatus } = useSession();
   const [coder, setCoder] = useState<Coder | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -30,7 +32,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
 
   const handleInquiry = async (type: "project" | "inquiry") => {
     if (authStatus !== "authenticated" || !coder) {
-      window.location.href = "/register?role=client";
+      router.push("/register?role=client");
       return;
     }
     setInitiating(type);
@@ -42,7 +44,7 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
       });
       const data = await res.json();
       if (data.projectId) {
-        window.location.href = `/dashboard/projects/${data.projectId}`;
+        router.push(`/dashboard/projects/${data.projectId}`);
       }
     } catch {
       setInitiating(null);
@@ -61,7 +63,9 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
 
   const [fetchError, setFetchError] = useState(false);
 
-  // Fetch coder from API
+  // Fetch coder from API. Hits the per-slug route so we transfer one coder's
+  // payload instead of the entire /api/coders gallery (which shipped every
+  // portfolio item + asset for every coder, just to discard all but one).
   useEffect(() => {
     let cancelled = false;
 
@@ -69,20 +73,17 @@ export default function CoderProfilePage({ params }: { params: Promise<{ slug: s
       setLoading(true);
       setFetchError(false);
       try {
-        const res = await fetch("/api/coders");
+        const res = await fetch(`/api/coders/${encodeURIComponent(slug)}`);
+        if (res.status === 404) {
+          if (!cancelled) setNotFound(true);
+          return;
+        }
         if (!res.ok) {
           if (!cancelled) setFetchError(true);
           return;
         }
-        const coders = await res.json();
-        if (!cancelled) {
-          const found = coders.find((c: Coder) => c.slug === slug);
-          if (found) {
-            setCoder(found);
-          } else {
-            setNotFound(true);
-          }
-        }
+        const found = (await res.json()) as Coder;
+        if (!cancelled) setCoder(found);
       } catch {
         if (!cancelled) setFetchError(true);
       } finally {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Badge from "./Badge";
@@ -263,6 +264,7 @@ function ProjectThumb({
 
 export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupProps) {
   const [activeProject, setActiveProject] = useState<PortfolioItem | null>(null);
+  const router = useRouter();
   const { status: authStatus } = useSession();
   const { isFavorited, toggle: toggleFavorite } = useFavorites();
   const [initiating, setInitiating] = useState<string | null>(null);
@@ -302,7 +304,7 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
 
   const handleInquiry = async (type: "project" | "inquiry") => {
     if (authStatus !== "authenticated") {
-      window.location.href = "/register?role=client";
+      router.push("/register?role=client");
       return;
     }
     setInitiating(type);
@@ -314,7 +316,7 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
       });
       const data = await res.json();
       if (data.projectId) {
-        window.location.href = `/dashboard/projects/${data.projectId}`;
+        router.push(`/dashboard/projects/${data.projectId}`);
       }
     } catch {
       setInitiating(null);
