@@ -447,6 +447,22 @@ async function handlePaymentSucceeded(payload: Record<string, any>) {
     });
   }
 
+  // Marketplace pass-through: funds just landed in our app's Whop balance
+  // from the sender's checkout. Forward the recipient's share to their
+  // Whop ledger so they can withdraw natively (KYC + payout method all
+  // handled by Whop). Idempotent via key derived from transaction id —
+  // webhook retries can't double-pay. Skipped when recipient has no
+  // Whop link (legacy /api/withdrawals path stays available for them).
+  if (transaction.amountCents > 0) {
+    await transferToCreatorLedger({
+      userId: transaction.userId,
+      amountCents: transaction.amountCents,
+      idempotenceKey: `payment_${transaction.id}`,
+      notes: `Vibechckd payment ${transaction.id.slice(0, 8)}`,
+      transactionId: transaction.id,
+    });
+  }
+
   console.log(`payment.succeeded: transaction ${transaction.id} marked completed`);
 }
 

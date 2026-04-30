@@ -1749,49 +1749,15 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     if (isSending) return;
     setIsSending(true);
 
-    // Try the Whop balance-to-balance transfer first — instant, no card
-    // checkout. Falls back to the legacy `/api/payments` (card checkout
-    // via Whop) when either party isn't on Whop or sender's balance is
-    // too low.
+    // Whop policy: "Apps cannot send money from a user account." So a
+    // direct user-to-user `transfers.create` is rejected — the sender
+    // has to go through Whop's checkout page instead. Whop's checkout UI
+    // already offers "Pay with Whop balance" as a payment method, so a
+    // user with credit can still pay from balance, just via the hosted
+    // checkout instead of a silent server call. Funds land in our app's
+    // company balance; the `payment.succeeded` webhook then transfers
+    // the recipient's share to their Whop ledger.
     try {
-      const transferRes = await fetch("/api/payments/transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipientId: data.recipientId,
-          projectId,
-          amountCents: data.amountCents,
-          description: data.description,
-        }),
-      });
-
-      if (transferRes.ok) {
-        toast("Payment sent");
-        userScrolledRef.current = false;
-        await fetchMessages();
-        await fetchBalance();
-        setIsSending(false);
-        setActiveAction(null);
-        return;
-      }
-
-      const transferErr = await transferRes.json().catch(() => ({}));
-      const code = transferErr?.code as string | undefined;
-
-      // If both parties are on Whop and the only issue is balance, OR
-      // either party isn't on Whop, fall through to the card checkout.
-      const fallToCheckout =
-        code === "insufficient_balance" ||
-        code === "sender_no_whop" ||
-        code === "recipient_no_whop";
-
-      if (!fallToCheckout) {
-        toast(transferErr?.error || "Payment failed");
-        setIsSending(false);
-        return;
-      }
-
-      // Fallback: card checkout via Whop.
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1810,7 +1776,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
         return;
       }
 
-      toast("Payment link created");
+      toast("Payment link sent to chat");
       userScrolledRef.current = false;
       await fetchMessages();
       await fetchBalance();

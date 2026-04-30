@@ -6,11 +6,13 @@ import {
   users,
   projectMembers,
   conversations,
+  conversationParticipants,
   invoices,
 } from "@/db/schema";
 import { eq, and, desc, lt, inArray } from "drizzle-orm";
 import { parseBody, z } from "@/lib/validation";
 import { publishConversationEvent } from "@/lib/conversation-bus";
+import { notifyWhopUsers } from "@/lib/whop-notifications";
 
 const messagePostSchema = z
   .object({
@@ -233,6 +235,64 @@ export async function POST(request: NextRequest) {
       conversationId,
     });
   }
+
+  // Whop push fan-out — same logic as /api/conversations/[id]/messages but
+  // triggered through the legacy project-chat route. Resolves participants
+  // via the project conversation when present, falls back to project_members
+  // when the conversation hasn't been created yet (defensive). Fire-and-
+  // forget so a slow Whop API doesn't block the chat write.
+  const senderName = session.user.name ?? "Someone";
+  const senderUserId = session.user.id;
+  void (async () => {
+    try {
+      // Prefer conversation_participants (handles dm/job_app overlays); fall
+      // back to project_members.
+      let recipientWhopIds: string[] = [];
+      if (conversationId) {
+        const peers = await db
+          .select({ whopUserId: users.whopUserId })
+          .from(conversationParticipants)
+          .innerJoin(users, eq(users.id, conversationParticipants.userId))
+          .where(eq(conversationParticipants.conversationId, conversationId));
+        recipientWhopIds = peers
+          .filter((p) => !!p.whopUserId)
+          .map((p) => p.whopUserId as string);
+      }
+      if (recipientWhopIds.length === 0) {
+        const peers = await db
+          .select({ whopUserId: users.whopUserId })
+          .from(projectMembers)
+          .innerJoin(users, eq(users.id, projectMembers.userId))
+          .where(eq(projectMembers.projectId, projectId));
+        recipientWhopIds = peers
+          .filter((p) => !!p.whopUserId)
+          .map((p) => p.whopUserId as string);
+      }
+      if (recipientWhopIds.length === 0) return;
+
+      const preview =
+        messageType === "file"
+          ? `${senderName} shared a file`
+          : (content || "").slice(0, 140);
+      const [me] = await db
+        .select({ whopUserId: users.whopUserId })
+        .from(users)
+        .where(eq(users.id, senderUserId))
+        .limit(1);
+      await notifyWhopUsers({
+        whopUserIds: recipientWhopIds,
+        title: `Project: ${senderName}`,
+        content: preview,
+        iconWhopUserId: me?.whopUserId ?? null,
+        deepLinkPath: conversationId
+          ? `/dashboard/inbox?c=${conversationId}`
+          : `/dashboard/projects/${projectId}`,
+      });
+    } catch {
+      // notifyWhopUsers swallows internal failures; outer try is just for
+      // the participant query.
+    }
+  })();
 
   return Response.json({
     ...created,
