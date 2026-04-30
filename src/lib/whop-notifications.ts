@@ -28,7 +28,13 @@ function getNotificationsClient(): Whop {
   const apiKey = process.env.WHOP_API_KEY;
   if (!apiKey) throw new Error("WHOP_API_KEY is not configured");
   const rawKey = apiKey.startsWith("Bearer ") ? apiKey.slice(7) : apiKey;
-  _notificationsClient = new Whop({ apiKey: rawKey });
+  // CRITICAL: pass `appID: null` explicitly. The SDK constructor defaults
+  // `appID` to `process.env.WHOP_APP_ID` when the param is omitted, which
+  // would re-add the `X-Whop-App-Id` header and trigger the same Whop
+  // rejection ("must be using an App API key"). Explicitly nulling it
+  // tells the SDK to skip that header entirely — same behaviour as our
+  // standalone test-notification.ts script that's confirmed working.
+  _notificationsClient = new Whop({ apiKey: rawKey, appID: null });
   return _notificationsClient;
 }
 
