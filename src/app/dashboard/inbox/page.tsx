@@ -1008,7 +1008,7 @@ export default function InboxPage() {
   const hasChatOpen = !!selectedId;
 
   return (
-    <div className="flex h-[calc(100vh-48px)] md:h-screen">
+    <div className="flex h-full md:h-screen">
       {/* ── Conversation list rail ── */}
       <div
         className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}
