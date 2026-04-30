@@ -46,12 +46,19 @@ export async function notifyWhopUsers(opts: NotifyOpts): Promise<void> {
   const experienceId = process.env.WHOP_EXPERIENCE_ID;
   const companyId = process.env.WHOP_COMPANY_ID;
 
+  // Verbose logging at every early-exit so production logs surface
+  // EXACTLY why a push didn't fire. Diagnosing "didn't get a notification"
+  // by greppping `[whop-notify]` should be deterministic.
   if (!experienceId && !companyId) {
-    return; // app not configured; no-op
+    console.warn("[whop-notify] skip: neither WHOP_EXPERIENCE_ID nor WHOP_COMPANY_ID set");
+    return;
   }
 
   const recipients = opts.whopUserIds.filter((id) => !!id);
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) {
+    console.warn("[whop-notify] skip: no recipients with whopUserId");
+    return;
+  }
 
   const params: {
     title: string;
@@ -73,15 +80,16 @@ export async function notifyWhopUsers(opts: NotifyOpts): Promise<void> {
 
   try {
     const client = getWhopClient();
-    // Type-cast: SDK's union of two shapes (with experience_id OR company_id)
-    // expects the discriminator, but we resolve at runtime.
-    await client.notifications.create(
+    const res = await client.notifications.create(
       params as Parameters<typeof client.notifications.create>[0]
+    );
+    console.log(
+      `[whop-notify] ok scope=${experienceId ? "experience" : "company"} recipients=${recipients.length} title="${opts.title}" res=${JSON.stringify(res)}`
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[whop-notify] failed (scope=${experienceId ? "experience" : "company"}, recipients=${recipients.length}):`,
+      `[whop-notify] failed scope=${experienceId ? "experience" : "company"} recipients=${recipients.length} title="${opts.title}":`,
       msg
     );
   }

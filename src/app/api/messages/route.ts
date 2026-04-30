@@ -243,31 +243,41 @@ export async function POST(request: NextRequest) {
   // forget so a slow Whop API doesn't block the chat write.
   const senderName = session.user.name ?? "Someone";
   const senderUserId = session.user.id;
+  console.log(
+    `[messages-notify] enter project=${projectId} conv=${conversationId ?? "-"} sender=${senderUserId}`
+  );
   void (async () => {
     try {
       // Prefer conversation_participants (handles dm/job_app overlays); fall
-      // back to project_members.
-      let recipientWhopIds: string[] = [];
+      // back to project_members. Always exclude the sender — no point
+      // pinging your own phone for a message you just typed.
+      let peers: { userId: string; whopUserId: string | null }[] = [];
       if (conversationId) {
-        const peers = await db
-          .select({ whopUserId: users.whopUserId })
+        peers = await db
+          .select({
+            userId: conversationParticipants.userId,
+            whopUserId: users.whopUserId,
+          })
           .from(conversationParticipants)
           .innerJoin(users, eq(users.id, conversationParticipants.userId))
           .where(eq(conversationParticipants.conversationId, conversationId));
-        recipientWhopIds = peers
-          .filter((p) => !!p.whopUserId)
-          .map((p) => p.whopUserId as string);
       }
-      if (recipientWhopIds.length === 0) {
-        const peers = await db
-          .select({ whopUserId: users.whopUserId })
+      if (peers.length === 0) {
+        peers = await db
+          .select({
+            userId: projectMembers.userId,
+            whopUserId: users.whopUserId,
+          })
           .from(projectMembers)
           .innerJoin(users, eq(users.id, projectMembers.userId))
           .where(eq(projectMembers.projectId, projectId));
-        recipientWhopIds = peers
-          .filter((p) => !!p.whopUserId)
-          .map((p) => p.whopUserId as string);
       }
+      const recipientWhopIds = peers
+        .filter((p) => p.userId !== senderUserId && !!p.whopUserId)
+        .map((p) => p.whopUserId as string);
+      console.log(
+        `[messages-notify] participants=${peers.length} eligible=${recipientWhopIds.length}`
+      );
       if (recipientWhopIds.length === 0) return;
 
       const preview =
@@ -288,9 +298,8 @@ export async function POST(request: NextRequest) {
           ? `/dashboard/inbox?c=${conversationId}`
           : `/dashboard/projects/${projectId}`,
       });
-    } catch {
-      // notifyWhopUsers swallows internal failures; outer try is just for
-      // the participant query.
+    } catch (err) {
+      console.warn("[messages-notify] participant query failed:", err);
     }
   })();
 

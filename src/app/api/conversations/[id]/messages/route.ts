@@ -193,17 +193,26 @@ export async function POST(
   const senderName = session.user.name ?? "Someone";
   const messageType = parsed.data.messageType;
   const messageBody = parsed.data.content;
+  console.log(
+    `[conv-notify] enter conv=${conversationId} sender=${senderUserId}`
+  );
   void (async () => {
     try {
       // Pull all participants minus the sender, joined to users for whopUserId.
       const peers = await db
-        .select({ whopUserId: users.whopUserId })
+        .select({
+          userId: conversationParticipants.userId,
+          whopUserId: users.whopUserId,
+        })
         .from(conversationParticipants)
         .innerJoin(users, eq(users.id, conversationParticipants.userId))
         .where(eq(conversationParticipants.conversationId, conversationId));
       const recipientWhopIds = peers
-        .filter((p) => !!p.whopUserId)
+        .filter((p) => p.userId !== senderUserId && !!p.whopUserId)
         .map((p) => p.whopUserId as string);
+      console.log(
+        `[conv-notify] participants=${peers.length} eligible=${recipientWhopIds.length}`
+      );
       if (recipientWhopIds.length === 0) return;
       const preview =
         messageType === "file"

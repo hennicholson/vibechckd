@@ -121,16 +121,23 @@ export async function POST(request: NextRequest) {
   // Whop push fan-out (fire-and-forget). Mirrors the new conversations API.
   const senderName = session.user.name ?? "Someone";
   const senderUserId = session.user.id;
+  console.log(`[dm-notify] enter thread=${threadId} sender=${senderUserId}`);
   void (async () => {
     try {
       const peers = await db
-        .select({ whopUserId: users.whopUserId })
+        .select({
+          userId: conversationParticipants.userId,
+          whopUserId: users.whopUserId,
+        })
         .from(conversationParticipants)
         .innerJoin(users, eq(users.id, conversationParticipants.userId))
         .where(eq(conversationParticipants.conversationId, threadId));
       const recipientWhopIds = peers
-        .filter((p) => !!p.whopUserId)
+        .filter((p) => p.userId !== senderUserId && !!p.whopUserId)
         .map((p) => p.whopUserId as string);
+      console.log(
+        `[dm-notify] participants=${peers.length} eligible=${recipientWhopIds.length}`
+      );
       if (recipientWhopIds.length === 0) return;
       const preview =
         messageType === "file"
