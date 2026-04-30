@@ -514,7 +514,9 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
   });
 
   useEffect(() => {
-    const interval = setInterval(fetchMessages, 30_000);
+    // 3s poll — SSE bus is in-process and won't cross Netlify lambdas, so
+    // polling is the reliable path. SSE stays as a same-instance upgrade.
+    const interval = setInterval(fetchMessages, 3_000);
     return () => clearInterval(interval);
   }, [fetchMessages]);
 
@@ -909,7 +911,10 @@ export default function InboxPage() {
   useEffect(() => {
     const onFocus = () => fetchConversations();
     window.addEventListener("focus", onFocus);
-    const interval = setInterval(fetchConversations, 30_000);
+    // 5s poll — list-level updates are less time-critical than message
+    // arrivals; tighter than messages would be wasteful with the LATERAL
+    // join doing a full re-scan each time.
+    const interval = setInterval(fetchConversations, 5_000);
     return () => {
       window.removeEventListener("focus", onFocus);
       clearInterval(interval);

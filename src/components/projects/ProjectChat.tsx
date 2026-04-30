@@ -1354,18 +1354,19 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     },
   });
 
-  // Poll fallback. Tightens to 4s while SSE isn't yet bound (initial mount,
-  // or environments without EventSource); relaxes to 30s once the stream
-  // is live so we still self-heal from a missed/dropped frame without
-  // hammering the API.
+  // Poll at 3s regardless of SSE state. SSE works within a single lambda
+  // instance but Netlify routes requests across multiple instances — the
+  // in-process bus can't fan out across them. Until we move to Postgres
+  // LISTEN/NOTIFY (or Pusher/Ably), polling is the reliable path. SSE
+  // remains a free upgrade when the stream + the writer happen to land
+  // on the same lambda — instant update, no harm if it doesn't.
   useEffect(() => {
-    const ms = conversationId ? 30_000 : POLL_INTERVAL;
     const interval = setInterval(() => {
       fetchMessages();
       fetchBalance();
-    }, ms);
+    }, 3_000);
     return () => clearInterval(interval);
-  }, [fetchMessages, fetchBalance, conversationId]);
+  }, [fetchMessages, fetchBalance]);
 
   // ---- Auto-scroll with scroll-awareness ----
   //

@@ -32,28 +32,57 @@ interface NotifyOpts {
 }
 
 export async function notifyWhopUsers(opts: NotifyOpts): Promise<void> {
+  // Critical scope distinction (per `notifications.md` skill):
+  //   - `company_id`: notification reaches ONLY team members (admins /
+  //     moderators) of the targeted company. Regular users — the people
+  //     who actually receive chat messages — never see it.
+  //   - `experience_id`: reaches all users with access to that experience
+  //     (i.e. anyone who installed the app via this experience).
+  //
+  // For chat notifications the recipient is always a regular user, so
+  // experience_id is the right scope. We read it from `WHOP_EXPERIENCE_ID`.
+  // Fall back to `company_id` only as a degraded path (dev / single-team
+  // notifications) — it WILL silently fail to deliver to non-admins.
+  const experienceId = process.env.WHOP_EXPERIENCE_ID;
   const companyId = process.env.WHOP_COMPANY_ID;
-  if (!companyId) {
-    // No-op when the app isn't fully configured — keeps the dev path
-    // (no Whop creds) from spamming errors.
-    return;
+
+  if (!experienceId && !companyId) {
+    return; // app not configured; no-op
   }
+
   const recipients = opts.whopUserIds.filter((id) => !!id);
   if (recipients.length === 0) return;
 
+  const params: {
+    title: string;
+    content: string;
+    user_ids: string[];
+    icon_user_id?: string | null;
+    rest_path?: string | null;
+    experience_id?: string;
+    company_id?: string;
+  } = {
+    title: opts.title,
+    content: opts.content,
+    user_ids: recipients,
+    icon_user_id: opts.iconWhopUserId ?? null,
+    rest_path: opts.deepLinkPath ?? null,
+  };
+  if (experienceId) params.experience_id = experienceId;
+  else if (companyId) params.company_id = companyId;
+
   try {
     const client = getWhopClient();
-    await client.notifications.create({
-      company_id: companyId,
-      title: opts.title,
-      content: opts.content,
-      user_ids: recipients,
-      icon_user_id: opts.iconWhopUserId ?? null,
-      rest_path: opts.deepLinkPath ?? null,
-    });
+    // Type-cast: SDK's union of two shapes (with experience_id OR company_id)
+    // expects the discriminator, but we resolve at runtime.
+    await client.notifications.create(
+      params as Parameters<typeof client.notifications.create>[0]
+    );
   } catch (err) {
-    // Don't propagate — chat write already succeeded. Log so we can
-    // diagnose dropped notifications in production.
-    console.warn("[whop-notify] notification failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[whop-notify] failed (scope=${experienceId ? "experience" : "company"}, recipients=${recipients.length}):`,
+      msg
+    );
   }
 }
