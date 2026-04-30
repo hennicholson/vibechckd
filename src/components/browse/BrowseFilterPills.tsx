@@ -68,13 +68,13 @@ export default function BrowseFilterPills({
   totalCount,
 }: BrowseFilterPillsProps) {
   return (
-    // Wrapper provides the edge-fade so partially-visible pills (e.g.
-    // "+ availability" at narrow Whop widths) dissolve into the page bg
-    // instead of getting clipped mid-character. Inner row scrolls
-    // horizontally; thumb swipe + trackpad scroll work natively.
+    // Right-side-only fade so the leading "All" pill stays fully opaque —
+    // it's the most-clicked control and shouldn't be ghosted by the mask.
+    // The trailing overflow ("+ availability" at narrow Whop widths) still
+    // dissolves into the page bg instead of getting clipped mid-character.
     <div
-      className="-mx-1 px-1 edge-fade-x"
-      style={{ ["--fade" as string]: "20px" }}
+      className="-mx-1 px-1 edge-fade-r"
+      style={{ ["--fade" as string]: "32px" }}
     >
       <div
         className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5 snap-x snap-proximity"

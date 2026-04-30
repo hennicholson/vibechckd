@@ -6,12 +6,31 @@ import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import ProjectChat from "@/components/projects/ProjectChat";
 import { useToast } from "@/components/Toast";
+import { useConversationStream } from "@/lib/use-conversation-stream";
+import { useTypingIndicator } from "@/lib/use-typing-indicator";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type InboxTab = "projects" | "messages";
+// Unified conversation shape returned by the new GET /api/conversations.
+// Supersedes the old `Conversation` (project-only) + `DMThread` (dm-only)
+// types — every chat surface, regardless of kind, fits this row.
+type UnifiedConversation = {
+  id: string;
+  kind: "dm" | "project" | "job_application";
+  projectId: string | null;
+  jobApplicationId: string | null;
+  title: string | null;
+  updatedAt: string;
+  lastReadAt: string | null;
+  lastMessageContent: string | null;
+  lastMessageKind: string | null;
+  lastMessageAt: string | null;
+  lastSenderName: string | null;
+  unreadCount: number;
+  participants: Array<{ id: string; name: string | null; image: string | null }> | null;
+};
 
 type Conversation = {
   projectId: string;
@@ -478,21 +497,60 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
     fetchMessages();
   }, [fetchMessages]);
 
-  // Poll every 4 seconds
+  // Typing indicator — pings on compose, listens for peer pings.
+  const { pingTyping, typingPeer, onPeerTyping } = useTypingIndicator(threadId);
+
+  // SSE push: threadId == conversationId post-unification, so subscribe
+  // directly. The 4s poll below stays as a fallback and self-heals if the
+  // stream drops, but moves to 30s once the SSE stream is alive.
+  useConversationStream(threadId, {
+    onMessage: () => {
+      fetchMessages();
+    },
+    onTyping: (e) => {
+      if (e.userId === currentUserId) return;
+      onPeerTyping(e);
+    },
+  });
+
   useEffect(() => {
-    const interval = setInterval(fetchMessages, 4000);
+    const interval = setInterval(fetchMessages, 30_000);
     return () => clearInterval(interval);
   }, [fetchMessages]);
 
-  // Auto-scroll
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    if (!userScrolledRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior });
-    }
-  }, []);
+  // Auto-scroll. Two passes:
+  //   - INITIAL load (or thread-switch) → snap to bottom instantly. No user
+  //     ever wants to start a chat halfway up the history.
+  //   - SUBSEQUENT message arrivals → smooth-scroll only if the user is
+  //     within ~80px of the bottom (i.e., they hadn't scrolled up to read
+  //     older messages). Mirrors how iMessage / Slack behave.
+  const initialLoadedRef = useRef(false);
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      if (!userScrolledRef.current) {
+        // requestAnimationFrame so the layout has flushed before we measure.
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior });
+        });
+      }
+    },
+    []
+  );
+
+  // Reset on thread switch so the scroll anchors fresh.
+  useEffect(() => {
+    initialLoadedRef.current = false;
+    userScrolledRef.current = false;
+  }, [threadId]);
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length === 0) return;
+    if (!initialLoadedRef.current) {
+      initialLoadedRef.current = true;
+      scrollToBottom("auto");
+    } else {
+      scrollToBottom("smooth");
+    }
   }, [messages, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
@@ -702,6 +760,29 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Typing indicator (sits above the input row) */}
+      {typingPeer && (
+        <div className="px-4 py-1 text-[11px] text-text-muted animate-[fadeInUp_0.18s_ease-out]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex gap-0.5">
+              <span
+                className="w-1 h-1 rounded-full bg-text-muted"
+                style={{ animation: "typingDot 1.2s ease-in-out infinite" }}
+              />
+              <span
+                className="w-1 h-1 rounded-full bg-text-muted"
+                style={{ animation: "typingDot 1.2s ease-in-out infinite", animationDelay: "0.15s" }}
+              />
+              <span
+                className="w-1 h-1 rounded-full bg-text-muted"
+                style={{ animation: "typingDot 1.2s ease-in-out infinite", animationDelay: "0.3s" }}
+              />
+            </span>
+            {typingPeer.name || otherUserName} is typing…
+          </span>
+        </div>
+      )}
+
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -726,6 +807,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
             onChange={(e) => {
               if (e.target.value.length <= 2000) {
                 setInputValue(e.target.value);
+                pingTyping();
               }
             }}
             onKeyDown={handleKeyDown}
@@ -758,80 +840,61 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
 // Main Inbox Page
 // ---------------------------------------------------------------------------
 
+
 export default function InboxPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
 
-  const [activeTab, setActiveTab] = useState<InboxTab>(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("vibechckd-inbox-tab");
-      if (saved === "projects" || saved === "messages") return saved;
-    }
-    return "projects";
-  });
-
-  // --- Projects tab state ---
-  const [selected, setSelected] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  // ── State ──
+  const [conversations, setConversations] = useState<UnifiedConversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [lastRead, setLastRead] = useState<Record<string, string>>({});
 
-  // --- Messages tab state ---
-  const [selectedThread, setSelectedThread] = useState<string | null>(null);
-  const [dmThreads, setDmThreads] = useState<DMThread[]>([]);
-  const [dmLoading, setDmLoading] = useState(true);
-  const [dmSearch, setDmSearch] = useState("");
-
-  // --- Notification prompt ---
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
   const [contacts, setContacts] = useState<{ userId: string; name: string; image: string; role: string }[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
 
-  // Persist tab
-  useEffect(() => {
-    sessionStorage.setItem("vibechckd-inbox-tab", activeTab);
-  }, [activeTab]);
-
-  // Load persisted read timestamps
-  useEffect(() => {
-    const saved = localStorage.getItem("vibechckd-inbox-read");
-    if (saved) {
-      try {
-        setLastRead(JSON.parse(saved));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
-
-  // Notification prompt on mount
+  // Selected conversation derived from URL `?c=<id>` for shareability +
+  // browser-back UX. We also keep a useState mirror so React-tracked changes
+  // flow normally; URL is the source-of-truth on initial mount and history
+  // navigation.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (typeof Notification === "undefined") return;
-    const prompted = localStorage.getItem("vibechckd-notif-prompted");
-    if (!prompted && Notification.permission === "default") {
-      const timer = setTimeout(() => setShowNotifPrompt(true), 1500);
-      return () => clearTimeout(timer);
-    }
+    const initial = new URLSearchParams(window.location.search).get("c");
+    if (initial) setSelectedId(initial);
+    const onPop = () => {
+      const id = new URLSearchParams(window.location.search).get("c");
+      setSelectedId(id);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // --- Fetch project conversations ---
+  function selectConversation(id: string | null) {
+    setSelectedId(id);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("c", id);
+    else url.searchParams.delete("c");
+    window.history.replaceState(null, "", url.toString());
+  }
+
+  // ── Fetch ──
   const fetchConversations = useCallback(async () => {
     try {
       const res = await fetch("/api/conversations");
       if (!res.ok) return;
-      const data: Conversation[] = await res.json();
-      const active = data.filter(
-        (c) => c.status !== "completed" && c.status !== "cancelled"
-      );
-      setConversations(active);
+      const data = (await res.json()) as { conversations: UnifiedConversation[] };
+      setConversations(data.conversations || []);
     } catch {
-      // silently fail
+      // silent
     } finally {
       setIsLoading(false);
     }
@@ -841,189 +904,144 @@ export default function InboxPage() {
     fetchConversations();
   }, [fetchConversations]);
 
+  // Refetch on focus + low-frequency poll. SSE on the SELECTED conversation
+  // updates the chat panel directly; this loop just refreshes the rail.
   useEffect(() => {
-    const interval = setInterval(fetchConversations, 10000);
-    return () => clearInterval(interval);
+    const onFocus = () => fetchConversations();
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(fetchConversations, 30_000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
   }, [fetchConversations]);
 
-  // --- Fetch DM threads ---
-  const fetchDMThreads = useCallback(async () => {
-    try {
-      const res = await fetch("/api/dm/threads");
-      if (!res.ok) return;
-      const data: DMThread[] = await res.json();
-      setDmThreads(data);
-    } catch {
-      // silently fail
-    } finally {
-      setDmLoading(false);
+  // Mark the active conversation read whenever it changes. Server bumps
+  // lastReadAt + emits `read` SSE so peers see read receipts later.
+  useEffect(() => {
+    if (!selectedId) return;
+    fetch(`/api/conversations/${selectedId}/read`, { method: "POST" }).catch(() => {});
+  }, [selectedId]);
+
+  // Notification prompt (browser permission, not Whop push) on first visit.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (typeof Notification === "undefined") return;
+    const prompted = localStorage.getItem("vibechckd-notif-prompted");
+    if (!prompted && Notification.permission === "default") {
+      const t = setTimeout(() => setShowNotifPrompt(true), 1500);
+      return () => clearTimeout(t);
     }
   }, []);
 
-  useEffect(() => {
-    if (activeTab === "messages") {
-      fetchDMThreads();
-    }
-  }, [activeTab, fetchDMThreads]);
+  // ── Derived ──
+  const filtered = search.trim()
+    ? conversations.filter((c) => {
+        const title = (c.title || "").toLowerCase();
+        const last = (c.lastMessageContent || "").toLowerCase();
+        const q = search.toLowerCase();
+        return title.includes(q) || last.includes(q);
+      })
+    : conversations;
 
-  useEffect(() => {
-    if (activeTab !== "messages") return;
-    const interval = setInterval(fetchDMThreads, 10000);
-    return () => clearInterval(interval);
-  }, [activeTab, fetchDMThreads]);
+  const selected = conversations.find((c) => c.id === selectedId) || null;
+  const otherParticipant = selected?.participants?.find((p) => p.id !== currentUserId) || null;
 
-  // --- Handlers ---
-
-  const handleSelectProject = (projectId: string) => {
-    setSelected(projectId);
-    const conv = conversations.find((c) => c.projectId === projectId);
-    if (conv?.lastMessageAt) {
-      setLastRead((prev) => {
-        const updated = { ...prev, [projectId]: conv.lastMessageAt };
-        localStorage.setItem("vibechckd-inbox-read", JSON.stringify(updated));
-        return updated;
-      });
-    }
-  };
-
-  const isUnread = (conv: Conversation) => {
-    if (!conv.lastMessageAt) return false;
-    const readAt = lastRead[conv.projectId];
-    if (!readAt) return true;
-    return new Date(conv.lastMessageAt) > new Date(readAt);
-  };
-
-  const handleArchive = async (e: React.MouseEvent, projectId: string) => {
+  // ── Handlers ──
+  async function handleArchive(e: React.MouseEvent, conv: UnifiedConversation) {
     e.stopPropagation();
-    setActionLoading(projectId);
+    if (conv.kind !== "project" || !conv.projectId) return;
+    setActionLoading(conv.id);
     try {
-      const res = await fetch(`/api/projects/${projectId}`, {
+      const res = await fetch(`/api/projects/${conv.projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "completed" }),
       });
       if (res.ok) {
-        setConversations((prev) => prev.filter((c) => c.projectId !== projectId));
-        if (selected === projectId) setSelected(null);
+        setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+        if (selectedId === conv.id) selectConversation(null);
       }
     } catch {
-      // silently fail
+      // silent
     } finally {
       setActionLoading(null);
     }
-  };
+  }
 
-  const handleDelete = async (e: React.MouseEvent, projectId: string) => {
-    e.stopPropagation();
-    setActionLoading(projectId);
+  async function startDmWith(userId: string) {
     try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "DELETE",
+      const res = await fetch("/api/dm/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientId: userId }),
       });
-      if (res.ok) {
-        setConversations((prev) => prev.filter((c) => c.projectId !== projectId));
-        if (selected === projectId) setSelected(null);
+      if (!res.ok) {
+        toast("Failed to start conversation");
+        return;
       }
+      const data = (await res.json()) as { threadId: string };
+      // The new threadId is also the conversationId post-unification.
+      // Refresh the rail so the new conversation row appears.
+      await fetchConversations();
+      selectConversation(data.threadId);
+      setShowContacts(false);
     } catch {
-      // silently fail
-    } finally {
-      setActionLoading(null);
+      toast("Failed to start conversation");
     }
-  };
+  }
 
-  const handleNewMessage = () => {
-    toast("User search coming soon");
-  };
+  // Type-aware visual badge + label for a conversation row.
+  function kindMeta(c: UnifiedConversation): {
+    badge: string;
+    badgeTone: string;
+  } {
+    if (c.kind === "project") {
+      return { badge: "Project", badgeTone: "text-text-secondary bg-surface-muted" };
+    }
+    if (c.kind === "job_application") {
+      return { badge: "Job", badgeTone: "text-warning bg-warning/10" };
+    }
+    return { badge: "DM", badgeTone: "text-text-muted bg-surface-muted" };
+  }
 
-  // --- Derived data ---
-
-  const selectedConv = conversations.find((c) => c.projectId === selected);
-  const selectedDmThread = dmThreads.find((t) => t.id === selectedThread);
-
-  const filteredConversations = search.trim()
-    ? conversations.filter((c) =>
-        c.projectName.toLowerCase().includes(search.toLowerCase())
-      )
-    : conversations;
-
-  const filteredDmThreads = dmSearch.trim()
-    ? dmThreads.filter((t) =>
-        t.otherUserName.toLowerCase().includes(dmSearch.toLowerCase())
-      )
-    : dmThreads;
-
-  const tabs: { key: InboxTab; label: string }[] = [
-    { key: "projects", label: "Projects" },
-    { key: "messages", label: "Messages" },
-  ];
-
-  // Whether a chat panel is active (for mobile full-screen behavior)
-  const hasChatOpen = activeTab === "projects" ? !!selected : !!selectedThread;
+  const hasChatOpen = !!selectedId;
 
   return (
     <div className="flex h-[calc(100vh-48px)] md:h-screen">
-      {/* Sidebar / conversation list */}
-      <div className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[280px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}>
+      {/* ── Conversation list rail ── */}
+      <div
+        className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}
+      >
         {/* Header */}
         <div className="px-4 pt-4 md:pt-5 pb-2 flex items-center justify-between">
           <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
             Inbox
           </h1>
-          <InboxMenu onOpenContacts={() => {
-            setShowContacts(true);
-            setContactsLoading(true);
-            fetch("/api/dm/contacts")
-              .then((r) => (r.ok ? r.json() : []))
-              .then((data) => setContacts(data))
-              .catch(() => setContacts([]))
-              .finally(() => setContactsLoading(false));
-          }} />
-        </div>
-
-        {/* Segmented control */}
-        <div className="px-3 pt-1 pb-1.5">
-          <div className="inline-flex bg-surface-muted rounded-lg p-0.5 w-full">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  if (tab.key === "projects") setSelectedThread(null);
-                  if (tab.key === "messages") setSelected(null);
-                }}
-                className={`relative flex-1 px-4 py-1.5 text-[13px] font-medium rounded-md transition-colors duration-150 cursor-pointer ${
-                  activeTab === tab.key
-                    ? "text-text-primary"
-                    : "text-text-muted hover:text-text-secondary"
-                }`}
-              >
-                {activeTab === tab.key && (
-                  <motion.div
-                    layoutId="inbox-tab"
-                    className="absolute inset-0 bg-background border border-border rounded-md"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">{tab.label}</span>
-              </button>
-            ))}
-          </div>
+          <InboxMenu
+            onOpenContacts={() => {
+              setShowContacts(true);
+              setContactsLoading(true);
+              fetch("/api/dm/contacts")
+                .then((r) => (r.ok ? r.json() : []))
+                .then((data) => setContacts(data))
+                .catch(() => setContacts([]))
+                .finally(() => setContactsLoading(false));
+            }}
+          />
         </div>
 
         {/* Search */}
-        <div className="px-3 py-1.5 border-b border-border">
+        <div className="px-3 pt-1 pb-2 border-b border-border">
           <div className="flex items-center gap-2 bg-surface-muted rounded-md px-2.5 py-1.5">
             <span className="text-text-muted flex-shrink-0">
               <SearchIcon />
             </span>
             <input
               type="text"
-              value={activeTab === "projects" ? search : dmSearch}
-              onChange={(e) => {
-                if (activeTab === "projects") setSearch(e.target.value);
-                else setDmSearch(e.target.value);
-              }}
-              placeholder={activeTab === "projects" ? "Search projects" : "Search messages"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search conversations"
               className="flex-1 text-[12px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none"
             />
           </div>
@@ -1031,323 +1049,230 @@ export default function InboxPage() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
-          {/* ---------- Projects Tab ---------- */}
-          {activeTab === "projects" && (
-            <>
-              {isLoading && (
-                <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-text-muted font-mono">Loading...</span>
-                </div>
-              )}
-              {!isLoading && filteredConversations.length === 0 && (
-                <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-text-muted font-body italic">
-                    {search.trim()
-                      ? "No conversations match your search"
-                      : "No conversations yet"}
-                  </span>
-                </div>
-              )}
-              {filteredConversations.map((conv) => {
-                const unread = isUnread(conv);
-                const showActions = hoveredId === conv.projectId;
-                const hasNoMessages = !conv.lastMessage;
-
-                return (
-                  <div
-                    key={conv.projectId}
-                    onClick={() => handleSelectProject(conv.projectId)}
-                    onMouseEnter={() => setHoveredId(conv.projectId)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    role="button"
-                    tabIndex={0}
-                    className={`w-full text-left px-4 py-3 border-b border-border transition-colors duration-150 cursor-pointer relative ${
-                      selected === conv.projectId
-                        ? "bg-surface-muted"
-                        : "bg-background hover:bg-surface-muted"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {unread && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0a0a0a] flex-shrink-0" />
-                        )}
-                        <span
-                          className={`text-[13px] font-body truncate ${
-                            unread
-                              ? "text-text-primary font-semibold"
-                              : "text-text-primary font-medium"
-                          }`}
-                        >
-                          {conv.projectName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                        {showActions && (
-                          <>
-                            <button
-                              onClick={(e) => handleArchive(e, conv.projectId)}
-                              disabled={actionLoading === conv.projectId}
-                              className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-neutral-200 transition-colors duration-150 cursor-pointer disabled:opacity-40"
-                              title="Archive"
-                            >
-                              <ArchiveIcon />
-                            </button>
-                            {hasNoMessages && (
-                              <button
-                                onClick={(e) => handleDelete(e, conv.projectId)}
-                                disabled={actionLoading === conv.projectId}
-                                className="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors duration-150 cursor-pointer disabled:opacity-40"
-                                title="Delete"
-                              >
-                                <TrashIcon />
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {!showActions && (
-                          <span className="text-[11px] font-mono text-text-muted">
-                            {conv.lastMessageAt ? relativeTimestamp(conv.lastMessageAt) : ""}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p
-                      className={`text-[12px] font-body truncate ${
-                        unread ? "text-text-secondary" : "text-text-muted"
-                      }`}
-                    >
-                      {conv.lastMessage || "No messages yet"}
-                    </p>
-                  </div>
-                );
-              })}
-            </>
+          {isLoading && (
+            <div className="px-4 py-6 text-center">
+              <span className="text-[12px] text-text-muted font-mono">Loading…</span>
+            </div>
           )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="px-4 py-10 text-center">
+              <ChatBubbleIcon />
+              <p className="text-[13px] text-text-primary font-medium mt-3 mb-1">
+                {search.trim() ? "No matches" : "No conversations yet"}
+              </p>
+              <p className="text-[12px] text-text-muted leading-relaxed max-w-[260px] mx-auto">
+                {search.trim()
+                  ? "Try a different search term."
+                  : "Start a DM, post a job, or join a project to begin a thread."}
+              </p>
+            </div>
+          )}
+          {filtered.map((conv) => {
+            const meta = kindMeta(conv);
+            const unread = conv.unreadCount > 0 && selectedId !== conv.id;
+            const showActions = hoveredId === conv.id && conv.kind === "project";
+            const avatar = otherParticipantOf(conv, currentUserId);
+            const titleText = conv.title || "Conversation";
 
-          {/* ---------- Messages Tab ---------- */}
-          {activeTab === "messages" && (
-            <>
-              {/* New message button */}
-              <div className="px-3 py-2 border-b border-border">
-                <button
-                  onClick={handleNewMessage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-text-primary border border-border rounded-md hover:bg-surface-muted transition-colors cursor-pointer w-full justify-center"
-                >
-                  <PlusIcon />
-                  New message
-                </button>
-              </div>
-
-              {dmLoading && (
-                <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-text-muted font-mono">Loading...</span>
-                </div>
-              )}
-              {!dmLoading && filteredDmThreads.length === 0 && (
-                <div className="px-4 py-6 text-center">
-                  <span className="text-[12px] text-text-muted font-body italic">
-                    {dmSearch.trim()
-                      ? "No conversations match your search"
-                      : "No direct messages yet"}
-                  </span>
-                </div>
-              )}
-              {filteredDmThreads.map((thread) => (
-                <button
-                  key={thread.id}
-                  onClick={() => setSelectedThread(thread.id)}
-                  className={`w-full text-left px-4 py-3 border-b border-border transition-colors duration-150 cursor-pointer ${
-                    selectedThread === thread.id
-                      ? "bg-surface-muted"
-                      : "bg-background hover:bg-surface-muted"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    {/* Avatar */}
+            return (
+              <div
+                key={conv.id}
+                onClick={() => selectConversation(conv.id)}
+                onMouseEnter={() => setHoveredId(conv.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    selectConversation(conv.id);
+                  }
+                }}
+                className={`w-full text-left px-4 py-3 border-b border-border transition-colors duration-150 cursor-pointer ${
+                  selectedId === conv.id
+                    ? "bg-surface-muted"
+                    : "bg-background hover:bg-surface-muted"
+                }`}
+              >
+                <div className="flex items-start gap-2.5">
+                  {/* Avatar — DM/job_app show the other participant; project
+                      shows a pill icon. Sized + spaced to keep all three
+                      kinds visually aligned. */}
+                  {conv.kind === "project" ? (
+                    <div className="w-8 h-8 rounded-md bg-surface-muted flex-shrink-0 flex items-center justify-center text-text-muted">
+                      <ChatBubbleIcon />
+                    </div>
+                  ) : (
                     <div className="w-8 h-8 rounded-full bg-surface-muted flex-shrink-0 flex items-center justify-center text-[12px] font-medium text-text-muted overflow-hidden">
-                      {thread.otherUserAvatar ? (
+                      {avatar?.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thread.otherUserAvatar} alt={thread.otherUserName} className="w-full h-full object-cover" />
+                        <img
+                          src={avatar.image}
+                          alt={avatar.name || "User"}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
-                        (thread.otherUserName || "?").charAt(0).toUpperCase()
+                        (avatar?.name || titleText).charAt(0).toUpperCase()
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[13px] font-medium text-text-primary font-body truncate">
-                          {thread.otherUserName}
-                        </span>
-                        <span className="text-[11px] font-mono text-text-muted flex-shrink-0 ml-2">
-                          {thread.lastMessageAt ? relativeTimestamp(thread.lastMessageAt) : ""}
-                        </span>
-                      </div>
-                      <p className="text-[12px] font-body text-text-muted truncate">
-                        {thread.lastMessage || "No messages yet"}
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span
+                        className={`text-[13px] font-body truncate flex-1 ${
+                          unread
+                            ? "text-text-primary font-semibold"
+                            : "text-text-primary font-medium"
+                        }`}
+                      >
+                        {titleText}
+                      </span>
+                      <span
+                        className={`text-[9.5px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0 ${meta.badgeTone}`}
+                      >
+                        {meta.badge}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p
+                        className={`text-[12px] font-body truncate flex-1 ${
+                          unread ? "text-text-secondary" : "text-text-muted"
+                        }`}
+                      >
+                        {conv.lastMessageKind === "file" ? (
+                          <span className="italic">Shared a file</span>
+                        ) : conv.lastMessageKind === "invoice" ? (
+                          <span className="italic">Sent an invoice</span>
+                        ) : (
+                          conv.lastMessageContent || "No messages yet"
+                        )}
                       </p>
+                      {showActions ? (
+                        <button
+                          onClick={(e) => handleArchive(e, conv)}
+                          disabled={actionLoading === conv.id}
+                          title="Archive"
+                          className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-neutral-200 transition-colors duration-150 cursor-pointer disabled:opacity-40 flex-shrink-0"
+                        >
+                          <ArchiveIcon />
+                        </button>
+                      ) : (
+                        <span className="text-[10.5px] font-mono text-text-muted flex-shrink-0 tabular-nums">
+                          {conv.lastMessageAt
+                            ? relativeTimestamp(conv.lastMessageAt)
+                            : ""}
+                        </span>
+                      )}
                     </div>
                   </div>
-                </button>
-              ))}
-            </>
-          )}
+
+                  {unread && (
+                    <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-text-primary flex-shrink-0" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Chat panel */}
+      {/* ── Chat panel ── */}
       <div className={`${hasChatOpen ? "flex" : "hidden md:flex"} flex-1 min-w-0 flex-col`}>
-        {/* ---------- Project Chat ---------- */}
-        {activeTab === "projects" && selectedConv && (
-          <div className="flex-1 min-h-0 flex flex-col">
-            {/* Chat header with back + open project */}
+        {selected ? (
+          <>
+            {/* Header */}
             <div className="flex items-center gap-2 px-4 h-[44px] border-b border-border flex-shrink-0">
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => selectConversation(null)}
                 className="md:hidden flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer min-h-[44px]"
               >
                 <BackIcon />
                 Back
               </button>
-              <span className="text-[13px] font-medium text-text-primary truncate flex-1 md:text-left text-center">
-                {selectedConv.projectName}
-              </span>
-              <button
-                onClick={() => router.push(`/dashboard/projects/${selectedConv.projectId}`)}
-                className="flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors cursor-pointer rounded-md hover:bg-surface-muted flex-shrink-0"
-                title="Open project"
-              >
-                <span className="hidden sm:inline">Open project</span>
-                <ExternalLinkIcon />
-              </button>
-            </div>
-            <div className="flex-1 min-h-0">
-              <ProjectChat projectId={selectedConv.projectId} />
-            </div>
-          </div>
-        )}
-
-        {/* ---------- DM Chat ---------- */}
-        {activeTab === "messages" && selectedDmThread && (
-          <div className="flex-1 min-h-0 flex flex-col">
-            {/* DM header */}
-            <div className="flex items-center gap-2 px-4 h-[44px] border-b border-border flex-shrink-0">
-              <button
-                onClick={() => setSelectedThread(null)}
-                className="md:hidden flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer min-h-[44px]"
-              >
-                <BackIcon />
-                Back
-              </button>
-              <div className="w-7 h-7 rounded-full bg-surface-muted flex-shrink-0 flex items-center justify-center text-[11px] font-medium text-text-muted overflow-hidden">
-                {selectedDmThread.otherUserAvatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedDmThread.otherUserAvatar} alt={selectedDmThread.otherUserName} className="w-full h-full object-cover" />
-                ) : (
-                  (selectedDmThread.otherUserName || "?").charAt(0).toUpperCase()
-                )}
-              </div>
+              {selected.kind !== "project" && otherParticipant && (
+                <div className="w-7 h-7 rounded-full bg-surface-muted flex-shrink-0 flex items-center justify-center text-[11px] font-medium text-text-muted overflow-hidden">
+                  {otherParticipant.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={otherParticipant.image}
+                      alt={otherParticipant.name || "User"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    (otherParticipant.name || "?").charAt(0).toUpperCase()
+                  )}
+                </div>
+              )}
               <span className="text-[13px] font-medium text-text-primary truncate flex-1">
-                {selectedDmThread.otherUserName}
+                {selected.title || "Conversation"}
               </span>
+              {selected.kind === "project" && selected.projectId && (
+                <button
+                  onClick={() =>
+                    router.push(`/dashboard/projects/${selected.projectId}`)
+                  }
+                  title="Open project"
+                  className="flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors cursor-pointer rounded-md hover:bg-surface-muted flex-shrink-0"
+                >
+                  <span className="hidden sm:inline">Open project</span>
+                  <ExternalLinkIcon />
+                </button>
+              )}
             </div>
+
+            {/* Body — pick the right chat surface based on conversation kind.
+                Project conversations get the rich ProjectChat with quick
+                actions / invoice cards / member roster. DM + job_application
+                share the DMChat panel for a focused 1:1 thread. */}
             <div className="flex-1 min-h-0">
-              <DMChat threadId={selectedDmThread.id} otherUserName={selectedDmThread.otherUserName} />
+              {selected.kind === "project" && selected.projectId ? (
+                <ProjectChat projectId={selected.projectId} />
+              ) : (
+                <DMChat
+                  threadId={selected.id}
+                  otherUserName={otherParticipant?.name || "User"}
+                />
+              )}
             </div>
-          </div>
-        )}
-
-        {/* ---------- Quick-pick: recent conversations ---------- */}
-        {!hasChatOpen && (
-          <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
-            {/* Background GIF */}
-            <div
-              className="absolute inset-0 bg-cover bg-center opacity-[0.04]"
-              style={{ backgroundImage: "url('https://mir-s3-cdn-cf.behance.net/project_modules/source/c560dd40693289.57890a5289475.gif')" }}
-            />
-            <div className="flex-1 flex flex-col items-center justify-center px-8 relative z-10">
-              <div className="w-full max-w-[400px]">
-                <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-4">
-                  Pick up where you left off:
-                </p>
-
-                {activeTab === "projects" && conversations.length > 0 && (
-                  <div className="space-y-2">
-                    {conversations.slice(0, 2).map((convo) => (
-                      <RecentProjectCard
-                        key={convo.projectId}
-                        convo={convo}
-                        onClick={() => setSelected(convo.projectId)}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {activeTab === "messages" && dmThreads.length > 0 && (
-                  <div className="space-y-2">
-                    {dmThreads.slice(0, 2).map((thread) => (
-                      <button
-                        key={thread.id}
-                        onClick={() => setSelectedThread(thread.id)}
-                        className="w-full text-left bg-background/80 backdrop-blur-sm border border-white/60 rounded-[10px] p-4 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:border-white/80 transition-all duration-200 cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted flex-shrink-0 overflow-hidden">
-                            {thread.otherUserAvatar ? (
-                              <img src={thread.otherUserAvatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              (thread.otherUserName || "?").charAt(0).toUpperCase()
-                            )}
-                          </div>
-                          <span className="text-[14px] font-medium text-text-primary truncate">{thread.otherUserName}</span>
-                          <span className="text-[10px] font-mono text-text-muted flex-shrink-0 ml-auto">
-                            {relativeTimestamp(thread.lastMessageAt)}
-                          </span>
-                        </div>
-                        <p className="text-[12px] text-text-muted truncate pl-11">{thread.lastMessage}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {((activeTab === "projects" && conversations.length === 0) ||
-                  (activeTab === "messages" && dmThreads.length === 0)) && (
-                  <div className="flex flex-col items-center py-8">
-                    <ChatBubbleIcon />
-                    <span className="text-[13px] text-text-muted mt-3">
-                      {activeTab === "projects" ? "No conversations yet" : "No messages yet"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          </>
+        ) : (
+          <EmptyState
+            conversations={conversations}
+            onSelect={selectConversation}
+            currentUserId={currentUserId}
+          />
         )}
       </div>
 
       {/* Contacts panel */}
       {showContacts && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowContacts(false)} />
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setShowContacts(false)}
+          />
           <div className="relative w-full max-w-[340px] bg-background border-l border-border h-full flex flex-col animate-[slideInRight_0.2s_ease-out]">
             <div className="px-4 py-4 border-b border-border flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-text-primary">Contacts</h2>
-              <button onClick={() => setShowContacts(false)} className="text-text-muted hover:text-text-primary transition-colors cursor-pointer">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <h2 className="text-[15px] font-semibold text-text-primary">
+                Contacts
+              </h2>
+              <button
+                onClick={() => setShowContacts(false)}
+                className="text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <CloseIcon />
               </button>
             </div>
 
             <div className="px-4 py-2 border-b border-border">
               <div className="flex items-center gap-2 bg-surface-muted rounded-md px-2.5 py-1.5">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted flex-shrink-0">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
+                <SearchIcon />
                 <input
                   type="text"
                   value={contactSearch}
                   onChange={(e) => setContactSearch(e.target.value)}
-                  placeholder="Search contacts..."
+                  placeholder="Search contacts…"
                   className="flex-1 text-[12px] text-text-primary placeholder:text-text-muted bg-transparent outline-none"
                 />
               </div>
@@ -1357,59 +1282,53 @@ export default function InboxPage() {
               {contactsLoading ? (
                 <div className="p-4 space-y-3">
                   {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-10 bg-surface-muted rounded animate-pulse" />
+                    <div
+                      key={i}
+                      className="h-10 bg-surface-muted rounded animate-pulse"
+                    />
                   ))}
                 </div>
               ) : contacts.length === 0 ? (
-                <div className="p-4 text-center text-[12px] text-text-muted">No contacts found</div>
+                <div className="p-4 text-center text-[12px] text-text-muted">
+                  No contacts found
+                </div>
               ) : (
                 <div className="py-1">
                   {contacts
-                    .filter((c) => !contactSearch || c.name.toLowerCase().includes(contactSearch.toLowerCase()))
+                    .filter(
+                      (c) =>
+                        !contactSearch ||
+                        c.name.toLowerCase().includes(contactSearch.toLowerCase())
+                    )
                     .map((contact) => (
-                    <button
-                      key={contact.userId}
-                      onClick={async () => {
-                        // Create or find DM thread with this contact
-                        try {
-                          const res = await fetch("/api/dm/threads", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ recipientId: contact.userId }),
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            setActiveTab("messages");
-                            setSelectedThread(data.threadId);
-                            setShowContacts(false);
-                            // Refresh DM threads
-                            fetch("/api/dm/threads")
-                              .then((r) => (r.ok ? r.json() : []))
-                              .then((threads) => setDmThreads(threads))
-                              .catch(() => {});
-                          }
-                        } catch {
-                          toast("Failed to start conversation");
-                        }
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-muted/50 transition-colors cursor-pointer"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted overflow-hidden flex-shrink-0">
-                        {contact.image ? (
-                          <img src={contact.image} alt={contact.name} className="w-full h-full object-cover" />
-                        ) : (
-                          contact.name.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-[13px] font-medium text-text-primary truncate">{contact.name}</p>
-                        <p className="text-[10px] text-text-muted">{contact.role}</p>
-                      </div>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted flex-shrink-0">
-                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                      </svg>
-                    </button>
-                  ))}
+                      <button
+                        key={contact.userId}
+                        onClick={() => startDmWith(contact.userId)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-muted/50 transition-colors cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted overflow-hidden flex-shrink-0">
+                          {contact.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={contact.image}
+                              alt={contact.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            contact.name.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-[13px] font-medium text-text-primary truncate">
+                            {contact.name}
+                          </p>
+                          <p className="text-[10px] text-text-muted">
+                            {contact.role}
+                          </p>
+                        </div>
+                        <ChatBubbleIcon />
+                      </button>
+                    ))}
                 </div>
               )}
             </div>
@@ -1417,10 +1336,97 @@ export default function InboxPage() {
         </div>
       )}
 
-      {/* Notification prompt */}
       {showNotifPrompt && (
         <NotificationPrompt onDismiss={() => setShowNotifPrompt(false)} />
       )}
+    </div>
+  );
+}
+
+// ── Helpers used by InboxPage ──────────────────────────────────────────────
+
+function otherParticipantOf(
+  c: UnifiedConversation,
+  currentUserId: string | undefined
+): { id: string; name: string | null; image: string | null } | null {
+  if (!c.participants || c.participants.length === 0) return null;
+  const other = c.participants.find((p) => p.id !== currentUserId);
+  return other ?? c.participants[0];
+}
+
+function EmptyState({
+  conversations,
+  onSelect,
+  currentUserId,
+}: {
+  conversations: UnifiedConversation[];
+  onSelect: (id: string) => void;
+  currentUserId: string | undefined;
+}) {
+  const recent = conversations.slice(0, 3);
+  return (
+    <div className="flex-1 flex flex-col bg-background relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 relative z-10">
+        <div className="w-full max-w-[420px]">
+          <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-4">
+            Pick up where you left off
+          </p>
+          {recent.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <ChatBubbleIcon />
+              <span className="text-[13px] text-text-muted mt-3">
+                No conversations yet
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recent.map((c) => {
+                const other = otherParticipantOf(c, currentUserId);
+                const titleText = c.title || "Conversation";
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => onSelect(c.id)}
+                    className="w-full text-left bg-background border border-border rounded-[10px] p-4 hover:border-border-hover hover:bg-surface-muted transition-colors duration-150 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      {c.kind === "project" ? (
+                        <div className="w-8 h-8 rounded-md bg-surface-muted flex-shrink-0 flex items-center justify-center text-text-muted">
+                          <ChatBubbleIcon />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-surface-muted flex items-center justify-center text-[12px] font-medium text-text-muted flex-shrink-0 overflow-hidden">
+                          {other?.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={other.image}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            (other?.name || titleText).charAt(0).toUpperCase()
+                          )}
+                        </div>
+                      )}
+                      <span className="text-[14px] font-medium text-text-primary truncate flex-1">
+                        {titleText}
+                      </span>
+                      {c.lastMessageAt && (
+                        <span className="text-[10px] font-mono text-text-muted flex-shrink-0">
+                          {relativeTimestamp(c.lastMessageAt)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[12px] text-text-muted truncate pl-11">
+                      {c.lastMessageContent || "No messages yet"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

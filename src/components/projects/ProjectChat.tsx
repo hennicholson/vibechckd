@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Fragment, useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useToast } from "../Toast";
+import { useConversationStream } from "@/lib/use-conversation-stream";
+import { useWhopIframeContext } from "@/lib/use-whop-iframe";
+import { useTypingIndicator } from "@/lib/use-typing-indicator";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type MessageType = "text" | "file" | "system" | "ai";
+type MessageType = "text" | "file" | "system" | "ai" | "invoice";
 type ActiveAction = "invoice" | "proposal" | "milestone" | "files" | "task" | "payment" | null;
 
 interface ChatMessage {
@@ -19,6 +22,21 @@ interface ChatMessage {
   messageType: MessageType;
   fileUrl: string | null;
   createdAt: string;
+  invoiceId?: string | null;
+  // Hydrated structured invoice (when messageType === 'invoice'). Replaces
+  // the fragile parseInvoiceContent() text-parsing path — the new /api/messages
+  // shim joins to the invoices table and inlines the row.
+  invoice?: {
+    id: string;
+    description: string;
+    amountCents: number;
+    status: string;
+    dueDate: string | null;
+    paidAt: string | null;
+    paymentUrl: string | null;
+    senderId: string | null;
+    recipientId: string | null;
+  } | null;
 }
 
 interface InvoiceData {
@@ -115,6 +133,93 @@ function getFileName(url: string): string {
 
 function isImageUrl(url: string): boolean {
   return IMAGE_EXTENSIONS.test(url);
+}
+
+// True when both ISO timestamps fall on the same calendar day in the
+// viewer's local timezone. Used to gate "Today / Yesterday / <date>"
+// dividers in the chat feed.
+function sameLocalDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+function dayDividerLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  if (sameLocalDay(iso, today.toISOString())) return "Today";
+  if (sameLocalDay(iso, yest.toISOString())) return "Yesterday";
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+  });
+}
+
+// Slash-command parser for the composer. Returns null when the input
+// doesn't match a known shape so the caller can fall through to a normal
+// message send.
+//
+// Supported (loose grammar — any combination, any order after `/invoice`):
+//
+//   /invoice 250
+//   /invoice $250 for site copy
+//   /invoice 1500.00 for landing page revisions due 2026-05-15
+//   /invoice 250 due Friday for that thing
+//
+// Date strings are passed through as-is; the InvoiceForm renders a date
+// picker for refinement, and ad-hoc strings ("Friday") become an empty
+// initialDue (the input ignores invalid dates).
+type SlashCommand = {
+  kind: "invoice";
+  amountDollars: string;
+  description?: string;
+  due?: string;
+};
+
+function parseSlashCommand(text: string): SlashCommand | null {
+  if (!text.startsWith("/invoice ")) return null;
+  const rest = text.slice("/invoice ".length).trim();
+  if (!rest) return null;
+
+  // Amount is the first token. Strip leading $ and trailing commas.
+  const tokens = rest.split(/\s+/);
+  const amountToken = (tokens.shift() || "").replace(/[$,]/g, "");
+  const amountNum = parseFloat(amountToken);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) return null;
+  const amountDollars = amountNum.toFixed(2).replace(/\.00$/, "");
+
+  let description: string | undefined;
+  let due: string | undefined;
+  let remainder = tokens.join(" ").trim();
+
+  // `due <…>` and `for <…>` consume to the end / next keyword.
+  const dueMatch = remainder.match(/(?:^|\s)due\s+(.+?)(?:\s+for\s+|$)/i);
+  if (dueMatch) {
+    due = dueMatch[1].trim();
+    remainder = remainder.replace(dueMatch[0], " ").trim();
+  }
+  const forMatch = remainder.match(/(?:^|\s)for\s+(.+?)(?:\s+due\s+|$)/i);
+  if (forMatch) {
+    description = forMatch[1].trim();
+    remainder = remainder.replace(forMatch[0], " ").trim();
+  }
+  // Anything still in `remainder` becomes the description if unset.
+  if (!description && remainder) description = remainder;
+
+  // If `due` was a calendar date in YYYY-MM-DD shape, keep it. Anything
+  // free-form gets dropped — the form's <input type=date> can't render it.
+  const ymd = /^\d{4}-\d{2}-\d{2}$/;
+  if (due && !ymd.test(due)) due = undefined;
+
+  return { kind: "invoice", amountDollars, description, due };
 }
 
 function parseInvoiceContent(content: string): ParsedInvoice | null {
@@ -419,6 +524,37 @@ function SystemMessage({ content }: { content: string }) {
   );
 }
 
+// --- Pay Invoice Button ---
+//
+// Splits the click target between two contexts:
+//   - Inside the Whop iframe: hand the URL to the iframe SDK so Whop opens
+//     it in-app (their UI overlays the checkout, returns control to us
+//     after). This is the canonical embedded-payment flow per @whop/iframe.
+//   - Standalone vibechckd.cc: window.open in a new tab.
+//
+// The button looks identical in both contexts so no visual flicker on the
+// iframe-detection hydration.
+
+function PayInvoiceButton({ url }: { url: string }) {
+  const { isInIframe, sdk } = useWhopIframeContext();
+  const onClick = () => {
+    if (isInIframe) {
+      sdk.openExternalUrl({ url });
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+    >
+      <IconWallet size={12} />
+      Pay now
+    </button>
+  );
+}
+
 // --- Invoice Card ---
 
 function InvoiceCard({
@@ -493,17 +629,12 @@ function InvoiceCard({
       {/* Actions footer */}
       {(!isPaid && !isVoided) && (
         <div className="px-3 py-2 border-t border-border flex items-center gap-2 flex-wrap">
-          {/* Show Pay button only to the recipient */}
+          {/* Show Pay button only to the recipient. When running inside the
+              Whop iframe the click is forwarded through `openExternalUrl` so
+              Whop can route the user to its hosted checkout in-app. Outside
+              the iframe (direct vibechckd.cc) we open in a new tab. */}
           {!isSender && invoice.payUrl && (
-            <a
-              href={invoice.payUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline"
-            >
-              <IconWallet size={12} />
-              Pay now
-            </a>
+            <PayInvoiceButton url={invoice.payUrl} />
           )}
           {invoice.invoiceId && onCheckStatus && (
             <button
@@ -682,6 +813,9 @@ function InvoiceForm({
   onCancel,
   sending,
   members,
+  initialDescription,
+  initialAmount,
+  initialDue,
 }: {
   onSend: (data: {
     description: string;
@@ -693,10 +827,16 @@ function InvoiceForm({
   onCancel: () => void;
   sending: boolean;
   members: ProjectMember[];
+  initialDescription?: string;
+  initialAmount?: string;
+  initialDue?: string;
 }) {
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [due, setDue] = useState("");
+  // initialX props let the slash composer (/invoice 250 for site copy)
+  // pre-fill the form. They're only consumed on first render — subsequent
+  // typing is owned by the form's local state.
+  const [desc, setDesc] = useState(initialDescription ?? "");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  const [due, setDue] = useState(initialDue ?? "");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [showSplit, setShowSplit] = useState(false);
   const [splits, setSplits] = useState<{ userId: string; share: string }[]>([]);
@@ -1129,6 +1269,17 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
   const [balance, setBalance] = useState<ProjectBalance | null>(null);
   const [showBalance, setShowBalance] = useState(false);
   const [checkingInvoice, setCheckingInvoice] = useState<string | null>(null);
+  // Conversation id for the SSE stream — populated from the X-Conversation-Id
+  // header on the first /api/messages fetch. Once set, useConversationStream
+  // pushes new messages in real time and we drop the 4s polling effectively
+  // to a fallback (kept for safety against missed events).
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  // Slash-command prefills for the invoice form. `key` forces remount so a
+  // second `/invoice` populates fresh values rather than merging with stale
+  // local state inside the form.
+  const [invoicePrefill, setInvoicePrefill] = useState<
+    { key: number; description?: string; amount?: string; due?: string } | null
+  >(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1149,6 +1300,8 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     try {
       const res = await fetch(`/api/messages?projectId=${projectId}`);
       if (!res.ok) return;
+      const headerConv = res.headers.get("X-Conversation-Id");
+      if (headerConv) setConversationId((c) => c ?? headerConv);
       const data: ChatMessage[] = await res.json();
       setChatMessages(data);
     } catch {
@@ -1176,24 +1329,76 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     fetchBalance();
   }, [fetchMessages, fetchBalance]);
 
+  // Typing indicator — peer composes → SSE `typing` event → render. Local
+  // composer fires throttled pings via `pingTyping()` invoked from onChange.
+  const { pingTyping, typingPeer, onPeerTyping } = useTypingIndicator(conversationId);
+
+  // Real-time push via SSE for any conversation we know about. The stream
+  // fires `message` events from posts (this user's, peers', invoices) and
+  // `invoice_status` events from the Whop webhook on payment / void / past
+  // due. Both trigger a refetch — cheaper than tracking deltas, and the
+  // /api/messages response is small enough that re-pulling is fine.
+  useConversationStream(conversationId, {
+    onMessage: () => {
+      fetchMessages();
+      fetchBalance();
+    },
+    onInvoiceStatus: () => {
+      fetchMessages();
+      fetchBalance();
+    },
+    onTyping: (e) => {
+      // Ignore our own pings — server emits to all subscribers including us.
+      if (e.userId === currentUserId) return;
+      onPeerTyping(e);
+    },
+  });
+
+  // Poll fallback. Tightens to 4s while SSE isn't yet bound (initial mount,
+  // or environments without EventSource); relaxes to 30s once the stream
+  // is live so we still self-heal from a missed/dropped frame without
+  // hammering the API.
   useEffect(() => {
+    const ms = conversationId ? 30_000 : POLL_INTERVAL;
     const interval = setInterval(() => {
       fetchMessages();
       fetchBalance();
-    }, POLL_INTERVAL);
+    }, ms);
     return () => clearInterval(interval);
-  }, [fetchMessages, fetchBalance]);
+  }, [fetchMessages, fetchBalance, conversationId]);
 
   // ---- Auto-scroll with scroll-awareness ----
+  //
+  // Two-pass behavior so opening a chat anchors at the bottom (where the
+  // most recent message lives), and subsequent messages drip-feed in:
+  //   - Initial load / project switch → instant snap (behaviour: 'auto').
+  //   - Subsequent message arrivals → smooth scroll, but ONLY if the user
+  //     is already near the bottom. If they scrolled up to read history,
+  //     don't yank them down — let them finish reading.
 
+  const initialLoadedRef = useRef(false);
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     if (!userScrolledRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior });
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+      });
     }
   }, []);
 
+  // Reset anchor state when the project changes — fresh chat, fresh anchor.
   useEffect(() => {
-    scrollToBottom();
+    initialLoadedRef.current = false;
+    userScrolledRef.current = false;
+  }, [projectId]);
+
+  useEffect(() => {
+    if (chatMessages.length === 0) return;
+    if (!initialLoadedRef.current) {
+      initialLoadedRef.current = true;
+      scrollToBottom("auto");
+    } else {
+      scrollToBottom("smooth");
+    }
   }, [chatMessages, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
@@ -1217,6 +1422,22 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
   async function handleSend() {
     const text = inputValue.trim();
     if (!text || isSending) return;
+
+    // Slash commands. Currently only `/invoice <amount> [for <description>]
+    // [due <date>]` is supported. Parsing is intentionally forgiving — any
+    // shape mismatch falls through to a normal message send.
+    const slash = parseSlashCommand(text);
+    if (slash?.kind === "invoice") {
+      setInputValue("");
+      setInvoicePrefill({
+        key: Date.now(),
+        amount: slash.amountDollars,
+        description: slash.description,
+        due: slash.due,
+      });
+      setActiveAction("invoice");
+      return;
+    }
 
     setIsSending(true);
     setInputValue("");
@@ -1326,6 +1547,13 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
     setIsSending(true);
     try {
+      // <input type="date"> emits YYYY-MM-DD; the API's Zod schema is
+      // `.datetime()` which requires a full ISO-8601 timestamp. Pad to end
+      // of day in the user's local TZ so "due Apr 30" doesn't read as
+      // midnight UTC the day before.
+      const dueIso = data.due
+        ? new Date(`${data.due}T23:59:59`).toISOString()
+        : undefined;
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1333,7 +1561,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
           projectId,
           description: data.description.trim(),
           amount: amountCents,
-          dueDate: data.due || undefined,
+          dueDate: dueIso,
           recipientEmail: data.recipientEmail || undefined,
           splits: data.splits.length > 0 ? data.splits : undefined,
         }),
@@ -1619,7 +1847,10 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
     { key: "proposal", icon: <IconProposal size={13} />, label: "Proposal", roles: ["creator"] },
     { key: "milestone", icon: <IconMilestone size={13} />, label: "Milestone", roles: ["creator"] },
     { key: "task", icon: <IconTask size={13} />, label: "Task", roles: ["both"] },
-    { key: "payment", icon: <IconDollar size={13} />, label: "Payment", roles: ["client"] },
+    // Direct payment — open to both sides. A client paying a creator is the
+    // common case; a creator paying a collaborator (e.g. splitting fees) is
+    // valid too. The form's recipient picker filters out the sender.
+    { key: "payment", icon: <IconDollar size={13} />, label: "Payment", roles: ["both"] },
     { key: "files", icon: <IconPaperclip size={13} />, label: "Files", roles: ["both"], immediate: true },
   ];
 
@@ -1668,6 +1899,10 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
           <div className="flex flex-col gap-0.5">
             {chatMessages.map((msg, idx) => {
               const prev = idx > 0 ? chatMessages[idx - 1] : null;
+              // Day divider — render a thin centered date line whenever the
+              // calendar day changes between consecutive messages. "Today"
+              // and "Yesterday" labels for the recent two; full date past that.
+              const showDayDivider = !prev || !sameLocalDay(prev.createdAt, msg.createdAt);
               const isStructured =
                 msg.content?.includes("INVOICE") ||
                 msg.content?.includes("PROPOSAL") ||
@@ -1693,12 +1928,72 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 !prevIsStructured &&
                 !isStructured;
 
+              // Helper: every render branch wraps its output in a Fragment
+              // keyed by msg.id so the optional day divider sits inline at
+              // the top of each "first-of-day" message.
+              const withDivider = (node: React.ReactNode) => (
+                <Fragment key={msg.id}>
+                  {showDayDivider && (
+                    <div className="flex items-center gap-3 my-3 px-4 select-none">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+                        {dayDividerLabel(msg.createdAt)}
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                  )}
+                  {node}
+                </Fragment>
+              );
+
               // System messages (non-structured)
               if (msg.messageType === "system" && !isStructured) {
-                return <SystemMessage key={msg.id} content={msg.content} />;
+                return withDivider(<SystemMessage content={msg.content} />);
               }
 
-              // Invoice message
+              // Structured invoice message (the new path — Phase 1 made
+              // every invoice an FK message). When the API hydrates
+              // `msg.invoice`, render directly from those fields. Skips
+              // the legacy regex parser entirely — paid/voided/past_due
+              // status flips arrive via SSE and re-render via state.
+              if (msg.messageType === "invoice" && msg.invoice) {
+                const inv = msg.invoice;
+                const isMine = inv.senderId === currentUserId;
+                const senderMember = members.find((m) => m.userId === inv.senderId);
+                const recipientMember = members.find((m) => m.userId === inv.recipientId);
+                const structuredInvoice: ParsedInvoice = {
+                  description: inv.description,
+                  amount: (inv.amountCents / 100).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }),
+                  due: inv.dueDate
+                    ? new Date(inv.dueDate).toLocaleDateString()
+                    : null,
+                  status: inv.status,
+                  invoiceId: inv.id,
+                  payUrl: inv.paymentUrl,
+                  from: senderMember?.name || null,
+                  to: recipientMember?.name || null,
+                };
+                return withDivider((
+                  <div
+                    key={msg.id}
+                    className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${isMine ? "justify-end" : "justify-start"}`}
+                  >
+                    <InvoiceCard
+                      invoice={structuredInvoice}
+                      currentUserName={currentUserName}
+                      isSender={isMine}
+                      onCheckStatus={handleCheckInvoiceStatus}
+                      onSendEmail={handleSendInvoiceEmail}
+                      checking={checkingInvoice === inv.id}
+                    />
+                  </div>
+                ));
+              }
+
+              // Legacy: text-parsed invoice message (pre-Phase 1).
               const invoice = parseInvoiceContent(msg.content);
               if (invoice) {
                 // Determine if current user is the invoice sender using From/To fields
@@ -1719,7 +2014,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 } else {
                   invoiceSentByMe = msg.senderId === currentUserId;
                 }
-                return (
+                return withDivider((
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${invoiceSentByMe ? "justify-end" : "justify-start"}`}>
                     <InvoiceCard
                       invoice={invoice}
@@ -1730,28 +2025,28 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                       checking={checkingInvoice === invoice.invoiceId}
                     />
                   </div>
-                );
+                ));
               }
 
               // Proposal message
               const proposal = parseProposalContent(msg.content);
               if (proposal) {
                 const isOwn = msg.senderId === currentUserId;
-                return (
+                return withDivider((
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${isOwn ? "justify-end" : "justify-start"}`}>
                     <ProposalCard proposal={proposal} onAccept={!isOwn ? handleAcceptProposal : undefined} isOwn={isOwn} senderName={msg.senderName} />
                   </div>
-                );
+                ));
               }
 
               // Milestone message
               const milestone = parseMilestone(msg.content);
               if (milestone) {
-                return (
+                return withDivider((
                   <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.25s_ease-out]">
                     <MilestoneCard title={milestone.title} amount={milestone.amount} status={milestone.status} />
                   </div>
-                );
+                ));
               }
 
               // Direct payment / payment received message
@@ -1796,7 +2091,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                   ? `You sent this${payTo ? ` to ${payTo}` : ""}`
                   : `${payFrom || "Someone"} sent you a payment`;
 
-                return (
+                return withDivider((
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${paySentByMe ? "justify-end" : "justify-start"}`}>
                     <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
                       <div className={`px-3 py-2 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
@@ -1866,12 +2161,12 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                       )}
                     </div>
                   </div>
-                );
+                ));
               }
 
               // Terms accepted message
               if (msg.content?.includes("TERMS ACCEPTED")) {
-                return (
+                return withDivider((
                   <div key={msg.id} className="flex justify-center py-3 animate-[fadeInUp_0.25s_ease-out]">
                     <div className="flex items-center gap-2 px-4 py-2 bg-positive/5 rounded-full border border-positive/20">
                       <span className="text-positive"><IconCheck size={14} /></span>
@@ -1879,13 +2174,13 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                       <span className="text-[11px] text-text-muted ml-1">by {msg.senderId === currentUserId ? "you" : msg.senderName}</span>
                     </div>
                   </div>
-                );
+                ));
               }
 
               // Task created message
               if (msg.content?.includes("TASK CREATED") && msg.messageType === "system") {
                 const taskContent = msg.content.replace("TASK CREATED\n", "").replace("TASK CREATED", "");
-                return (
+                return withDivider((
                   <div key={msg.id} className="flex items-center gap-3 py-3 animate-[fadeInUp_0.2s_ease-out]">
                     <div className="flex-1 h-px bg-border" />
                     <div className="flex items-center gap-1.5">
@@ -1894,7 +2189,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                     </div>
                     <div className="flex-1 h-px bg-border" />
                   </div>
-                );
+                ));
               }
 
               const isOwn = msg.senderId === currentUserId;
@@ -1936,6 +2231,31 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Typing indicator — sits just above the composer so you don't lose
+          your place in the feed. Auto-clears 5s after the last `typing` SSE
+          event from the peer (via useTypingIndicator). */}
+      {typingPeer && (
+        <div className="px-4 py-1 text-[11px] text-text-muted animate-[fadeInUp_0.18s_ease-out]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex gap-0.5">
+              <span
+                className="w-1 h-1 rounded-full bg-text-muted"
+                style={{ animation: "typingDot 1.2s ease-in-out infinite", animationDelay: "0s" }}
+              />
+              <span
+                className="w-1 h-1 rounded-full bg-text-muted"
+                style={{ animation: "typingDot 1.2s ease-in-out infinite", animationDelay: "0.15s" }}
+              />
+              <span
+                className="w-1 h-1 rounded-full bg-text-muted"
+                style={{ animation: "typingDot 1.2s ease-in-out infinite", animationDelay: "0.3s" }}
+              />
+            </span>
+            {typingPeer.name || "Someone"} is typing…
+          </span>
+        </div>
+      )}
+
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -1947,10 +2267,17 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       {/* Inline forms */}
       {activeAction === "invoice" && (
         <InvoiceForm
+          key={invoicePrefill?.key ?? "default"}
           onSend={handleSendInvoice}
-          onCancel={() => setActiveAction(null)}
+          onCancel={() => {
+            setActiveAction(null);
+            setInvoicePrefill(null);
+          }}
           sending={isSending}
           members={members}
+          initialDescription={invoicePrefill?.description}
+          initialAmount={invoicePrefill?.amount}
+          initialDue={invoicePrefill?.due}
         />
       )}
       {activeAction === "proposal" && (
@@ -2021,10 +2348,11 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
             onChange={(e) => {
               if (e.target.value.length <= MAX_CHARS) {
                 setInputValue(e.target.value);
+                pingTyping();
               }
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder="Type a message…  ·  /invoice 250 for site copy"
             rows={1}
             className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
             style={{ minHeight: "22px" }}

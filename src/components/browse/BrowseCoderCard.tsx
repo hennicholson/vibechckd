@@ -62,13 +62,26 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
   const initial = (coder.displayName || "?").charAt(0).toUpperCase();
 
   return (
-    <motion.button
+    // Card root is a div with role="button" (not a real <button>) so the
+    // nested FavoriteButton can stay a real <button> without violating the
+    // HTML rule that <button> can't be a descendant of <button>. We add
+    // explicit keyboard handlers (Enter / Space) to keep accessibility on
+    // par with a real button.
+    <motion.div
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.02, 0.2), ease: [0.2, 0, 0, 1] }}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       className="group text-left bg-background border border-border rounded-[10px] overflow-hidden hover:border-border-hover transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-text-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`View profile for ${coder.displayName}`}
     >
@@ -176,6 +189,6 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
           </div>
         )}
       </div>
-    </motion.button>
+    </motion.div>
   );
 }

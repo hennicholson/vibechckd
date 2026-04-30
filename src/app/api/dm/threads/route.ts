@@ -2,80 +2,72 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  directMessageThreads,
-  directMessageParticipants,
-  directMessages,
-  users,
+  conversations,
+  conversationParticipants,
 } from "@/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
+
+// Thin shim — preserves the legacy /api/dm/threads response shape so the
+// inbox UI keeps working unchanged. Reads/writes flow through the unified
+// `conversations` + `conversation_participants` tables. The old N+1
+// (one query per thread for participants and last message) is replaced
+// with a single SQL using LATERAL JOINs against the new schema.
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
-  // Get all threads the current user participates in
-  const myParticipations = await db
-    .select({ threadId: directMessageParticipants.threadId })
-    .from(directMessageParticipants)
-    .where(eq(directMessageParticipants.userId, session.user.id));
+  const result = (await db.execute(sql`
+    SELECT
+      c."id" AS "threadId",
+      ps."participants",
+      lm."content" AS "lastMessage",
+      lm."created_at" AS "lastMessageAt"
+    FROM "conversations" c
+    JOIN "conversation_participants" cp
+      ON cp."conversation_id" = c."id"
+     AND cp."user_id" = ${userId}
+     AND cp."left_at" IS NULL
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object('userId', u."id", 'name', u."name", 'image', u."image")
+      ) AS "participants"
+      FROM "conversation_participants" cp2
+      JOIN "users" u ON u."id" = cp2."user_id"
+      WHERE cp2."conversation_id" = c."id"
+        AND cp2."user_id" <> ${userId}
+        AND cp2."left_at" IS NULL
+    ) ps ON true
+    LEFT JOIN LATERAL (
+      SELECT m."content", m."created_at"
+      FROM "messages" m
+      WHERE m."conversation_id" = c."id"
+      ORDER BY m."created_at" DESC
+      LIMIT 1
+    ) lm ON true
+    WHERE c."kind" IN ('dm', 'job_application')
+    ORDER BY COALESCE(lm."created_at", c."updated_at") DESC NULLS LAST
+  `)) as unknown as {
+    rows: Array<{
+      threadId: string;
+      participants: Array<{ userId: string; name: string | null; image: string | null }> | null;
+      lastMessage: string | null;
+      lastMessageAt: string | null;
+    }>;
+  };
 
-  if (myParticipations.length === 0) {
-    return Response.json([]);
-  }
-
-  const threadIds = myParticipations.map((p) => p.threadId);
-
-  // For each thread, get the other participants and the last message
-  const threads = await Promise.all(
-    threadIds.map(async (threadId) => {
-      // Get other participants with user info
-      const participants = await db
-        .select({
-          userId: users.id,
-          name: users.name,
-          image: users.image,
-        })
-        .from(directMessageParticipants)
-        .innerJoin(users, eq(directMessageParticipants.userId, users.id))
-        .where(
-          and(
-            eq(directMessageParticipants.threadId, threadId),
-            sql`${directMessageParticipants.userId} != ${session.user.id}`
-          )
-        );
-
-      // Get last message
-      const [lastMsg] = await db
-        .select({
-          content: directMessages.content,
-          createdAt: directMessages.createdAt,
-          senderId: directMessages.senderId,
-        })
-        .from(directMessages)
-        .where(eq(directMessages.threadId, threadId))
-        .orderBy(desc(directMessages.createdAt))
-        .limit(1);
-
-      return {
-        threadId,
-        participants,
-        lastMessage: lastMsg?.content || null,
-        lastMessageAt: lastMsg?.createdAt || null,
-      };
-    })
+  // db.execute() returns { rows, rowCount, ... } — pull rows explicitly.
+  return Response.json(
+    (result.rows ?? []).map((r) => ({
+      threadId: r.threadId,
+      participants: r.participants ?? [],
+      lastMessage: r.lastMessage,
+      lastMessageAt: r.lastMessageAt,
+    }))
   );
-
-  // Sort by last message time descending (threads with no messages go last)
-  threads.sort((a, b) => {
-    if (!a.lastMessageAt && !b.lastMessageAt) return 0;
-    if (!a.lastMessageAt) return 1;
-    if (!b.lastMessageAt) return -1;
-    return b.lastMessageAt.getTime() - a.lastMessageAt.getTime();
-  });
-
-  return Response.json(threads);
 }
 
 export async function POST(request: NextRequest) {
@@ -84,16 +76,11 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { recipientId } = body;
-
+  const body = await request.json().catch(() => null);
+  const recipientId: string | undefined = body?.recipientId;
   if (!recipientId) {
-    return Response.json(
-      { error: "recipientId is required" },
-      { status: 400 }
-    );
+    return Response.json({ error: "recipientId is required" }, { status: 400 });
   }
-
   if (recipientId === session.user.id) {
     return Response.json(
       { error: "Cannot create a DM thread with yourself" },
@@ -101,40 +88,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check if a thread already exists between these two users
-  // Find threads where both users are participants
-  const myThreads = await db
-    .select({ threadId: directMessageParticipants.threadId })
-    .from(directMessageParticipants)
-    .where(eq(directMessageParticipants.userId, session.user.id));
-
-  for (const { threadId } of myThreads) {
-    const [recipientParticipation] = await db
-      .select()
-      .from(directMessageParticipants)
-      .where(
-        and(
-          eq(directMessageParticipants.threadId, threadId),
-          eq(directMessageParticipants.userId, recipientId)
-        )
+  // Find an existing 1:1 dm conversation between exactly these two users.
+  const existing = (await db.execute(sql`
+    SELECT c."id"
+    FROM "conversations" c
+    WHERE c."kind" = 'dm'
+      AND (
+        SELECT COUNT(*) FROM "conversation_participants" cp
+        WHERE cp."conversation_id" = c."id" AND cp."left_at" IS NULL
+      ) = 2
+      AND EXISTS (
+        SELECT 1 FROM "conversation_participants" cpA
+        WHERE cpA."conversation_id" = c."id" AND cpA."user_id" = ${session.user.id}
       )
-      .limit(1);
+      AND EXISTS (
+        SELECT 1 FROM "conversation_participants" cpB
+        WHERE cpB."conversation_id" = c."id" AND cpB."user_id" = ${recipientId}
+      )
+    LIMIT 1
+  `)) as unknown as { rows: Array<{ id: string }> };
 
-    if (recipientParticipation) {
-      return Response.json({ threadId });
-    }
+  if ((existing.rows?.length ?? 0) > 0) {
+    return Response.json({ threadId: existing.rows[0].id });
   }
 
-  // No existing thread found — create a new one
-  const [thread] = await db
-    .insert(directMessageThreads)
-    .values({})
-    .returning();
-
-  await db.insert(directMessageParticipants).values([
-    { threadId: thread.id, userId: session.user.id },
-    { threadId: thread.id, userId: recipientId },
+  const [conv] = await db
+    .insert(conversations)
+    .values({ kind: "dm" })
+    .returning({ id: conversations.id });
+  await db.insert(conversationParticipants).values([
+    { conversationId: conv.id, userId: session.user.id },
+    { conversationId: conv.id, userId: recipientId },
   ]);
 
-  return Response.json({ threadId: thread.id });
+  return Response.json({ threadId: conv.id });
 }

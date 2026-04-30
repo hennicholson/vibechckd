@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PageShell from "@/components/PageShell";
+
 
 interface JobDetail {
   id: string;
@@ -69,28 +69,28 @@ export default function JobApplyClient({ id }: { id: string }) {
 
   if (error) {
     return (
-      <PageShell>
-        <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 md:py-12">
+      <div className="h-full overflow-y-auto">
+        <div className="w-full max-w-3xl px-4 md:px-8 pt-4 md:pt-6 pb-8">
           <p className="text-[13px] text-negative">{error}</p>
         </div>
-      </PageShell>
+      </div>
     );
   }
 
   if (!job) {
     return (
-      <PageShell>
-        <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 md:py-12">
+      <div className="h-full overflow-y-auto">
+        <div className="w-full max-w-3xl px-4 md:px-8 pt-4 md:pt-6 pb-8">
           <div className="h-6 w-64 bg-surface-muted rounded animate-pulse mb-4" />
           <div className="h-32 bg-surface-muted rounded-[10px] animate-pulse" />
         </div>
-      </PageShell>
+      </div>
     );
   }
 
   return (
-    <PageShell>
-      <div className="max-w-2xl mx-auto px-4 md:px-6 py-8 md:py-12">
+    <div className="h-full overflow-y-auto">
+      <div className="w-full max-w-3xl px-4 md:px-8 pt-4 md:pt-6 pb-8">
         <Link
           href="/jobs"
           className="text-[11px] font-mono text-text-muted hover:text-text-primary inline-flex items-center gap-1 mb-3"
@@ -162,6 +162,6 @@ export default function JobApplyClient({ id }: { id: string }) {
           </section>
         )}
       </div>
-    </PageShell>
+    </div>
   );
 }

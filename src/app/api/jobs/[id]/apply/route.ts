@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
@@ -7,42 +7,43 @@ import {
   jobApplications,
   coderProfiles,
   users,
-  directMessageThreads,
-  directMessageParticipants,
-  directMessages,
+  conversations,
+  conversationParticipants,
+  messages,
 } from "@/db/schema";
 import { parseBody, z } from "@/lib/validation";
+import { publishConversationEvent } from "@/lib/conversation-bus";
 
-// Find an existing 1:1 DM thread between two users (a thread that has
-// EXACTLY these two participants, no more), or create a new one and add
-// them. Returns the threadId.
-async function findOrCreateThread(userA: string, userB: string): Promise<string> {
-  // Threads that contain BOTH users…
-  const candidate = await db.execute<{ thread_id: string }>(sql`
-    SELECT thread_id FROM direct_message_participants
-    WHERE user_id IN (${userA}, ${userB})
-    GROUP BY thread_id
-    HAVING COUNT(DISTINCT user_id) = 2
-  `);
-  // …filter to threads with exactly 2 participants total.
-  for (const row of candidate as unknown as { thread_id: string }[]) {
-    const counted = await db.execute<{ n: number }>(sql`
-      SELECT COUNT(*)::int AS n FROM direct_message_participants
-      WHERE thread_id = ${row.thread_id}
-    `);
-    const total = (counted as unknown as { n: number }[])[0]?.n ?? 0;
-    if (total === 2) return row.thread_id;
-  }
-  // Create a new thread + add both participants.
-  const [thread] = await db
-    .insert(directMessageThreads)
-    .values({})
-    .returning({ id: directMessageThreads.id });
-  await db.insert(directMessageParticipants).values([
-    { threadId: thread.id, userId: userA },
-    { threadId: thread.id, userId: userB },
+// Find or create the job_application conversation between client + creator
+// for a given application id. We tie the conversation to the application
+// (not the job) so when the client clicks "Start project," start-project
+// can transition this exact conversation in place to kind='project'.
+async function findOrCreateAppConversation(
+  applicationId: string,
+  clientId: string,
+  creatorId: string
+): Promise<string> {
+  const [existing] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.jobApplicationId, applicationId),
+        eq(conversations.kind, "job_application")
+      )
+    )
+    .limit(1);
+  if (existing) return existing.id;
+
+  const [created] = await db
+    .insert(conversations)
+    .values({ kind: "job_application", jobApplicationId: applicationId })
+    .returning({ id: conversations.id });
+  await db.insert(conversationParticipants).values([
+    { conversationId: created.id, userId: clientId },
+    { conversationId: created.id, userId: creatorId },
   ]);
-  return thread.id;
+  return created.id;
 }
 
 export const runtime = "nodejs";
@@ -140,11 +141,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     })
     .returning({ id: jobApplications.id });
 
-  // Open (or reuse) a 1:1 DM thread between client and creator + post a
-  // system-style message announcing the application. Both parties see
-  // this in /dashboard/inbox via the existing direct-message UI.
-  // Failures here are non-fatal — the application itself is the source
-  // of truth for the apply action.
+  // Open (or reuse) the job_application conversation between client and
+  // creator + post a system message announcing the application. Both parties
+  // see this in /dashboard/inbox under the unified conversations list. When
+  // the client clicks "Start project," start-project will flip this same
+  // conversation to kind='project' — preserving full history.
+  // Failures here are non-fatal — the application is the source of truth.
   try {
     const [creator] = await db
       .select({ name: users.name })
@@ -152,16 +154,32 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .where(eq(users.id, session.user.id))
       .limit(1);
     const creatorName = creator?.name || "A creator";
-    const threadId = await findOrCreateThread(job.clientId, session.user.id);
+    const conversationId = await findOrCreateAppConversation(
+      created.id,
+      job.clientId,
+      session.user.id
+    );
     const lines = [
       `${creatorName} applied to your job: "${job.title}".`,
       pitch ? `\nTheir pitch:\n${pitch}` : null,
     ].filter(Boolean);
-    await db.insert(directMessages).values({
-      threadId,
-      senderId: session.user.id,
-      content: lines.join(""),
-      messageType: "system",
+    const [systemMsg] = await db
+      .insert(messages)
+      .values({
+        conversationId,
+        senderId: session.user.id,
+        content: lines.join(""),
+        messageType: "system",
+      })
+      .returning({ id: messages.id });
+    await db
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, conversationId));
+    publishConversationEvent({
+      type: "message",
+      messageId: systemMsg.id,
+      conversationId,
     });
   } catch {
     // swallow — application created successfully regardless

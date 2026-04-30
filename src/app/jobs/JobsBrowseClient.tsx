@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import PageShell from "@/components/PageShell";
 
 interface JobRow {
   id: string;
@@ -32,8 +31,8 @@ export default function JobsBrowseClient() {
   }, []);
 
   return (
-    <PageShell>
-      <div className="max-w-3xl mx-auto px-4 md:px-6 py-8 md:py-12">
+    <div className="h-full overflow-y-auto">
+      <div className="w-full px-4 md:px-8 pt-4 md:pt-6 pb-8">
         <div className="mb-8">
           <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">Job board</p>
           <h1 className="text-[26px] font-semibold text-text-primary tracking-[-0.02em]">Open jobs</h1>
@@ -106,6 +105,6 @@ export default function JobsBrowseClient() {
           </ul>
         )}
       </div>
-    </PageShell>
+    </div>
   );
 }

@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationPage() {
-  const { id } = await requireRole(["coder"]);
+  const { id } = await requireRole(["coder", "admin"]);
 
   // Most recent application + the linked coderProfile status. Both surfaces
   // are useful: applications.status tracks the vetting workflow,

@@ -4,6 +4,6 @@ import EarningsClient from "./EarningsClient";
 export const dynamic = "force-dynamic";
 
 export default async function EarningsPage() {
-  await requireRole(["coder"]);
+  await requireRole(["coder", "admin"]);
   return <EarningsClient />;
 }

@@ -185,85 +185,79 @@ function MobileTopBar({
           />
         </button>
       </div>
-      <AnimatePresence>
-        {drawerOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="border-t border-border overflow-hidden"
-          >
-            <div className="px-4 py-3 space-y-1">
-              <Link href="/browse" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-primary font-medium bg-surface-muted">
-                Browse
-              </Link>
-              <Link href="/dashboard/teams/new" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-muted hover:text-text-primary">
-                Build a Team
-              </Link>
-              <Link href="/dashboard/projects" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-muted hover:text-text-primary">
-                Projects
-              </Link>
-              <Link href="/dashboard/inbox" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 rounded-md text-[13px] text-text-muted hover:text-text-primary">
-                Messages
-              </Link>
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-2">Filter</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    onClick={() => { onFilterChange("all"); setDrawerOpen(false); }}
-                    className={`h-8 px-2.5 rounded-md text-[11px] font-medium ${filter === "all" ? "bg-text-primary text-white" : "bg-background text-text-primary border border-border"}`}
-                  >
-                    All · {totalCount}
-                  </button>
-                  {SPECIALTIES.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => { onFilterChange(s); setDrawerOpen(false); }}
-                      className={`h-8 px-2.5 rounded-md text-[11px] font-medium ${filter === s ? "bg-text-primary text-white" : "bg-background text-text-primary border border-border"}`}
-                    >
-                      {SPECIALTY_LABELS[s]} · {counts[s] ?? 0}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {session?.user ? (
-                <div className="border-t border-border pt-3 mt-3 space-y-0.5">
-                  <Link href="/dashboard" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary">Dashboard</Link>
-                  <Link href="/dashboard/profile" onClick={() => setDrawerOpen(false)} className="block px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary">Profile</Link>
-                  <button
-                    onClick={() => { setDrawerOpen(false); signOut({ callbackUrl: "/" }); }}
-                    className="block w-full text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary cursor-pointer"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <div className="border-t border-border pt-3 mt-3 flex gap-2">
-                  <Link
-                    href="/login"
-                    onClick={() => setDrawerOpen(false)}
-                    className="flex-1 text-center py-1.5 text-[12px] text-text-primary border border-border rounded-md"
-                  >
-                    Log in
-                  </Link>
-                  <Link
-                    href="/apply"
-                    onClick={() => setDrawerOpen(false)}
-                    className="flex-1 text-center py-1.5 text-[12px] font-medium text-white bg-text-primary rounded-md"
-                  >
-                    Apply
-                  </Link>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* Mobile search */}
       <div className="px-4 pb-3">
         <BrowseSearchBar value={searchValue} onChange={onSearchChange} />
       </div>
+
+      {/* Drawer — fixed overlay below the top row so content underneath isn't
+          pushed down. Filter UI is intentionally NOT duplicated here; the
+          BrowseFilterPills row on the page already handles filtering on mobile. */}
+      <AnimatePresence>
+        {drawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="md:hidden fixed inset-x-0 top-[48px] bottom-0 z-40 bg-black/30"
+              onClick={() => setDrawerOpen(false)}
+            />
+            <motion.div
+              initial={{ y: -8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -8, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="md:hidden fixed inset-x-0 top-[48px] z-50 bg-background border-b border-border max-h-[calc(100vh-48px)] overflow-y-auto"
+            >
+              <div className="px-4 py-3 space-y-0.5">
+                <Link href="/browse" onClick={() => setDrawerOpen(false)} className="block px-2 py-2 rounded-md text-[14px] text-text-primary font-medium bg-surface-muted">
+                  Browse Talent
+                </Link>
+                <Link href="/dashboard/teams/new" onClick={() => setDrawerOpen(false)} className="block px-2 py-2 rounded-md text-[14px] text-text-muted hover:text-text-primary">
+                  Build a Team
+                </Link>
+                <Link href="/dashboard/projects" onClick={() => setDrawerOpen(false)} className="block px-2 py-2 rounded-md text-[14px] text-text-muted hover:text-text-primary">
+                  Projects
+                </Link>
+                <Link href="/dashboard/inbox" onClick={() => setDrawerOpen(false)} className="block px-2 py-2 rounded-md text-[14px] text-text-muted hover:text-text-primary">
+                  Messages
+                </Link>
+                {session?.user ? (
+                  <div className="border-t border-border pt-2 mt-2 space-y-0.5">
+                    <Link href="/dashboard" onClick={() => setDrawerOpen(false)} className="block px-2 py-2 rounded-md text-[14px] text-text-muted hover:text-text-primary">Dashboard</Link>
+                    <Link href="/dashboard/profile" onClick={() => setDrawerOpen(false)} className="block px-2 py-2 rounded-md text-[14px] text-text-muted hover:text-text-primary">Profile</Link>
+                    <button
+                      onClick={() => { setDrawerOpen(false); signOut({ callbackUrl: "/" }); }}
+                      className="block w-full text-left px-2 py-2 rounded-md text-[14px] text-text-muted hover:text-text-primary cursor-pointer"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border-t border-border pt-3 mt-2 flex gap-2">
+                    <Link
+                      href="/login"
+                      onClick={() => setDrawerOpen(false)}
+                      className="flex-1 text-center py-2 text-[13px] text-text-primary border border-border rounded-md"
+                    >
+                      Log in
+                    </Link>
+                    <Link
+                      href="/apply"
+                      onClick={() => setDrawerOpen(false)}
+                      className="flex-1 text-center py-2 text-[13px] font-medium text-white bg-text-primary rounded-md"
+                    >
+                      Apply
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -400,7 +394,7 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        <div className="max-w-[1320px] w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
+        <div className="w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
           {/* Desktop search — sits above the header row */}
           <div className="hidden md:block mb-4">
             <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
@@ -463,7 +457,7 @@ export default function BrowsePage() {
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
@@ -489,7 +483,7 @@ export default function BrowsePage() {
               </div>
             ) : (
               <LayoutGroup>
-                <motion.div layout className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
+                <motion.div layout className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 xl:grid-cols-4">
                   <AnimatePresence mode="popLayout">
                     {filteredCoders.map((coder, i) => (
                       <BrowseCoderCard

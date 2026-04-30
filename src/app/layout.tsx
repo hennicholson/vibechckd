@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import { WhopIframeSdkProvider } from "@whop/react";
 import { ToastProvider } from "@/components/Toast";
 import { auth } from "@/lib/auth";
 import "./globals.css";
@@ -80,7 +81,15 @@ export default async function RootLayout({
           refetchOnWindowFocus={false}
           refetchInterval={0}
         >
-          <ToastProvider>{children}</ToastProvider>
+          {/* WhopIframeSdkProvider mounts the postmessage transport regardless
+              of context — when running standalone at vibechckd.cc the SDK
+              calls just no-op (parent doesn't reply). Components opt into
+              real iframe behaviour via useWhopIframeContext() which exposes
+              an `isInIframe` boolean, falling back to native window.open /
+              <a> behaviour outside Whop. */}
+          <WhopIframeSdkProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </WhopIframeSdkProvider>
         </SessionProvider>
       </body>
     </html>

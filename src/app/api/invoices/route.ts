@@ -1,11 +1,19 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { invoices, invoiceSplits, messages, projectMembers, users } from "@/db/schema";
+import {
+  invoices,
+  invoiceSplits,
+  messages,
+  projectMembers,
+  users,
+  conversations,
+} from "@/db/schema";
 import { eq, and, ne, desc } from "drizzle-orm";
 import { createInvoice } from "@/lib/whop";
 import { emails } from "@/lib/email";
 import { parseBody, z } from "@/lib/validation";
+import { publishConversationEvent } from "@/lib/conversation-bus";
 
 // Local HTML escape helper — duplicated intentionally (src/lib/email.ts is
 // owned by another agent and out-of-scope for this edit).
@@ -139,37 +147,31 @@ export async function POST(request: NextRequest) {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    const displayDue = dueDate || "Upon receipt";
 
-    // Get sender name for the message
-    const [senderUser] = await db
-      .select({ name: users.name })
-      .from(users)
-      .where(eq(users.id, session.user.id))
+    // Resolve the project's conversation. The 0012 backfill seeded one per
+    // project; new projects are seeded by the project-creation flow. If
+    // somehow missing, fall back to inserting a project conversation row
+    // here so the invoice still posts (degraded but never blocked).
+    let [projectConv] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.projectId, projectId),
+          eq(conversations.kind, "project")
+        )
+      )
       .limit(1);
-    const senderName = senderUser?.name || "Someone";
-    const recipientName = name || "the client";
-
-    // Build the system message content
-    let messageContent = `INVOICE SENT\nFrom: ${senderName}\nTo: ${recipientName}\nDescription: ${description}\nAmount: $${displayAmount}\nDue: ${displayDue}\nStatus: Sent\nInvoice ID: ${whopInvoice.id}`;
-
-    if (whopInvoice.paymentUrl) {
-      messageContent += `\nPay: ${whopInvoice.paymentUrl}`;
+    if (!projectConv) {
+      const [created] = await db
+        .insert(conversations)
+        .values({ kind: "project", projectId })
+        .returning({ id: conversations.id });
+      projectConv = created;
     }
+    const conversationId = projectConv.id;
 
-    // Insert system message into the project chat
-    const [chatMessage] = await db
-      .insert(messages)
-      .values({
-        projectId,
-        senderId: session.user.id,
-        content: messageContent,
-        messageType: "system",
-        fileUrl: null,
-      })
-      .returning();
-
-    // Persist invoice to the invoices table
+    // Persist invoice first (no messageId yet — circular FK is filled in below).
     const [invoice] = await db
       .insert(invoices)
       .values({
@@ -182,9 +184,42 @@ export async function POST(request: NextRequest) {
         status: saveDraft ? "draft" : "sent",
         dueDate: dueDate ? new Date(dueDate) : null,
         paymentUrl: whopInvoice.paymentUrl || null,
-        messageId: chatMessage.id,
+        messageId: null,
       })
       .returning();
+
+    // Insert a structured invoice message. Body is a one-line summary —
+    // the rich card UI is rendered client-side from the `invoiceId` FK
+    // join, no fragile text-parsing.
+    const [chatMessage] = await db
+      .insert(messages)
+      .values({
+        conversationId,
+        projectId,
+        senderId: session.user.id,
+        content: `Sent invoice: ${description} ($${displayAmount})`,
+        messageType: "invoice",
+        invoiceId: invoice.id,
+      })
+      .returning();
+
+    // Stamp the message back onto the invoice so the audit link is bidirectional.
+    await db
+      .update(invoices)
+      .set({ messageId: chatMessage.id })
+      .where(eq(invoices.id, invoice.id));
+    invoice.messageId = chatMessage.id;
+
+    // Touch conversation.updated_at + fan out to SSE listeners.
+    await db
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, conversationId));
+    publishConversationEvent({
+      type: "message",
+      messageId: chatMessage.id,
+      conversationId,
+    });
 
     // Insert splits if provided
     let insertedSplits: typeof invoiceSplits.$inferSelect[] = [];
@@ -222,9 +257,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Invoice creation failed:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to create invoice";
-    return Response.json({ error: message }, { status: 500 });
+    const raw = error instanceof Error ? error.message : "Failed to create invoice";
+
+    // Whop returns "Required permission: invoice:create" when the app's
+    // Whop dashboard config doesn't include that scope. Surface a clearer
+    // message + 503 (config error, not server bug) so the UI can show
+    // "Configuration needed" rather than a generic 500.
+    if (raw.includes("invoice:create")) {
+      return Response.json(
+        {
+          error:
+            "Whop permission missing. Add `invoice:create` to your app's permissions in the Whop developer dashboard, then reinstall the app.",
+          code: "missing_invoice_permission",
+        },
+        { status: 503 }
+      );
+    }
+    return Response.json({ error: raw }, { status: 500 });
   }
 }
 

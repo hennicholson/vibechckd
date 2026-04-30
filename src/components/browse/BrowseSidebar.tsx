@@ -48,22 +48,36 @@ function NavItem({
   icon: React.ReactNode;
   children: React.ReactNode;
 }) {
-  // Label text is hidden between md and nav (compact-desktop / Whop iframe
-  // widths) so the rail collapses to icons-only and frees ~150px for content.
-  // `title` provides the affordance for what the icon means on hover.
+  // Below `nav` (1100px) the rail collapses to icons-only and the label is
+  // hidden — frees ~150px for content. Inverted to `nav:` only because the
+  // `max-{breakpoint}` variant from Tailwind v4 custom theme breakpoints
+  // wasn't being applied reliably; `nav:` (min-width) compiles correctly.
   const label = typeof children === "string" ? children : undefined;
   return (
     <Link
       href={href}
       title={label}
-      className={`flex items-center gap-2 px-2 py-1.5 nav:px-2 max-nav:justify-center max-nav:px-0 rounded-md text-[13px] transition-colors ${
+      className={`group relative flex items-center justify-center gap-2 px-0 py-1.5 nav:justify-start nav:px-2 rounded-md text-[13px] transition-colors ${
         active
           ? "text-text-primary font-medium bg-surface-muted"
           : "text-text-muted hover:text-text-primary hover:bg-background-alt"
       }`}
     >
       {icon}
-      <span className="flex-1 max-nav:hidden">{children}</span>
+      <span className="hidden nav:inline flex-1">{children}</span>
+      {/* Hover tooltip — only rendered when the rail is icon-only (sub-`nav`
+          breakpoint). Sits to the right of the icon with a subtle arrow,
+          opacity-fades in via group-hover. `pointer-events-none` so it
+          doesn't swallow clicks meant for the link beneath. */}
+      <span
+        className="nav:hidden pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-md bg-text-primary px-2 py-1 text-[11px] font-medium text-background opacity-0 group-hover:opacity-100 transition-opacity duration-100 shadow-md"
+      >
+        {label}
+        <span
+          aria-hidden
+          className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-[4px] border-y-transparent border-r-[5px] border-r-text-primary"
+        />
+      </span>
     </Link>
   );
 }
@@ -137,7 +151,7 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
   const showSetPassword = whopLinked && hasPassword === false;
 
   return (
-    <aside className="hidden md:flex flex-col w-[52px] nav:w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background transition-[width] duration-150">
+    <aside className="hidden md:flex flex-col w-[52px] nav:w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background transition-[width] duration-150 z-30">
       {/* Logo — at compact widths show only the verified seal so the rail
           stays tight; full wordmark returns at nav (1100px+). */}
       <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border">
@@ -192,7 +206,7 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
       <div className="mt-auto border-t border-border">
         {status === "authenticated" && session?.user ? (
           <div className="px-2 nav:px-3 py-3">
-            <div className="flex items-center gap-2 px-1 nav:px-2 mb-2 max-nav:justify-center">
+            <div className="flex items-center justify-center gap-2 px-1 nav:px-2 nav:justify-start mb-2">
               <div
                 className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0"
                 title={session.user.name || undefined}
@@ -224,7 +238,7 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               title="Sign out"
-              className="w-full text-left max-nav:text-center px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              className="w-full text-center nav:text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             >
               <span className="hidden nav:inline">Sign out</span>
               <span className="nav:hidden inline-flex items-center justify-center w-full" aria-hidden>

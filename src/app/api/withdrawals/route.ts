@@ -48,37 +48,31 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    // RACE CONDITION WARNING: The balance check and transaction insert below are
-    // NOT atomic. Two concurrent withdrawal requests could both pass the balance
-    // check and overdraw the account. A proper solution would use a database
-    // transaction with SELECT ... FOR UPDATE to lock the balance rows. With
-    // neon-http (serverless), true DB transactions require the websocket driver.
-
-    // Compute available balance from completed transactions
-    const [balance] = await db
-      .select({
-        total: sql<number>`coalesce(sum(${transactions.amountCents}), 0)`,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.status, "completed")
-        )
-      );
-
-    const availableCents = Number(balance.total);
-
-    if (amountCents > availableCents) {
-      return Response.json(
-        {
-          error: "Insufficient balance",
-          availableCents,
-          requestedCents: amountCents,
-        },
-        { status: 400 }
-      );
+    // Atomic balance check + pending withdrawal transaction insert.
+    // `request_withdrawal()` (drizzle/0013_atomic_withdrawal_fn.sql) holds a
+    // FOR UPDATE lock on the user's transaction rows so two concurrent calls
+    // can't both pass the balance check. RAISES sqlstate P0001 with message
+    // 'insufficient_balance' on overdraw — caught + returned as 400 below.
+    let pendingTxId: string;
+    try {
+      const result = (await db.execute(
+        sql`SELECT request_withdrawal(${userId}::uuid, ${amountCents}::int) AS id`
+      )) as unknown as { rows: Array<{ id: string }> };
+      pendingTxId = result.rows[0].id;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("insufficient_balance")) {
+        return Response.json(
+          {
+            error: "Insufficient balance",
+            requestedCents: amountCents,
+          },
+          { status: 400 }
+        );
+      }
+      throw err;
     }
+    transactionId = pendingTxId;
 
     // Check if user has a connected Whop company (check coderProfiles first, then users)
     let whopCompanyId: string | null = null;
@@ -117,7 +111,9 @@ export async function POST(request: NextRequest) {
     const idempotencyKey = crypto.randomUUID();
     const amountDollars = amountCents / 100;
 
-    // Insert withdrawal record with status "pending"
+    // The pending withdrawal *transaction* row was already inserted by
+    // request_withdrawal() (atomic). Insert the matching `withdrawals`
+    // table row here for payout-method tracking.
     const [withdrawal] = await db
       .insert(withdrawals)
       .values({
@@ -128,18 +124,13 @@ export async function POST(request: NextRequest) {
       .returning();
     withdrawalId = withdrawal.id;
 
-    // Insert transaction record with NEGATIVE amountCents, status "pending"
-    const [transaction] = await db
-      .insert(transactions)
-      .values({
-        userId,
-        type: "withdrawal",
-        status: "pending",
-        amountCents: -amountCents,
-        description: `Withdrawal of $${amountDollars.toFixed(2)}`,
-      })
-      .returning();
-    transactionId = transaction.id;
+    // Update the description on the auto-created transaction so it shows
+    // the dollar amount the user can recognize, instead of the generic
+    // 'Withdrawal request' the function inserted.
+    await db
+      .update(transactions)
+      .set({ description: `Withdrawal of $${amountDollars.toFixed(2)}` })
+      .where(eq(transactions.id, pendingTxId));
 
     // Execute the payout transfer via Whop
     const transferResult = await createPayoutTransfer({
@@ -166,7 +157,7 @@ export async function POST(request: NextRequest) {
         whopTransferId: transferResult.id,
         completedAt: new Date(),
       })
-      .where(eq(transactions.id, transaction.id));
+      .where(eq(transactions.id, pendingTxId));
 
     // Generate payout portal link so creator can claim funds
     let payoutPortalUrl: string | null = null;
@@ -186,7 +177,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       withdrawalId: withdrawal.id,
-      transactionId: transaction.id,
+      transactionId: pendingTxId,
       status: "completed",
       feeAmount: transferResult.feeAmount,
       payoutPortalUrl,

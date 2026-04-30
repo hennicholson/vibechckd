@@ -328,7 +328,7 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <div className="max-w-[1100px] h-full flex flex-col">
+    <div className="w-full h-full flex flex-col">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-center justify-between">

@@ -18,6 +18,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "@whop/embedded-components-react-js": "^0.0.12",
     "@whop/embedded-components-vanilla-js": "^0.0.12",
+    "@whop/react": "^0.3.2",
     "@whop/sdk": "^0.0.37",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",

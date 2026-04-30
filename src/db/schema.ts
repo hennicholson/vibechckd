@@ -21,7 +21,11 @@ export const assetTypeEnum = pgEnum("asset_type", ["pdf", "image", "video", "liv
 export const projectStatusEnum = pgEnum("project_status", ["draft", "proposal", "active", "review", "completed", "cancelled"]);
 export const taskStatusEnum = pgEnum("task_status", ["todo", "in_progress", "done"]);
 export const deliverableStatusEnum = pgEnum("deliverable_status", ["pending", "submitted", "approved", "revision_requested"]);
-export const messageTypeEnum = pgEnum("message_type", ["text", "file", "system", "ai"]);
+// Note: `invoice` is added via ALTER TYPE in migration 0012 — Postgres only
+// allows enum values to be appended, not replaced, so the schema definition
+// here lists the post-migration set.
+export const messageTypeEnum = pgEnum("message_type", ["text", "file", "system", "ai", "invoice"]);
+export const conversationKindEnum = pgEnum("conversation_kind", ["dm", "project", "job_application"]);
 export const applicationStatusEnum = pgEnum("application_status", ["applied", "under_review", "interview", "approved", "rejected"]);
 export const jobStatusEnum = pgEnum("job_status", ["open", "closed", "filled"]);
 export const jobApplicationStatusEnum = pgEnum("job_application_status", ["applied", "shortlisted", "rejected", "hired"]);
@@ -223,17 +227,82 @@ export const deliverables = pgTable("deliverables", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-// ── Messages ──
+// ── Conversations ──
+//
+// Polymorphic chat container — every chat surface (project group chat, 1:1 DM,
+// job-application thread) is a `conversation`. The `kind` column + nullable
+// `projectId` / `jobApplicationId` FKs let one row fit any context. Job
+// application threads transition in place to `kind='project'` when the client
+// clicks "Start project," preserving the full discussion history.
+//
+// Per-user unread state lives on `conversationParticipants.lastReadAt`,
+// replacing the old localStorage-based read timestamps in inbox UI.
 
-export const messages = pgTable("messages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  senderId: uuid("sender_id").references(() => users.id),
-  content: text("content").notNull(),
-  messageType: messageTypeEnum("message_type").default("text"),
-  fileUrl: text("file_url"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    kind: conversationKindEnum("kind").notNull(),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    jobApplicationId: uuid("job_application_id"),
+    title: text("title"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("conversations_project_id_idx").on(t.projectId),
+    index("conversations_job_app_id_idx").on(t.jobApplicationId),
+    index("conversations_updated_at_idx").on(t.updatedAt),
+  ]
+);
+
+export const conversationParticipants = pgTable(
+  "conversation_participants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { mode: "date" }).defaultNow().notNull(),
+    leftAt: timestamp("left_at", { mode: "date" }),
+    lastReadAt: timestamp("last_read_at", { mode: "date" }),
+  },
+  (t) => [
+    uniqueIndex("conv_participants_conv_user_uq").on(t.conversationId, t.userId),
+    index("conv_participants_user_conv_idx").on(t.userId, t.conversationId),
+  ]
+);
+
+// ── Messages ──
+//
+// Unified message store. `conversationId` is the new path; `projectId` is kept
+// nullable for the duration of the migration so the legacy /api/messages route
+// shim can still resolve project membership while the frontend cuts over.
+// `invoiceId` makes structured invoice messages first-class — replaces the
+// fragile parseInvoiceContent() text-parsing in ProjectChat.
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id").references(() => users.id),
+    content: text("content").notNull(),
+    messageType: messageTypeEnum("message_type").default("text"),
+    fileUrl: text("file_url"),
+    // FK declared at the constraint level in migration to break the circular
+    // dependency with `invoices.messageId` (drizzle can't express it inline).
+    invoiceId: uuid("invoice_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("messages_conversation_id_created_at_idx").on(t.conversationId, t.createdAt),
+    index("messages_project_id_idx").on(t.projectId),
+    index("messages_sender_id_idx").on(t.senderId),
+  ]
+);
 
 // ── Direct Messages ──
 

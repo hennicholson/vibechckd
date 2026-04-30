@@ -1,9 +1,16 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { messages, users, projectMembers } from "@/db/schema";
-import { eq, and, desc, lt } from "drizzle-orm";
+import {
+  messages,
+  users,
+  projectMembers,
+  conversations,
+  invoices,
+} from "@/db/schema";
+import { eq, and, desc, lt, inArray } from "drizzle-orm";
 import { parseBody, z } from "@/lib/validation";
+import { publishConversationEvent } from "@/lib/conversation-bus";
 
 const messagePostSchema = z
   .object({
@@ -78,8 +85,10 @@ export async function GET(request: NextRequest) {
       content: messages.content,
       messageType: messages.messageType,
       fileUrl: messages.fileUrl,
+      invoiceId: messages.invoiceId,
       createdAt: messages.createdAt,
       senderName: users.name,
+      conversationId: messages.conversationId,
     })
     .from(messages)
     .leftJoin(users, eq(messages.senderId, users.id))
@@ -87,7 +96,71 @@ export async function GET(request: NextRequest) {
     .orderBy(desc(messages.createdAt))
     .limit(limit);
 
-  return Response.json(rows);
+  // Hydrate invoice rows in a single query (replaces the old fragile
+  // text-parsing of the message body in ProjectChat).
+  const invoiceIds = rows
+    .map((r) => r.invoiceId)
+    .filter((x): x is string => !!x);
+  type InvoiceLite = {
+    id: string;
+    description: string;
+    amountCents: number;
+    status: string;
+    dueDate: Date | null;
+    paidAt: Date | null;
+    paymentUrl: string | null;
+    senderId: string | null;
+    recipientId: string | null;
+  };
+  const invoiceMap = new Map<string, InvoiceLite>();
+  if (invoiceIds.length > 0) {
+    const invs = await db
+      .select({
+        id: invoices.id,
+        description: invoices.description,
+        amountCents: invoices.amountCents,
+        status: invoices.status,
+        dueDate: invoices.dueDate,
+        paidAt: invoices.paidAt,
+        paymentUrl: invoices.paymentUrl,
+        senderId: invoices.senderId,
+        recipientId: invoices.recipientId,
+      })
+      .from(invoices)
+      .where(inArray(invoices.id, invoiceIds));
+    for (const i of invs) invoiceMap.set(i.id, i);
+  }
+  // We fetched DESC (newest first) so cursor pagination can grab the most
+  // recent N efficiently against the (conversation_id, created_at DESC)
+  // index. The chat UI expects ASC (oldest first → newest at the bottom),
+  // so reverse before serializing. Without this, ProjectChat renders the
+  // newest message at the TOP of the feed — exactly the bug you saw.
+  const hydrated = rows
+    .map((r) => ({
+      ...r,
+      invoice: r.invoiceId ? invoiceMap.get(r.invoiceId) ?? null : null,
+    }))
+    .reverse();
+
+  // Expose the project's conversationId via a response header so chat UI
+  // can subscribe to the new SSE stream without changing the array body
+  // shape that existing callers depend on.
+  const [projectConv] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.projectId, projectId),
+        eq(conversations.kind, "project")
+      )
+    )
+    .limit(1);
+
+  return Response.json(hydrated, {
+    headers: projectConv?.id
+      ? { "X-Conversation-Id": projectConv.id }
+      : undefined,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -122,10 +195,26 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Resolve the project's conversation so we can stamp conversationId
+  // (powers the new SSE stream) AND fan out a `message` event for any
+  // listeners already on the new API.
+  const [projectConv] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.projectId, projectId),
+        eq(conversations.kind, "project")
+      )
+    )
+    .limit(1);
+  const conversationId = projectConv?.id ?? null;
+
   const [created] = await db
     .insert(messages)
     .values({
       projectId,
+      conversationId,
       senderId: session.user.id,
       content,
       messageType: messageType || "text",
@@ -133,7 +222,18 @@ export async function POST(request: NextRequest) {
     })
     .returning();
 
-  // Return with sender name
+  if (conversationId) {
+    await db
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, conversationId));
+    publishConversationEvent({
+      type: "message",
+      messageId: created.id,
+      conversationId,
+    });
+  }
+
   return Response.json({
     ...created,
     senderName: session.user.name || "Unknown",
