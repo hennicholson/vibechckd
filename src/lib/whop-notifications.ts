@@ -14,7 +14,23 @@
 // underlying chat write. Errors are logged for observability but swallowed
 // so the user-facing path isn't slowed by a Whop API hiccup.
 
-import { getWhopClient } from "@/lib/whop-client";
+import { Whop } from "@whop/sdk";
+
+// Notifications-only client. We instantiate without `appID` because Whop
+// rejects notification calls that send `X-Whop-App-Id` unless the API key
+// is an App-scoped key — and our `WHOP_API_KEY` is a personal/user key
+// (the dev test script confirmed this path works). Other SDK calls
+// (invoices, transfers, webhooks) keep using the appID-scoped client
+// because they're routed under the app context.
+let _notificationsClient: Whop | null = null;
+function getNotificationsClient(): Whop {
+  if (_notificationsClient) return _notificationsClient;
+  const apiKey = process.env.WHOP_API_KEY;
+  if (!apiKey) throw new Error("WHOP_API_KEY is not configured");
+  const rawKey = apiKey.startsWith("Bearer ") ? apiKey.slice(7) : apiKey;
+  _notificationsClient = new Whop({ apiKey: rawKey });
+  return _notificationsClient;
+}
 
 interface NotifyOpts {
   // Recipients — only Whop user IDs (users.whopUserId values) work here.
@@ -79,7 +95,7 @@ export async function notifyWhopUsers(opts: NotifyOpts): Promise<void> {
   else if (companyId) params.company_id = companyId;
 
   try {
-    const client = getWhopClient();
+    const client = getNotificationsClient();
     const res = await client.notifications.create(
       params as Parameters<typeof client.notifications.create>[0]
     );
