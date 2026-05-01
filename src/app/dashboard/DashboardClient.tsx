@@ -140,7 +140,7 @@ function ClientOverview({ name }: { name: string }) {
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
           Quick actions
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
             href="/browse"
             className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors group"
@@ -165,6 +165,18 @@ function ClientOverview({ name }: { name: string }) {
             <p className="text-[13px] font-medium text-text-primary">Build a team</p>
             <p className="text-[11px] text-text-muted mt-0.5">Assemble your dream squad</p>
           </Link>
+          <Link
+            href="/dashboard/jobs/new"
+            className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-md bg-surface-muted flex items-center justify-center mb-3 group-hover:bg-text-primary group-hover:text-white transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.93 23.93 0 0 1 12 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2m4 6h.01M5 20h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
+              </svg>
+            </div>
+            <p className="text-[13px] font-medium text-text-primary">Post a job</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Brief vetted creators — replies in hours.</p>
+          </Link>
         </div>
       </div>
 
@@ -184,8 +196,8 @@ function ClientOverview({ name }: { name: string }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <p className="text-[13px] text-text-primary font-medium mb-1">No projects yet</p>
-            <p className="text-[11px] text-text-muted mb-3">Find a coder and start your first project.</p>
+            <p className="text-[13px] text-text-primary font-medium mb-1">Nothing in flight</p>
+            <p className="text-[11px] text-text-muted mb-3">Start a project — track tasks, payments, and chat from one place.</p>
             <Link
               href="/browse"
               className="inline-flex px-4 py-2 bg-text-primary text-white text-[12px] font-medium rounded-md hover:bg-accent-hover transition-colors"

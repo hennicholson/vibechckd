@@ -231,6 +231,11 @@ export default function ProjectDashboardPage() {
 
   return (
     <div className="w-full px-4 md:px-8 py-3 md:py-4">
+      {/* Header + tab nav block — sticky on mobile so the title and active
+          tab stay visible while chat / tasks scroll underneath. -mx-4 px-4
+          lets the bottom border bleed to the screen edges; bg-background is
+          required so messages don't ghost through during scroll. */}
+      <div className="sticky top-0 z-20 bg-background md:static -mx-4 md:mx-0 px-4 md:px-0 pb-1 md:pb-0 border-b md:border-b-0 border-border">
       {/* Header */}
       <div className="mb-3 md:mb-4">
         <div className="flex items-center gap-2 mb-1">
@@ -357,6 +362,7 @@ export default function ProjectDashboardPage() {
           </button>
         ))}
       </div>
+      </div>{/* /sticky header+tab block (PD-1) */}
 
       {/* Tab content */}
       {activeTab === "chat" && (
@@ -460,7 +466,7 @@ export default function ProjectDashboardPage() {
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
                   rows={3}
-                  placeholder="What is this project about?"
+                  placeholder="Describe the project"
                   className="w-full text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none focus:border-border-hover transition-colors"
                 />
               </div>
@@ -484,7 +490,7 @@ export default function ProjectDashboardPage() {
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
-                    placeholder="Add a tag..."
+                    placeholder="Tag…"
                     className="flex-1 text-[12px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-2.5 py-1.5 outline-none focus:border-border-hover transition-colors"
                   />
                   <button onClick={addTag} disabled={!newTag.trim()} className="text-[11px] font-medium text-text-secondary border border-border rounded-md px-2.5 py-1.5 hover:border-border-hover transition-colors cursor-pointer disabled:opacity-40">

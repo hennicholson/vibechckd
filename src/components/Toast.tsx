@@ -13,6 +13,15 @@ import { AnimatePresence, motion } from "framer-motion";
 
 type ToastType = "success" | "error" | "info";
 
+// Standardize "something went wrong" toast strings so the UI sounds like
+// one human assistant rather than a dozen different error templates.
+//
+//   toast(failed("send that"))      → "Couldn't send that — give it another shot"
+//   toast(failed("upload the file")) → "Couldn't upload the file — give it another shot"
+export function failed(action: string): string {
+  return `Couldn't ${action} — give it another shot`;
+}
+
 interface ToastItem {
   id: string;
   message: string;

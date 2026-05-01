@@ -6,7 +6,7 @@ import Input from "@/components/Input";
 import Textarea from "@/components/Textarea";
 import Button from "@/components/Button";
 import Tag from "@/components/Tag";
-import { useToast } from "@/components/Toast";
+import { useToast, failed } from "@/components/Toast";
 import FileUploadButton from "./FileUploadButton";
 
 const ASSET_TYPES = ["pdf", "image", "video", "live_preview", "figma"] as const;
@@ -93,7 +93,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
         };
         setAssets((prev) => [...prev, asset]);
       } catch {
-        toast("Failed to add asset", "error");
+        toast(failed("add that asset"), "error");
         return;
       }
     } else {
@@ -124,7 +124,7 @@ export default function PortfolioItemEditor({ item, onSave, onClose }: Portfolio
         });
         if (!res.ok) throw new Error("Failed to remove asset");
       } catch {
-        toast("Failed to remove asset", "error");
+        toast(failed("remove that asset"), "error");
         return;
       }
     }

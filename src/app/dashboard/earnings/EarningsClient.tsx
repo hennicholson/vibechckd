@@ -206,7 +206,7 @@ function WithdrawModal({
                 onClick={() => setAmount(maxDollars.toFixed(2))}
                 className="text-[11px] font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
               >
-                Withdraw all
+                Cash out all
               </button>
             </div>
           </div>
@@ -243,7 +243,7 @@ function WithdrawModal({
             ) : (
               <>
                 <IconArrowDown />
-                Withdraw {isValid ? formatCurrency(Math.round(parsed * 100)) : ""}
+                Cash out {isValid ? formatCurrency(Math.round(parsed * 100)) : ""}
               </>
             )}
           </button>
@@ -323,7 +323,7 @@ export default function EarningsPage() {
         return;
       }
 
-      toast("Withdrawal requested -- processing");
+      toast("On the way — funds settle in 2–3 business days.");
       setShowWithdraw(false);
       await fetchBalance();
       await fetchTransactions();
@@ -509,9 +509,9 @@ export default function EarningsPage() {
 
         {transactions.length === 0 ? (
           <div className="px-5 py-12 text-center">
-            <p className="text-[13px] text-text-muted">No transactions yet</p>
+            <p className="text-[13px] text-text-muted">Nothing yet</p>
             <p className="text-[12px] text-text-muted mt-1">
-              Transactions will appear here when you receive payments or make withdrawals
+              Earnings, payouts, and refunds land here as they happen.
             </p>
           </div>
         ) : (

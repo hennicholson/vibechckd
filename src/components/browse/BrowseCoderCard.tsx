@@ -35,6 +35,12 @@ interface BrowseCoderCardProps {
   coder: Coder;
   index: number;
   onClick: () => void;
+  // Viewer's role drives the inline action button on the card.
+  //   - client → "Start a project" (jumps to team-builder pre-filled with this coder)
+  //   - creator → "Connect" (opens or creates a 1:1 DM thread)
+  //   - guest / undefined → no button, card click opens public profile
+  viewerRole?: "client" | "creator" | "guest";
+  onPrimaryAction?: (coder: Coder) => void;
 }
 
 const availabilityDot: Record<Coder["availability"], string> = {
@@ -49,7 +55,13 @@ const availabilityLabel: Record<Coder["availability"], string> = {
   unavailable: "Unavailable",
 };
 
-export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCardProps) {
+export default function BrowseCoderCard({
+  coder,
+  index,
+  onClick,
+  viewerRole,
+  onPrimaryAction,
+}: BrowseCoderCardProps) {
   const { isFavorited, toggle } = useFavorites();
   const hasGif = isRealUrl(coder.gifPreviewUrl);
   const hasAvatar = isImageAssetReachable(coder.avatarUrl);
@@ -129,6 +141,21 @@ export default function BrowseCoderCard({ coder, index, onClick }: BrowseCoderCa
             size="sm"
           />
         </div>
+
+        {/* Role-aware primary action — bottom-right of hero. Click stops
+            propagation so it doesn't trigger the card's profile-open. */}
+        {viewerRole && viewerRole !== "guest" && onPrimaryAction && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrimaryAction(coder);
+            }}
+            className="absolute bottom-2 right-2 inline-flex items-center gap-1 h-8 px-3 rounded-md bg-background/95 backdrop-blur-sm border border-border text-[12px] font-medium text-text-primary hover:bg-background hover:border-border-hover transition cursor-pointer"
+          >
+            {viewerRole === "client" ? "Start a project" : "Connect"}
+          </button>
+        )}
       </div>
 
       {/* Info section */}

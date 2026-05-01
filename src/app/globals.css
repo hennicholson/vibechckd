@@ -147,6 +147,25 @@ html, body {
   );
 }
 
+/* Right-edge only fade — for horizontal pill rows where the leading element
+   (e.g. an "All" tab) should stay fully opaque and only the trailing overflow
+   dissolves out. Same `--fade` knob. */
+.edge-fade-r {
+  --fade: 28px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - var(--fade)),
+    transparent 100%
+  );
+          mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - var(--fade)),
+    transparent 100%
+  );
+}
+
 /* Typing indicator dots */
 @keyframes typingDot {
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }

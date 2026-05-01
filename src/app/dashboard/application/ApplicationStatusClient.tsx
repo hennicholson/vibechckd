@@ -57,7 +57,7 @@ export default function ApplicationStatusClient({
         <div className="max-w-2xl">
           <div className="mb-6">
             <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">Application</p>
-            <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.02em]">You haven&apos;t applied yet</h1>
+            <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.02em]">Ready when you are</h1>
             <p className="text-[13px] text-text-secondary mt-1.5 leading-relaxed">
               Complete the vetting application to unlock your public profile in the gallery.
             </p>
@@ -66,7 +66,7 @@ export default function ApplicationStatusClient({
             href="/apply"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-text-primary text-white text-[13px] font-medium hover:opacity-90 transition-opacity"
           >
-            Start your application
+            Begin the application
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -189,7 +189,7 @@ export default function ApplicationStatusClient({
             href="/apply"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-text-primary text-white text-[13px] font-medium hover:opacity-90 transition-opacity"
           >
-            Re-apply
+            Apply again
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -217,10 +217,10 @@ function JobApplicationsSection({ items }: { items: JobApp[] }) {
       {items.length === 0 ? (
         <div className="border border-border rounded-[10px] p-5 text-center">
           <p className="text-[13px] font-medium text-text-primary mb-1">
-            No job applications yet
+            No applications out yet
           </p>
           <p className="text-[12px] text-text-muted mb-3">
-            Apply to open jobs from the job board to start filling this list.
+            Browse open jobs and apply with one tap — they&apos;ll land here.
           </p>
           <Link
             href="/jobs"

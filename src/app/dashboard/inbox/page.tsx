@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import ProjectChat from "@/components/projects/ProjectChat";
-import { useToast } from "@/components/Toast";
+import { useToast, failed } from "@/components/Toast";
 import { useConversationStream } from "@/lib/use-conversation-stream";
 import { useTypingIndicator } from "@/lib/use-typing-indicator";
 
@@ -258,7 +258,7 @@ function InboxMenu({ onOpenContacts }: { onOpenContacts: () => void }) {
       });
       toast(`Status: ${val}`, "success");
     } catch {
-      toast("Failed to update", "error");
+      toast(failed("update status"), "error");
     }
   };
 
@@ -411,23 +411,23 @@ function NotificationPrompt({ onDismiss }: { onDismiss: () => void }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-medium text-text-primary mb-1">
-            Enable notifications
+            Hear when it happens
           </p>
           <p className="text-[12px] text-text-muted leading-relaxed mb-3">
-            Stay updated on new messages from your projects and team.
+            We&apos;ll ping you when a project message or invoice lands. No marketing, ever.
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={handleEnable}
               className="px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer"
             >
-              Enable
+              Turn on
             </button>
             <button
               onClick={handleDismiss}
               className="px-3 py-1.5 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             >
-              Not now
+              Maybe later
             </button>
           </div>
         </div>
@@ -600,7 +600,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
 
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        toast("Failed to send message");
+        toast(failed("send that"));
         setInputValue(text);
         setIsSending(false);
         return;
@@ -610,7 +610,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
       setMessages((prev) => prev.map((m) => (m.id === optimisticId ? created : m)));
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      toast("Failed to send message");
+      toast(failed("send that"));
       setInputValue(text);
     }
 
@@ -652,7 +652,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
       });
 
       if (!res.ok) {
-        toast("Failed to send file");
+        toast(failed("upload that file"));
         return;
       }
 
@@ -698,8 +698,8 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
           <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
             <ChatBubbleIcon />
             <div className="text-center">
-              <p className="text-[14px] font-medium text-text-primary">Start the conversation</p>
-              <p className="text-[13px] text-text-muted mt-0.5">Send a message to {otherUserName}</p>
+              <p className="text-[14px] font-medium text-text-primary">Say hi to {otherUserName}</p>
+              <p className="text-[13px] text-text-muted mt-0.5">Drop a line — they&apos;ll see it the moment you hit send.</p>
             </div>
           </div>
         )}
@@ -793,8 +793,9 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
         onChange={handleFileChange}
       />
 
-      {/* Input row */}
-      <div className="border-t border-border bg-background">
+      {/* Input row — pb-[env(safe-area-inset-bottom)] keeps the textarea
+          above the iPhone home indicator on notched phones. */}
+      <div className="border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-end gap-2 px-3 py-2">
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -815,7 +816,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
+            className="flex-1 text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
             style={{ minHeight: "22px" }}
           />
           <button
@@ -982,7 +983,7 @@ export default function InboxPage() {
         body: JSON.stringify({ recipientId: userId }),
       });
       if (!res.ok) {
-        toast("Failed to start conversation");
+        toast(failed("start that conversation"));
         return;
       }
       const data = (await res.json()) as { threadId: string };
@@ -992,7 +993,7 @@ export default function InboxPage() {
       selectConversation(data.threadId);
       setShowContacts(false);
     } catch {
-      toast("Failed to start conversation");
+      toast(failed("start that conversation"));
     }
   }
 
@@ -1013,7 +1014,7 @@ export default function InboxPage() {
   const hasChatOpen = !!selectedId;
 
   return (
-    <div className="flex h-full md:h-screen">
+    <div className="flex h-full md:h-[100dvh]">
       {/* ── Conversation list rail ── */}
       <div
         className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}
@@ -1047,7 +1048,7 @@ export default function InboxPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search conversations"
-              className="flex-1 text-[12px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none"
+              className="flex-1 text-[16px] md:text-[12px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none"
             />
           </div>
         </div>
@@ -1063,12 +1064,12 @@ export default function InboxPage() {
             <div className="px-4 py-10 text-center">
               <ChatBubbleIcon />
               <p className="text-[13px] text-text-primary font-medium mt-3 mb-1">
-                {search.trim() ? "No matches" : "No conversations yet"}
+                {search.trim() ? "Nothing matches that" : "Your inbox is clear"}
               </p>
               <p className="text-[12px] text-text-muted leading-relaxed max-w-[260px] mx-auto">
                 {search.trim()
-                  ? "Try a different search term."
-                  : "Start a DM, post a job, or join a project to begin a thread."}
+                  ? "Try a looser query."
+                  : "Start a DM with a coder, post a job, or join a project — threads land here."}
               </p>
             </div>
           )}
@@ -1187,7 +1188,7 @@ export default function InboxPage() {
         {selected ? (
           <>
             {/* Header */}
-            <div className="flex items-center gap-2 px-4 h-[44px] border-b border-border flex-shrink-0">
+            <div className="sticky top-0 z-10 flex items-center gap-2 px-4 h-[44px] border-b border-border bg-background flex-shrink-0">
               <button
                 onClick={() => selectConversation(null)}
                 className="md:hidden flex items-center gap-1 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer min-h-[44px]"
@@ -1374,13 +1375,13 @@ function EmptyState({
       <div className="flex-1 flex flex-col items-center justify-center px-8 relative z-10">
         <div className="w-full max-w-[420px]">
           <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-4">
-            Pick up where you left off
+            Recent threads
           </p>
           {recent.length === 0 ? (
             <div className="flex flex-col items-center py-8 text-center">
               <ChatBubbleIcon />
               <span className="text-[13px] text-text-muted mt-3">
-                No conversations yet
+                No threads yet
               </span>
             </div>
           ) : (

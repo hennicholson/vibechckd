@@ -6,9 +6,9 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 // of the route looking like a different product.
 export default function JobsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
+    <div className="h-[100dvh] bg-background flex overflow-hidden">
       <DashboardSidebar />
-      <main className="flex-1 min-w-0 h-full pt-[48px] pb-[56px] md:pt-0 md:pb-0 overflow-hidden">
+      <main className="flex-1 min-w-0 h-full pt-[48px] pb-[calc(56px+env(safe-area-inset-bottom))] md:pt-0 md:pb-0 overflow-hidden">
         {children}
       </main>
     </div>

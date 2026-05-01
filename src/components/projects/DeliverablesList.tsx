@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useToast } from "@/components/Toast";
+import { useToast, failed } from "@/components/Toast";
 
 type DeliverableStatus = "pending" | "submitted" | "approved" | "revision_requested";
 
@@ -228,7 +228,7 @@ export default function DeliverablesList({
         toast("Deliverable submitted", "success");
       }
     } catch {
-      toast("Failed to submit", "error");
+      toast(failed("submit that"), "error");
     } finally {
       setSubmitting(false);
     }

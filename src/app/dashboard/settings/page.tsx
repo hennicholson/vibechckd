@@ -6,7 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 import Modal from "@/components/Modal";
-import { useToast } from "@/components/Toast";
+import { useToast, failed } from "@/components/Toast";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings page — wired end-to-end.
@@ -316,7 +316,7 @@ export default function SettingsPage() {
       toast("Availability updated", "success");
     } catch {
       setAvailability(prev);
-      toast("Failed to update availability", "error");
+      toast(failed("update availability"), "error");
     }
   }
 
@@ -344,7 +344,7 @@ export default function SettingsPage() {
       );
     } catch {
       setProfileVisible(prev);
-      toast("Failed to update visibility", "error");
+      toast(failed("update visibility"), "error");
     }
   }
 

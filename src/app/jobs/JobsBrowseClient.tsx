@@ -70,8 +70,8 @@ export default function JobsBrowseClient() {
 
         {jobs && jobs.length === 0 && (
           <div className="border border-border rounded-[10px] p-8 text-center">
-            <p className="text-[13px] font-medium text-text-primary mb-1">No open jobs right now</p>
-            <p className="text-[12px] text-text-muted">Check back soon.</p>
+            <p className="text-[13px] font-medium text-text-primary mb-1">No open briefs</p>
+            <p className="text-[12px] text-text-muted">New ones drop weekly — we&apos;ll ping you.</p>
           </div>
         )}
 

@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import type { PortfolioItem } from "@/lib/mock-data";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
-import { useToast } from "@/components/Toast";
+import { useToast, failed } from "@/components/Toast";
 import PortfolioItemEditor from "./PortfolioItemEditor";
 
 function ThumbnailUploadButton({
@@ -127,7 +127,7 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
       });
       if (!res.ok) throw new Error("Failed to save order");
     } catch {
-      toast("Failed to save order", "error");
+      toast(failed("save the new order"), "error");
     }
   }
 
@@ -144,7 +144,7 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
       );
       toast("Thumbnail updated", "success");
     } catch {
-      toast("Failed to update thumbnail", "error");
+      toast(failed("update the thumbnail"), "error");
     }
   }
 

@@ -24,8 +24,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useSession, signOut } from "next-auth/react";
+import { uiRole } from "@/lib/dashboard-nav";
 import VerifiedSeal from "@/components/VerifiedSeal";
 import CoderProfilePopup from "@/components/CoderProfilePopup";
 import {
@@ -285,6 +287,15 @@ function SkeletonCard() {
 }
 
 export default function BrowsePage() {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const viewerRawRole = (session?.user as { role?: string } | undefined)?.role;
+  // Map DB roles → UI role buckets ("client" | "creator" | undefined).
+  // Logged-out users get "guest" so the card omits the action button.
+  const viewerRole: "client" | "creator" | "guest" = !session?.user
+    ? "guest"
+    : uiRole(viewerRawRole) ?? "guest";
+
   const [coders, setCoders] = useState<Coder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -292,6 +303,33 @@ export default function BrowsePage() {
   const [sort, setSort] = useState<SortKey>("best");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
+
+  // Card primary-action handler. Client → team-builder pre-filled; creator
+  // → open or create a 1:1 DM thread (POST /api/dm/threads is find-or-
+  // create so we get back the threadId regardless).
+  const handlePrimaryAction = useCallback(
+    async (coder: Coder) => {
+      if (viewerRole === "client") {
+        router.push(`/dashboard/teams/new?coder=${encodeURIComponent(coder.id)}`);
+        return;
+      }
+      if (viewerRole === "creator") {
+        try {
+          const res = await fetch("/api/dm/threads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recipientId: coder.id }),
+          });
+          if (!res.ok) return;
+          const data = (await res.json()) as { threadId: string };
+          router.push(`/dashboard/inbox?c=${data.threadId}`);
+        } catch {
+          // silent — user can still tap the card to view the profile
+        }
+      }
+    },
+    [router, viewerRole]
+  );
 
   const loadCoders = useCallback(() => {
     setIsLoading(true);
@@ -377,7 +415,7 @@ export default function BrowsePage() {
   }, [searchFiltered, filter, sort]);
 
   return (
-    <div className="h-screen bg-background flex md:overflow-hidden">
+    <div className="h-[100dvh] bg-background flex md:overflow-hidden">
       <BrowseSidebar
         filter={filter}
         onFilterChange={setFilter}
@@ -393,6 +431,26 @@ export default function BrowsePage() {
           totalCount={searchFiltered.length}
           counts={specialtyCounts}
         />
+
+        {/* Sticky filter + sort row on mobile. The MobileTopBar above is
+            already sticky at top-0 — this row docks just below it so users
+            can re-filter without scrolling back to the top of the grid.
+            top-[100px] = MobileTopBar's logo row (48px) + its search row
+            (~52px). z-30 < the top bar's z-40 so they layer correctly. */}
+        <div className="md:hidden sticky top-[100px] z-30 bg-background/95 backdrop-blur-md border-b border-border px-4 py-2">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-mono text-text-muted tabular-nums">
+              {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
+            </p>
+            <SortDropdown value={sort} onChange={setSort} />
+          </div>
+          <BrowseFilterPills
+            filter={filter}
+            onFilterChange={setFilter}
+            counts={specialtyCounts}
+            totalCount={searchFiltered.length}
+          />
+        </div>
 
         <div className="w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
           {/* Desktop search — sits above the header row */}
@@ -415,16 +473,10 @@ export default function BrowsePage() {
             <SortDropdown value={sort} onChange={setSort} />
           </div>
 
-          {/* Mobile sort row */}
-          <div className="md:hidden flex items-center justify-between mb-3 mt-3">
-            <p className="text-[11px] font-mono text-text-muted tabular-nums">
-              {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
-            </p>
-            <SortDropdown value={sort} onChange={setSort} />
-          </div>
-
-          {/* Filter pills */}
-          <div className="mb-4">
+          {/* Filter pills — desktop only. On mobile, the sticky row above
+              the content container handles this so the pills stay visible
+              while the user scrolls the grid. */}
+          <div className="hidden md:block mb-4">
             <BrowseFilterPills
               filter={filter}
               onFilterChange={setFilter}
@@ -469,8 +521,8 @@ export default function BrowsePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                <p className="text-[13px] font-medium text-text-primary mb-1">No coders found</p>
-                <p className="text-[11px] text-text-muted mb-3">Try adjusting your search or filters.</p>
+                <p className="text-[13px] font-medium text-text-primary mb-1">No matches yet</p>
+                <p className="text-[11px] text-text-muted mb-3">Loosen the filters or check back — we vet new coders weekly.</p>
                 <button
                   onClick={() => {
                     setSearchQuery("");
@@ -478,7 +530,7 @@ export default function BrowsePage() {
                   }}
                   className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
                 >
-                  Reset filters
+                  Clear filters
                 </button>
               </div>
             ) : (
@@ -491,6 +543,8 @@ export default function BrowsePage() {
                         coder={coder}
                         index={i}
                         onClick={() => setSelectedCoder(coder)}
+                        viewerRole={viewerRole}
+                        onPrimaryAction={handlePrimaryAction}
                       />
                     ))}
                   </AnimatePresence>

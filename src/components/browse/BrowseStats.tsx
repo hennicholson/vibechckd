@@ -144,7 +144,7 @@ export default function BrowseStats({ coders }: BrowseStatsProps) {
           style={{ animation: "livePulse 1.6s ease-in-out infinite" }}
         />
         <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-          Live
+          Live now
         </span>
       </div>
 

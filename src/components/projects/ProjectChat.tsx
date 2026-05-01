@@ -2,7 +2,8 @@
 
 import { Fragment, useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { useToast } from "../Toast";
+import { motion, AnimatePresence } from "framer-motion";
+import { useToast, failed } from "../Toast";
 import { useConversationStream } from "@/lib/use-conversation-stream";
 import { useWhopIframeContext } from "@/lib/use-whop-iframe";
 import { useTypingIndicator } from "@/lib/use-typing-indicator";
@@ -406,6 +407,15 @@ function IconCheck({ size = 16 }: { size?: number }) {
   );
 }
 
+function IconPlus({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 function IconRefresh({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -547,7 +557,7 @@ function PayInvoiceButton({ url }: { url: string }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+      className="flex items-center gap-1.5 px-4 py-2.5 md:py-1.5 md:px-3 text-[13px] md:text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer min-h-[44px] md:min-h-0"
     >
       <IconWallet size={12} />
       Pay now
@@ -881,8 +891,8 @@ function InvoiceForm({
         type="text"
         value={desc}
         onChange={(e) => setDesc(e.target.value)}
-        placeholder="What is this invoice for?"
-        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
+        placeholder="What's this invoice for?"
+        className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
       />
 
       <div className="flex gap-2 mb-2">
@@ -893,7 +903,7 @@ function InvoiceForm({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
+            className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
           />
         </div>
         <input
@@ -927,7 +937,7 @@ function InvoiceForm({
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
                 placeholder="client@company.com"
-                className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-8 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
+                className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-8 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
               />
             </div>
           </div>
@@ -958,7 +968,7 @@ function InvoiceForm({
                               value={split.share}
                               onChange={(e) => updateSplitShare(m.userId, e.target.value)}
                               placeholder="0.00"
-                              className="w-full text-[12px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded px-2 pl-5 py-1 outline-none focus:border-border-hover transition-colors tabular-nums"
+                              className="w-full text-[16px] md:text-[12px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded px-2 pl-5 py-1 outline-none focus:border-border-hover transition-colors tabular-nums"
                             />
                           </div>
                           <button
@@ -1018,7 +1028,7 @@ function ProposalForm({ onSend, onCancel, sending }: { onSend: (scope: string, b
         onChange={(e) => setScope(e.target.value)}
         placeholder="Describe the scope of work..."
         rows={3}
-        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none mb-2 focus:border-border-hover transition-colors"
+        className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none mb-2 focus:border-border-hover transition-colors"
       />
       <div className="flex gap-2 mb-3">
         <div className="flex-1 relative">
@@ -1028,7 +1038,7 @@ function ProposalForm({ onSend, onCancel, sending }: { onSend: (scope: string, b
             value={budget}
             onChange={(e) => setBudget(e.target.value)}
             placeholder="5,000"
-            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
+            className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
           />
         </div>
         <input
@@ -1036,7 +1046,7 @@ function ProposalForm({ onSend, onCancel, sending }: { onSend: (scope: string, b
           value={timeline}
           onChange={(e) => setTimeline(e.target.value)}
           placeholder="2 weeks"
-          className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
+          className="flex-1 text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
         />
       </div>
       <button
@@ -1072,7 +1082,7 @@ function MilestoneForm({ onSend, onCancel, sending }: { onSend: (title: string, 
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Milestone name (e.g. Design mockups)"
-        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
+        className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
       />
       <div className="flex gap-2 mb-2">
         <div className="flex-1 relative">
@@ -1082,7 +1092,7 @@ function MilestoneForm({ onSend, onCancel, sending }: { onSend: (title: string, 
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="Payment for this milestone"
-            className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
+            className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
           />
         </div>
       </div>
@@ -1091,7 +1101,7 @@ function MilestoneForm({ onSend, onCancel, sending }: { onSend: (title: string, 
         onChange={(e) => setDescription(e.target.value)}
         placeholder="What needs to be delivered? (optional)"
         rows={2}
-        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none mb-3 focus:border-border-hover transition-colors"
+        className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none mb-3 focus:border-border-hover transition-colors"
       />
       <button
         onClick={() => onSend(title, amount, description)}
@@ -1125,7 +1135,7 @@ function TaskForm({ onSend, onCancel, sending, members }: { onSend: (title: stri
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="What needs to be done?"
-        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
+        className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-2 focus:border-border-hover transition-colors"
       />
       {members.length > 0 && (
         <div className="mb-3">
@@ -1224,7 +1234,7 @@ function PaymentForm({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="0.00"
-          className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
+          className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-7 pr-3 py-2 outline-none focus:border-border-hover transition-colors tabular-nums"
         />
       </div>
 
@@ -1232,8 +1242,8 @@ function PaymentForm({
         type="text"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="What is this payment for? (optional)"
-        className="w-full text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-3 focus:border-border-hover transition-colors"
+        placeholder="What's this for? (optional)"
+        className="w-full text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none mb-3 focus:border-border-hover transition-colors"
       />
 
       <button
@@ -1280,6 +1290,11 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
   const [invoicePrefill, setInvoicePrefill] = useState<
     { key: number; description?: string; amount?: string; due?: string } | null
   >(null);
+  // Mobile-only quick-actions bottom sheet. On desktop the actions sit
+  // inline above the composer (md:flex); on mobile the user taps the `+`
+  // icon left of the textarea to open this list — frees ~30px of vertical
+  // space and gives each action a 44pt+ tap target.
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1466,7 +1481,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
       if (!res.ok) {
         setChatMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        toast("Failed to send message");
+        toast(failed("send that"));
         setInputValue(text);
         setIsSending(false);
         return;
@@ -1476,7 +1491,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       setChatMessages((prev) => prev.map((m) => (m.id === optimisticId ? created : m)));
     } catch {
       setChatMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      toast("Failed to send message");
+      toast(failed("send that"));
       setInputValue(text);
     }
 
@@ -1511,7 +1526,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
       if (!res.ok) {
         setChatMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-        toast("Failed to send message");
+        toast(failed("send that"));
         setIsSending(false);
         return;
       }
@@ -1520,7 +1535,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       setChatMessages((prev) => prev.map((m) => (m.id === optimisticId ? created : m)));
     } catch {
       setChatMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      toast("Failed to send message");
+      toast(failed("send that"));
     }
 
     setIsSending(false);
@@ -1580,7 +1595,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       await fetchMessages();
       await fetchBalance();
     } catch {
-      toast("Failed to send invoice");
+      toast(failed("send the invoice"));
     }
 
     setIsSending(false);
@@ -1627,7 +1642,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
         toast(err.error || "Failed to send email");
       }
     } catch {
-      toast("Failed to send email");
+      toast(failed("send the email"));
     }
   }
 
@@ -1703,7 +1718,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       });
 
       if (!res.ok) {
-        toast("Failed to create task");
+        toast(failed("create that task"));
         setIsSending(false);
         return;
       }
@@ -1730,7 +1745,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       userScrolledRef.current = false;
       await fetchMessages();
     } catch {
-      toast("Failed to create task");
+      toast(failed("create that task"));
     }
 
     setIsSending(false);
@@ -1825,7 +1840,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       });
 
       if (!res.ok) {
-        toast("Failed to send file");
+        toast(failed("upload that file"));
         return;
       }
 
@@ -2320,10 +2335,14 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
         />
       )}
 
-      {/* Combined input + actions */}
-      <div className="border-t border-border bg-background">
-        {/* Quick actions */}
-        <div className="flex items-center gap-1 px-2 pt-1.5 pb-0.5 overflow-x-auto scrollbar-none">
+      {/* Combined input + actions — pb-[env(safe-area-inset-bottom)]
+          keeps the composer above the iPhone home indicator. */}
+      <div className="border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
+        {/* Quick actions — desktop only. On mobile, the `+` button to the
+            left of the textarea opens a bottom sheet (rendered below) with
+            the same actions but as a vertical list with proper 44pt tap
+            targets. Frees ~30px of vertical space above the composer. */}
+        <div className="hidden md:flex items-center gap-1 px-2 pt-1.5 pb-0.5 overflow-x-auto scrollbar-none">
           {actions.map((action) => (
             <button
               key={action.key}
@@ -2349,7 +2368,18 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
         </div>
 
         {/* Input row */}
-        <div className="flex items-end gap-2 px-3 pb-2 pt-0.5">
+        <div className="flex items-end gap-2 px-3 pb-2 pt-1 md:pt-0.5">
+          {/* Mobile-only `+` trigger — opens the actions bottom sheet
+              defined further down. Hidden on md+ where the inline action
+              row above the composer is visible. */}
+          <button
+            type="button"
+            onClick={() => setMobileActionsOpen(true)}
+            className="md:hidden flex-shrink-0 w-9 h-9 rounded-full bg-surface-muted text-text-primary flex items-center justify-center hover:bg-surface-muted/80 active:scale-95 transition cursor-pointer"
+            aria-label="Quick actions"
+          >
+            <IconPlus size={16} />
+          </button>
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -2362,7 +2392,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
             onKeyDown={handleKeyDown}
             placeholder="Type a message…  ·  /invoice 250 for site copy"
             rows={1}
-            className="flex-1 text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
+            className="flex-1 text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
             style={{ minHeight: "22px" }}
           />
           {charCount >= CHAR_WARN_THRESHOLD && (
@@ -2386,6 +2416,56 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
           </button>
         </div>
       </div>
+
+      {/* Mobile-only quick-actions bottom sheet. Tapping the `+` next to
+          the composer opens this; tapping the backdrop or any action
+          dismisses it. Each row is a full-width 56px tap target — way
+          better than the cramped 30px icon strip on phones. */}
+      <AnimatePresence>
+        {mobileActionsOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="md:hidden fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-end"
+            onClick={() => setMobileActionsOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 32 }}
+              animate={{ y: 0 }}
+              exit={{ y: 32 }}
+              transition={{ type: "spring", stiffness: 400, damping: 32 }}
+              className="w-full bg-background border-t border-border rounded-t-[16px] pb-[env(safe-area-inset-bottom)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* drag handle */}
+              <div className="w-10 h-1 bg-text-muted/30 rounded-full mx-auto mt-2 mb-3" />
+              <div className="px-3 pb-3 space-y-1">
+                {actions.map((action) => (
+                  <button
+                    key={action.key}
+                    onClick={() => {
+                      setMobileActionsOpen(false);
+                      if (action.key === "files") {
+                        fileInputRef.current?.click();
+                      } else {
+                        setActiveAction(action.key);
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] text-text-primary hover:bg-surface-muted active:bg-surface-muted/80 transition cursor-pointer"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-surface-muted flex items-center justify-center text-text-secondary">
+                      {action.icon}
+                    </span>
+                    <span className="flex-1 text-left">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

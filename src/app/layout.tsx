@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { WhopIframeSdkProvider } from "@whop/react";
@@ -20,6 +20,21 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   display: "swap",
 });
+
+// Viewport hints for mobile keyboard behavior.
+//   `interactiveWidget: "resizes-content"` — when the keyboard slides up,
+//   browser pushes content above it instead of overlaying (paired with
+//   `h-[100dvh]` containers and `pb-[env(safe-area-inset-bottom)]` on
+//   composers, this is what keeps the textarea visible while typing).
+//   `maximumScale: 1` — prevents pinch-zoom; combined with `text-[16px]`
+//   on inputs, defeats Safari's auto-zoom-on-focus behavior that otherwise
+//   shoves the layout sideways.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  interactiveWidget: "resizes-content",
+};
 
 export const metadata: Metadata = {
   title: "vibechckd — The Most Vetted Vibe Coders in the Game",

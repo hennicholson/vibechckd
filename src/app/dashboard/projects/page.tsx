@@ -250,7 +250,7 @@ export default function ProjectsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-[20px] font-semibold text-text-primary">Projects</h1>
           <Button variant="secondary" size="sm" onClick={() => router.push("/dashboard/teams/new")}>
-            New project
+            Start project
           </Button>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
@@ -308,12 +308,17 @@ export default function ProjectsPage() {
       {/* Empty */}
       {!isLoading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-[13px] text-text-muted mb-4">
-            {searchQuery || filterTag ? "No matching projects" : "No projects yet"}
+          <p className="text-[13px] font-medium text-text-primary mb-1">
+            {searchQuery || filterTag ? "Nothing matches" : "Nothing in flight"}
+          </p>
+          <p className="text-[12px] text-text-muted mb-4 max-w-sm">
+            {searchQuery || filterTag
+              ? "Loosen the filters or clear the search to see everything."
+              : "Start a project — chat, tasks, payments, all in one place."}
           </p>
           {!searchQuery && !filterTag && (
             <Button variant="primary" size="md" onClick={() => router.push("/browse")}>
-              Browse coders
+              Find a coder
             </Button>
           )}
         </div>
