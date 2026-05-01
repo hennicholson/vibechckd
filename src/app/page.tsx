@@ -62,9 +62,16 @@ export default function LandingPage() {
             <p className="text-[14px] text-text-secondary mt-4 max-w-[400px] leading-[1.55]">
               Every coder on vibechckd has been heavily vetted. Clients don&apos;t gamble on talent. The verified badge means something.
             </p>
-            <div className="flex gap-2 mt-6">
+            <div className="flex flex-wrap items-center gap-2 mt-6">
               <Button href="/browse">Browse coders</Button>
               <Button href="/apply" variant="secondary">Apply</Button>
+              <a
+                href="/learnmore"
+                className="ml-1 text-[12px] font-mono text-text-muted hover:text-text-primary transition-colors uppercase tracking-[0.06em] inline-flex items-center gap-1"
+              >
+                Take the 2-min tour
+                <span aria-hidden>→</span>
+              </a>
             </div>
           </motion.div>
 
