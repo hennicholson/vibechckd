@@ -353,25 +353,37 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.18 }}
         >
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
+          {/* Backdrop — quick fade. Tap to close. */}
+          <motion.div
+            className="absolute inset-0 bg-black/50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
             onClick={onClose}
             aria-hidden
           />
 
-          {/* Modal */}
+          {/* Modal — spring-physics entry so it lands with weight rather
+              than sliding generically. Sized intelligently across
+              viewports: full-bleed on mobile, comfortable inset on
+              tablet, max 1200px wide on desktop. */}
           <motion.div
             role="dialog"
             aria-modal="true"
             aria-label={`${coder.displayName} profile`}
-            className="relative bg-background border border-border w-full max-w-[1100px] sm:rounded-xl shadow-[0_24px_80px_rgba(0,0,0,0.18)] flex flex-col h-full sm:h-auto sm:max-h-[calc(100vh-3rem)] sm:my-6 sm:mx-4 overflow-hidden"
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            className="relative bg-background border border-border w-full max-w-[1200px] sm:rounded-2xl shadow-[0_28px_80px_-12px_rgba(0,0,0,0.28)] flex flex-col h-full sm:h-auto sm:max-h-[min(880px,calc(100vh-3rem))] sm:my-6 sm:mx-4 lg:mx-6 overflow-hidden will-change-transform"
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            transition={{
+              type: "spring",
+              stiffness: 360,
+              damping: 32,
+              mass: 0.9,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button — floats top right, always reachable */}

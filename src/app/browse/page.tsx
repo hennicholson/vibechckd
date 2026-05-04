@@ -517,7 +517,10 @@ export default function BrowsePage() {
             <BrowseStats coders={filteredCoders} />
           </div>
           <div className="w-full px-4 md:px-12 lg:px-16 pb-5">
-            <div className="max-w-[1100px] border-b border-border">
+            {/* Search spans the full content width — the hairline beneath
+                stretches the whole way across, framing the page like a
+                masthead rule. */}
+            <div className="w-full border-b border-border">
               <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
             </div>
           </div>
@@ -567,7 +570,7 @@ export default function BrowsePage() {
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="grid gap-x-6 gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
+              <div className="grid gap-x-5 gap-y-9 sm:gap-x-6 sm:gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
@@ -593,7 +596,7 @@ export default function BrowsePage() {
               </div>
             ) : (
               <LayoutGroup>
-                <motion.div layout className="grid gap-x-6 gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
+                <motion.div layout className="grid gap-x-5 gap-y-9 sm:gap-x-6 sm:gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                   <AnimatePresence mode="popLayout">
                     {filteredCoders.map((coder, i) => (
                       <BrowseCoderCard
