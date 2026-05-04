@@ -320,7 +320,13 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
   // ---------- Connected -- show Whop Elements ----------
   if (state === "connected" && whopElements && token && companyId) {
     const { react: WhopReact, loader } = whopElements;
-    const els = loader();
+    // Sandbox vs production for the embedded payouts UI. The flag is
+    // surfaced to the client via NEXT_PUBLIC_WHOP_ENV so this client
+    // component can read it. Per https://docs.whop.com/developer/sandbox,
+    // `loadWhopElements({ environment: "sandbox" })` requires
+    // @whop/embedded-components-vanilla-js >= 0.0.6.
+    const isSandbox = process.env.NEXT_PUBLIC_WHOP_ENV === "sandbox";
+    const els = loader({ environment: isSandbox ? "sandbox" : "production" });
     const { Elements, PayoutsSession, BalanceElement } = WhopReact;
 
     return (

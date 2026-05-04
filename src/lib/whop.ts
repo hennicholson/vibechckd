@@ -17,7 +17,14 @@
 
 import { whopsdk } from "@/lib/whop-client";
 
-const WHOP_BASE_URL = "https://api.whop.com/api/v1";
+// Mirror the sandbox toggle the SDK uses (see whop-client.ts). Only the
+// `sendInvoice` helper still hits raw fetch — the SDK doesn't expose a
+// resend method — so this is the one place we need to honor it.
+const WHOP_BASE_URL =
+  process.env.WHOP_API_BASE_URL ||
+  (process.env.WHOP_ENV === "sandbox"
+    ? "https://sandbox-api.whop.com/api/v1"
+    : "https://api.whop.com/api/v1");
 
 function getKey() {
   const key = process.env.WHOP_API_KEY;

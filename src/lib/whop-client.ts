@@ -32,6 +32,17 @@ export function getWhopClient(): Whop {
     ? Buffer.from(rawWebhookSecret, "utf-8").toString("base64")
     : null;
 
+  // Sandbox toggle. Two ways to flip:
+  //   - WHOP_ENV=sandbox            (preferred — short, matches doc style)
+  //   - WHOP_API_BASE_URL=...        (explicit override, beats WHOP_ENV)
+  // Production default omits baseURL so the SDK uses its built-in endpoint.
+  // Sandbox per https://docs.whop.com/developer/sandbox.
+  const explicitBaseUrl = process.env.WHOP_API_BASE_URL;
+  const isSandbox = process.env.WHOP_ENV === "sandbox";
+  const baseURL =
+    explicitBaseUrl ||
+    (isSandbox ? "https://sandbox-api.whop.com/api/v1" : undefined);
+
   _client = new Whop({
     apiKey: rawKey,
     appID:
@@ -39,6 +50,7 @@ export function getWhopClient(): Whop {
       process.env.WHOP_APP_ID ||
       null,
     webhookKey,
+    ...(baseURL ? { baseURL } : {}),
   });
   return _client;
 }
