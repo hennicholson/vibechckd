@@ -41,7 +41,7 @@ export default function BrowseSearchBar({
   return (
     <div className="relative group">
       <svg
-        className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none"
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-text-muted pointer-events-none"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -55,7 +55,7 @@ export default function BrowseSearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-12 pl-10 pr-20 text-[16px] md:text-[14px] text-text-primary bg-background border border-border rounded-lg placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors duration-150"
+        className="w-full h-14 md:h-[60px] pl-12 pr-24 text-[16px] md:text-[15px] text-text-primary bg-background border border-border rounded-xl placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors duration-150"
         aria-label="Search coders"
       />
       <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center pointer-events-none">

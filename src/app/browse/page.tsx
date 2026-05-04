@@ -41,6 +41,7 @@ import {
 import BrowseSidebar from "@/components/browse/BrowseSidebar";
 import BrowseSearchBar from "@/components/browse/BrowseSearchBar";
 import BrowseCoderCard from "@/components/browse/BrowseCoderCard";
+import BrowseStats from "@/components/browse/BrowseStats";
 
 type Filter = "all" | Specialty;
 
@@ -375,18 +376,89 @@ export default function BrowsePage() {
 
   // Search-only filtered list (used to compute counts so filter counts
   // reflect the current query even before specialty filtering).
+  //
+  // Ranking model: each token of the query is matched independently against
+  // a set of weighted fields per coder. A coder must hit AT LEAST one
+  // field per token to qualify (AND across tokens, OR across fields), and
+  // their total score determines the order. This makes searches like
+  // "react brooklyn" or "figma full stack" pair developers correctly
+  // instead of relying on a single substring match.
   const searchFiltered = useMemo(() => {
-    if (!searchQuery.trim()) return coders;
-    const q = searchQuery.toLowerCase();
-    return coders.filter(
-      (c) =>
-        c.displayName.toLowerCase().includes(q) ||
-        (c.title || "").toLowerCase().includes(q) ||
-        (c.location || "").toLowerCase().includes(q) ||
-        (c.specialties || []).some((s) => (SPECIALTY_LABELS[s] || "").toLowerCase().includes(q)) ||
-        (c.skills || []).some((s) => s.toLowerCase().includes(q)) ||
-        (c.portfolio || []).some((p) => (p.title || "").toLowerCase().includes(q))
-    );
+    const raw = searchQuery.trim();
+    if (!raw) return coders;
+    const tokens = raw
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+
+    // Field weights — higher = stronger pull. Tuned so an exact skill or
+    // specialty-label match beats a coincidental substring in a portfolio
+    // title; an exact name match (e.g. someone searching for a specific
+    // creator they've heard of) still wins outright.
+    const W = {
+      nameExact: 100,
+      namePrefix: 60,
+      nameSubstr: 25,
+      titlePrefix: 25,
+      titleSubstr: 12,
+      specialtyExact: 40,
+      specialtySubstr: 18,
+      skillExact: 35,
+      skillSubstr: 12,
+      locationSubstr: 8,
+      portfolioSubstr: 10,
+    };
+
+    const scoreCoder = (c: Coder, t: string): number => {
+      let s = 0;
+      const name = (c.displayName || "").toLowerCase();
+      if (name === t) s += W.nameExact;
+      else if (name.startsWith(t)) s += W.namePrefix;
+      else if (name.includes(t)) s += W.nameSubstr;
+
+      const title = (c.title || "").toLowerCase();
+      if (title.startsWith(t)) s += W.titlePrefix;
+      else if (title.includes(t)) s += W.titleSubstr;
+
+      for (const sp of c.specialties || []) {
+        const label = (SPECIALTY_LABELS[sp] || "").toLowerCase();
+        if (label === t) s += W.specialtyExact;
+        else if (label.includes(t)) s += W.specialtySubstr;
+      }
+
+      for (const sk of c.skills || []) {
+        const lower = sk.toLowerCase();
+        if (lower === t) s += W.skillExact;
+        else if (lower.includes(t)) s += W.skillSubstr;
+      }
+
+      const loc = (c.location || "").toLowerCase();
+      if (loc.includes(t)) s += W.locationSubstr;
+
+      for (const p of c.portfolio || []) {
+        if ((p.title || "").toLowerCase().includes(t)) s += W.portfolioSubstr;
+      }
+
+      return s;
+    };
+
+    const scored: { coder: Coder; score: number }[] = [];
+    for (const c of coders) {
+      let total = 0;
+      let matchedAll = true;
+      for (const t of tokens) {
+        const tokenScore = scoreCoder(c, t);
+        if (tokenScore === 0) {
+          matchedAll = false;
+          break;
+        }
+        total += tokenScore;
+      }
+      if (matchedAll) scored.push({ coder: c, score: total });
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((x) => x.coder);
   }, [coders, searchQuery]);
 
   const specialtyCounts = useMemo(() => {
@@ -402,9 +474,10 @@ export default function BrowsePage() {
       filter === "all"
         ? searchFiltered
         : searchFiltered.filter((c) => (c.specialties || []).includes(filter));
-    // Single ranking: featured + available first, then verified, then leave
-    // input order. The simplified browse only shows "Featured" — sort
-    // controls live elsewhere if/when needed.
+    // When the user is searching, `searchFiltered` is already ordered by
+    // relevance score — preserve that. Only re-sort by featured/available
+    // when there's no active query.
+    if (searchQuery.trim()) return list;
     return [...list].sort((a, b) => {
       const score = (c: Coder) =>
         (c.featured ? 2 : 0) +
@@ -412,7 +485,7 @@ export default function BrowsePage() {
         (c.verified ? 0.5 : 0);
       return score(b) - score(a);
     });
-  }, [searchFiltered, filter]);
+  }, [searchFiltered, filter, searchQuery]);
 
   return (
     <div className="h-[100dvh] bg-background flex overflow-hidden">
@@ -432,16 +505,27 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        <div className="w-full px-4 md:px-12 lg:px-16 pt-6 md:pt-10 pb-10">
-          {/* Desktop search — calmer, more breathing room above */}
-          <div className="hidden md:block mb-6 max-w-[920px]">
-            <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
+        {/* Sticky desktop header: expanded search + clean stat ticker.
+            Pinned at the top of the scrolling main column so the user
+            can refine their query from anywhere on the page. The tabs
+            row below is intentionally NOT sticky — it's part of the
+            page rhythm, not a permanent control surface. */}
+        <div className="hidden md:block sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border">
+          <div className="w-full px-4 md:px-12 lg:px-16 pt-6 pb-3">
+            <div className="max-w-[1100px]">
+              <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
+            </div>
           </div>
+          <div className="px-4 md:px-12 lg:px-16 pb-3">
+            <BrowseStats coders={filteredCoders} />
+          </div>
+        </div>
 
+        <div className="w-full px-4 md:px-12 lg:px-16 pt-6 md:pt-8 pb-10">
           {/* Tab strip — "Featured" + "Project types ▾" filter dropdown.
-              Replaces the previous count + sort + pill row to keep the
-              top of the page calm; sort + advanced filters move into the
-              sidebar / overlay so the grid is the protagonist. */}
+              Sits AFTER the search + ticker so the grid header has
+              breathing room and the user reads top-down naturally:
+              [search] → [live stats] → [tabs] → [grid]. */}
           <div className="flex items-center gap-1 mb-8 md:mb-10 -mx-1">
             <button
               type="button"
