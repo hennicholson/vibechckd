@@ -13,6 +13,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { whopsdk } from "@/lib/whop-client";
 import { publishConversationEvent } from "@/lib/conversation-bus";
+import { notifyWhopUsers } from "@/lib/whop-notifications";
 
 // POST /api/webhooks/whop
 //
@@ -266,6 +267,12 @@ async function handleInvoiceEvent(
           notes: `Vibechckd invoice ${invoice.id.slice(0, 8)}`,
           transactionId: tx.id,
         });
+
+        await notifyRecipientPaymentLanded(
+          s.userId,
+          s.amountCents,
+          `Your share of "${invoice.description}" just landed.`
+        );
       }
     } else if (invoice.senderId) {
       const [existing] = await db
@@ -300,9 +307,40 @@ async function handleInvoiceEvent(
           notes: `Vibechckd invoice ${invoice.id.slice(0, 8)}`,
           transactionId: tx.id,
         });
+
+        await notifyRecipientPaymentLanded(
+          invoice.senderId,
+          invoice.amountCents,
+          `"${invoice.description}" was paid in full.`
+        );
       }
     }
   }
+}
+
+// Helper: push a Whop notification to a vibechckd user when funds land in
+// their wallet. Silent for non-Whop accounts (no `whopUserId`).
+async function notifyRecipientPaymentLanded(
+  userId: string,
+  amountCents: number,
+  description: string
+): Promise<void> {
+  const [recipient] = await db
+    .select({ whopUserId: users.whopUserId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!recipient?.whopUserId) return;
+  const displayAmount = (amountCents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  await notifyWhopUsers({
+    whopUserIds: [recipient.whopUserId],
+    title: `Payment received · $${displayAmount}`,
+    content: description,
+    deepLinkPath: "/dashboard/earnings",
+  });
 }
 
 // Whop-native marketplace pass-through. Per `payments-transfers.md` skill:
@@ -375,12 +413,17 @@ async function handlePaymentSucceeded(payload: Record<string, any>) {
     data.metadata?.transactionId ||
     data.checkout_configuration?.metadata?.transactionId;
 
-  console.log("payment.succeeded webhook:", JSON.stringify({
+  // Redacted: don't log Object.keys(data) or full payload — Whop payloads
+  // can include customer email + arbitrary metadata. Only log identifiers
+  // we need to debug routing.
+  console.log(
+    "payment.succeeded webhook: checkoutId=",
     checkoutId,
+    "metaTxId=",
     metadataTransactionId,
-    dataId: data.id,
-    dataKeys: Object.keys(data),
-  }));
+    "dataId=",
+    data.id
+  );
 
   let transaction = null;
 
@@ -468,6 +511,12 @@ async function handlePaymentSucceeded(payload: Record<string, any>) {
       notes: `Vibechckd payment ${transaction.id.slice(0, 8)}`,
       transactionId: transaction.id,
     });
+
+    await notifyRecipientPaymentLanded(
+      transaction.userId,
+      transaction.amountCents,
+      transaction.description || "A new payment landed in your wallet."
+    );
   }
 
   console.log(`payment.succeeded: transaction ${transaction.id} marked completed`);

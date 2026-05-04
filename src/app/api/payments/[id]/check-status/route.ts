@@ -56,10 +56,9 @@ export async function POST(
     let checkoutData: Record<string, unknown> | null = null;
     if (res.ok) {
       checkoutData = await res.json();
-      console.log("Payment check-status: checkout config response:", JSON.stringify(checkoutData));
-
-      // Check if the checkout config itself indicates completion
       const configStatus = (((checkoutData as Record<string, unknown>).status as string) || "").toLowerCase();
+      console.log("Payment check-status: checkout config status:", configStatus);
+
       if (configStatus === "succeeded" || configStatus === "completed" || configStatus === "paid") {
         console.log("Payment check-status: checkout config status is", configStatus, "- marking completed");
         await db
@@ -84,7 +83,7 @@ export async function POST(
         return Response.json({ status: "completed", changed: true });
       }
     } else {
-      console.log("Payment check-status: checkout config lookup failed:", res.status, await res.text());
+      console.log("Payment check-status: checkout config lookup failed:", res.status);
     }
 
     // Fall back to listing payments for this company to find a match
@@ -104,12 +103,13 @@ export async function POST(
       console.log("Payment check-status: listing", payments.length, "payments to find match for checkout", transaction.whopCheckoutId);
 
       for (const payment of payments) {
-        console.log("Payment check-status: payment entry:", JSON.stringify({
-          id: payment.id,
-          status: payment.status,
-          checkout_configuration_id: payment.checkout_configuration_id,
-          metadata: payment.metadata,
-        }));
+        // Redact: avoid logging payment.metadata (can contain emails / PII).
+        console.log(
+          "Payment check-status: payment entry id=",
+          payment.id,
+          "status=",
+          payment.status
+        );
 
         const matchesCheckout =
           payment.checkout_configuration_id === transaction.whopCheckoutId;

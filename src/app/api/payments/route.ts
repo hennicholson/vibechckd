@@ -8,10 +8,12 @@ import { parseBody, z } from "@/lib/validation";
 
 // Strict schema: the sender is ALWAYS session.user.id. Never accept sender from body.
 // amountCents is bounded to prevent Whop-side / integer-overflow abuse.
+// projectId is REQUIRED — direct payments must be tied to an active project both
+// parties belong to. Closes the unsolicited-payment surface (anyone-can-pay-anyone).
 const paymentSchema = z
   .object({
     recipientId: z.string().uuid(),
-    projectId: z.string().uuid().optional(),
+    projectId: z.string().uuid(),
     amountCents: z.number().int().positive().max(10_000_000), // $100k cap
     description: z.string().min(1).max(500),
   })
@@ -53,28 +55,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
     }
 
-    // If this payment is tied to a project, confirm BOTH parties belong to it.
-    // TODO(security): If the product intent is "a client can pay any coder
-    // on the marketplace" without a project context, that's currently the
-    // fallback behavior here. Revisit whether unsolicited direct payments
-    // from arbitrary users should be allowed at all, or should require an
-    // invoice / inquiry linkage first. For now, we enforce project
-    // co-membership when projectId is supplied, and allow direct payment
-    // otherwise (sender is always the authenticated user, so no
-    // impersonation risk exists — just unsolicited-payment risk).
-    if (projectId) {
-      const memberships = await db
-        .select({ userId: projectMembers.userId })
-        .from(projectMembers)
-        .where(eq(projectMembers.projectId, projectId));
+    // Confirm BOTH parties belong to the project. projectId is required
+    // by the schema, so this branch always runs.
+    const memberships = await db
+      .select({ userId: projectMembers.userId })
+      .from(projectMembers)
+      .where(eq(projectMembers.projectId, projectId));
 
-      const memberSet = new Set(memberships.map((m) => m.userId));
-      if (!memberSet.has(session.user.id) || !memberSet.has(recipientId)) {
-        return NextResponse.json(
-          { error: "Forbidden: both parties must be project members" },
-          { status: 403 }
-        );
-      }
+    const memberSet = new Set(memberships.map((m) => m.userId));
+    if (!memberSet.has(session.user.id) || !memberSet.has(recipientId)) {
+      return NextResponse.json(
+        { error: "Forbidden: both parties must be project members" },
+        { status: 403 }
+      );
     }
 
     // Convert cents to dollars for Whop API
@@ -85,12 +78,11 @@ export async function POST(request: NextRequest) {
 
     // Create checkout session via Whop
     const baseUrl = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
-    const redirectPath = projectId ? `/dashboard/projects/${projectId}` : "/dashboard/earnings";
     const checkout = await createCheckoutSession({
       amount: amountDollars,
       description,
       metadata: { transactionId: tempId },
-      redirectUrl: `${baseUrl}${redirectPath}`,
+      redirectUrl: `${baseUrl}/dashboard/projects/${projectId}`,
     });
 
     // Insert transaction record (sender is always session.user.id)
@@ -99,7 +91,7 @@ export async function POST(request: NextRequest) {
       .values({
         id: tempId,
         userId: recipientId,
-        projectId: projectId || null,
+        projectId,
         invoiceId: null,
         type: "direct_payment",
         status: "pending",
@@ -111,8 +103,8 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Post system message to project chat if projectId provided
-    if (projectId) {
+    // Post system message to project chat
+    {
       const displayAmount = (amountCents / 100).toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
