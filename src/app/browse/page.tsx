@@ -79,16 +79,16 @@ function SpecialtyDropdown({
   }, [open]);
 
   const label =
-    filter === "all" ? "Project types" : SPECIALTY_LABELS[filter] || "Project types";
+    filter === "all" ? "Discipline" : SPECIALTY_LABELS[filter] || "Discipline";
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${
+        className={`relative inline-flex items-center gap-1.5 px-2 py-1 text-[13px] font-medium transition-colors cursor-pointer ${
           filter !== "all"
-            ? "bg-surface-muted text-text-primary"
+            ? "text-text-primary after:absolute after:left-2 after:right-2 after:-bottom-1 after:h-[1.5px] after:bg-text-primary"
             : "text-text-muted hover:text-text-primary"
         }`}
         aria-haspopup="listbox"
@@ -505,34 +505,38 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        {/* Sticky desktop header: expanded search + clean stat ticker.
-            Pinned at the top of the scrolling main column so the user
-            can refine their query from anywhere on the page. The tabs
-            row below is intentionally NOT sticky — it's part of the
-            page rhythm, not a permanent control surface. */}
-        <div className="hidden md:block sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-border">
-          <div className="w-full px-4 md:px-12 lg:px-16 pt-6 pb-3">
-            <div className="max-w-[1100px]">
+        {/* Sticky desktop header — innovation note:
+            The page reads top-down as a single quiet thought. A whisper
+            of marketplace context (the ticker) sits above the search,
+            so the visitor sees "real, live, vetted" before they see
+            the input. The search itself is borderless, type-as-hero.
+            No outline, no kbd hint, no panel chrome — just the
+            magnifier and the user's words.
+
+            Visible separation comes from typographic weight + spacing,
+            not borders. backdrop-blur lets the grid scroll behind. */}
+        <div className="hidden md:block sticky top-0 z-20 bg-background/85 backdrop-blur-md">
+          <div className="px-4 md:px-12 lg:px-16 pt-4 pb-1">
+            <BrowseStats coders={filteredCoders} />
+          </div>
+          <div className="w-full px-4 md:px-12 lg:px-16 pb-5">
+            <div className="max-w-[1100px] border-b border-border">
               <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
             </div>
           </div>
-          <div className="px-4 md:px-12 lg:px-16 pb-3">
-            <BrowseStats coders={filteredCoders} />
-          </div>
         </div>
 
-        <div className="w-full px-4 md:px-12 lg:px-16 pt-6 md:pt-8 pb-10">
-          {/* Tab strip — "Featured" + "Project types ▾" filter dropdown.
-              Sits AFTER the search + ticker so the grid header has
-              breathing room and the user reads top-down naturally:
-              [search] → [live stats] → [tabs] → [grid]. */}
-          <div className="flex items-center gap-1 mb-8 md:mb-10 -mx-1">
+        <div className="w-full px-4 md:px-12 lg:px-16 pt-5 md:pt-6 pb-10">
+          {/* Lightweight tab row — text-only, underline-on-active.
+              "Featured" is the resting state; selecting a discipline
+              filters the grid in place. */}
+          <div className="flex items-center gap-1 mb-10 md:mb-12 -ml-2">
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${
+              className={`relative px-2 py-1 text-[13px] font-medium transition-colors cursor-pointer ${
                 filter === "all"
-                  ? "bg-surface-muted text-text-primary"
+                  ? "text-text-primary after:absolute after:left-2 after:right-2 after:-bottom-1 after:h-[1.5px] after:bg-text-primary"
                   : "text-text-muted hover:text-text-primary"
               }`}
             >

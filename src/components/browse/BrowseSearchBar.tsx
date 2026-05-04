@@ -19,7 +19,7 @@ interface BrowseSearchBarProps {
 export default function BrowseSearchBar({
   value,
   onChange,
-  placeholder = "Search by name, specialty, stack, or project...",
+  placeholder = "Search creators, skills, or work…",
 }: BrowseSearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,13 +39,17 @@ export default function BrowseSearchBar({
   }, []);
 
   return (
-    <div className="relative group">
+    // Borderless typographic search. The whole row reads like a single
+    // line of intent — magnifier, the user's words, a clear button when
+    // they have text. No box, no kbd hint, no chrome. The visual weight
+    // comes from the type itself, not a container.
+    <div className="relative group flex items-center gap-3 md:gap-4 py-1">
       <svg
-        className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-text-muted pointer-events-none"
+        className="w-5 h-5 md:w-[22px] md:h-[22px] text-text-muted flex-shrink-0 transition-colors group-focus-within:text-text-primary"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
-        strokeWidth={1.6}
+        strokeWidth={1.5}
       >
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.2-5.2m1.95-5.05a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
@@ -55,29 +59,22 @@ export default function BrowseSearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-14 md:h-[60px] pl-12 pr-24 text-[16px] md:text-[15px] text-text-primary bg-background border border-border rounded-xl placeholder:text-text-muted focus:outline-none focus:border-border-hover transition-colors duration-150"
+        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[18px] md:text-[22px] tracking-[-0.01em] text-text-primary placeholder:text-text-muted/70 placeholder:font-normal py-2 md:py-3"
         aria-label="Search coders"
       />
-      <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center pointer-events-none">
-        {value ? (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            onMouseDown={(e) => e.preventDefault()}
-            className="pointer-events-auto text-text-muted hover:text-text-primary transition-colors cursor-pointer p-1"
-            aria-label="Clear search"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        ) : (
-          <kbd className="inline-flex items-center gap-0.5 h-[22px] px-1.5 text-[11px] font-mono text-text-muted bg-surface-muted border border-border rounded">
-            <span className="text-[12px] leading-none">⌘</span>
-            <span>K</span>
-          </kbd>
-        )}
-      </div>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          onMouseDown={(e) => e.preventDefault()}
+          className="flex-shrink-0 text-text-muted hover:text-text-primary transition-colors cursor-pointer p-1"
+          aria-label="Clear search"
+        >
+          <svg className="w-4 h-4 md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
