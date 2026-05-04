@@ -321,7 +321,7 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
   if (state === "connected" && whopElements && token && companyId) {
     const { react: WhopReact, loader } = whopElements;
     const els = loader();
-    const { Elements, PayoutsSession, BalanceElement, WithdrawButtonElement, WithdrawalsElement } = WhopReact;
+    const { Elements, PayoutsSession, BalanceElement } = WhopReact;
 
     return (
       <div className="border border-border rounded-[10px] overflow-hidden mb-6">
@@ -335,11 +335,23 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
             <span className="text-[11px] text-text-muted">Connected</span>
           </div>
         </div>
-        <div className="p-5">
+        <div className="p-5 space-y-4">
+          {/* Whop's BalanceElement renders the wallet balance + a single
+              withdraw CTA. We intentionally drop WithdrawButtonElement and
+              WithdrawalsElement — they were rendering as duplicate empty
+              "Withdraw" placeholders when the wallet has no balance, and
+              our own Transaction History (below this card on the page)
+              already lists every withdrawal. One canonical surface, no
+              ghost buttons. */}
           <Elements
             appearance={{
               classes: {
-                ".Button": { height: "40px", "border-radius": "8px", "font-size": "13px", "font-weight": "500" },
+                ".Button": {
+                  height: "40px",
+                  "border-radius": "8px",
+                  "font-size": "13px",
+                  "font-weight": "500",
+                },
                 ".Container": { "border-radius": "10px" },
               },
             }}
@@ -348,43 +360,45 @@ export default function WhopWallet({ availableCents, onWithdrawalComplete }: Who
             <PayoutsSession
               token={() => Promise.resolve(token)}
               companyId={companyId}
-              redirectUrl={typeof window !== "undefined" ? `${window.location.origin}/dashboard/earnings` : "https://vibechckd.cc/dashboard/earnings"}
+              redirectUrl={
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/dashboard/earnings`
+                  : "https://vibechckd.cc/dashboard/earnings"
+              }
             >
-              <div className="space-y-4">
-                <BalanceElement
-                  showWithdrawButton={false}
-                  fallback={<div className="h-20 bg-surface-muted rounded-lg animate-pulse" />}
-                />
-                <WithdrawButtonElement
-                  size="3"
-                  variant="solid"
-                  fallback={<div className="h-10 bg-surface-muted rounded-lg animate-pulse" />}
-                />
-                <WithdrawalsElement
-                  fallback={<div className="h-16 bg-surface-muted rounded-lg animate-pulse" />}
-                />
-              </div>
+              <BalanceElement
+                showWithdrawButton={true}
+                fallback={
+                  <div className="h-20 bg-surface-muted rounded-lg animate-pulse" />
+                }
+              />
             </PayoutsSession>
           </Elements>
-        </div>
 
-        {/* Also show our withdraw button for the platform balance */}
-        {availableCents > 0 && (
-          <div className="px-5 py-3 border-t border-border">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] text-text-muted">
-                Platform balance: ${maxDollars.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
+          {/* Platform-balance pass-through: when the user still has funds
+              on our side that haven't transferred to their Whop wallet
+              yet, surface a single inline action instead of stacking it
+              in a footer band. */}
+          {availableCents > 0 && (
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+              <div className="min-w-0">
+                <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+                  Platform balance
+                </p>
+                <p className="text-[14px] font-semibold text-text-primary tabular-nums">
+                  ${maxDollars.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
               <button
                 onClick={() => setShowWithdraw(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer"
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer"
               >
                 <IconArrowDown />
                 Transfer to wallet
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Withdraw modal */}
         {showWithdraw && (
