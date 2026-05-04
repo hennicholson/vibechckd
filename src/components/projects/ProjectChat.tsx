@@ -35,6 +35,7 @@ interface ChatMessage {
     dueDate: string | null;
     paidAt: string | null;
     paymentUrl: string | null;
+    whopCheckoutConfigId?: string | null;
     senderId: string | null;
     recipientId: string | null;
   } | null;
@@ -43,6 +44,7 @@ interface ChatMessage {
 interface InvoiceData {
   id: string;
   whopInvoiceId: string | null;
+  whopCheckoutConfigId?: string | null;
   description: string;
   amountCents: number;
   status: string;
@@ -63,6 +65,7 @@ interface ParsedInvoice {
   status: string;
   invoiceId: string | null;
   payUrl: string | null;
+  checkoutConfigId?: string | null;
   from: string | null;
   to: string | null;
 }
@@ -545,10 +548,31 @@ function SystemMessage({ content }: { content: string }) {
 // The button looks identical in both contexts so no visual flicker on the
 // iframe-detection hydration.
 
-function PayInvoiceButton({ url }: { url: string }) {
+function PayInvoiceButton({
+  url,
+  checkoutConfigId,
+}: {
+  url: string;
+  checkoutConfigId?: string | null;
+}) {
   const { isInIframe, sdk } = useWhopIframeContext();
   const onClick = () => {
     if (isInIframe) {
+      // Prefer openCheckout when the invoice carried a checkout-config id —
+      // this renders the native Whop checkout modal in-place. The
+      // installed @whop/iframe types don't expose openCheckout in their
+      // declaration files yet, so we feature-detect and cast.
+      const sdkAny = sdk as unknown as {
+        openCheckout?: (args: { checkoutConfigurationId: string }) => unknown;
+      };
+      if (checkoutConfigId && typeof sdkAny.openCheckout === "function") {
+        try {
+          sdkAny.openCheckout({ checkoutConfigurationId: checkoutConfigId });
+          return;
+        } catch {
+          // fall through to openExternalUrl
+        }
+      }
       sdk.openExternalUrl({ url });
     } else {
       window.open(url, "_blank", "noopener,noreferrer");
@@ -644,7 +668,10 @@ function InvoiceCard({
               Whop can route the user to its hosted checkout in-app. Outside
               the iframe (direct vibechckd.cc) we open in a new tab. */}
           {!isSender && invoice.payUrl && (
-            <PayInvoiceButton url={invoice.payUrl} />
+            <PayInvoiceButton
+              url={invoice.payUrl}
+              checkoutConfigId={invoice.checkoutConfigId ?? null}
+            />
           )}
           {invoice.invoiceId && onCheckStatus && (
             <button
@@ -1996,6 +2023,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                   status: inv.status,
                   invoiceId: inv.id,
                   payUrl: inv.paymentUrl,
+                  checkoutConfigId: inv.whopCheckoutConfigId ?? null,
                   from: senderMember?.name || null,
                   to: recipientMember?.name || null,
                 };

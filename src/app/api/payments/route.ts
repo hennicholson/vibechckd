@@ -5,6 +5,7 @@ import { transactions, users, messages, projectMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createCheckoutSession } from "@/lib/whop";
 import { parseBody, z } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Strict schema: the sender is ALWAYS session.user.id. Never accept sender from body.
 // amountCents is bounded to prevent Whop-side / integer-overflow abuse.
@@ -23,6 +24,23 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 10 direct payments per minute per user. Same window as invoices.
+  const rl = checkRateLimit(`payments:${session.user.id}`, 10, 60_000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          "Too many payments in a row — give it a minute and try again.",
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+        },
+      }
+    );
   }
 
   try {

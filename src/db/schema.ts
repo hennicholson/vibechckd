@@ -337,6 +337,10 @@ export const invoices = pgTable("invoices", {
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
   whopInvoiceId: text("whop_invoice_id").unique(),
+  // Whop checkout-configuration id used by the iframe SDK to render an
+  // in-place checkout modal (`iframeSdk.openCheckout`). When unset, the UI
+  // falls back to opening `paymentUrl` in a new tab.
+  whopCheckoutConfigId: text("whop_checkout_config_id"),
   senderId: uuid("sender_id").references(() => users.id),
   recipientId: uuid("recipient_id").references(() => users.id),
   description: text("description").notNull(),
@@ -363,6 +367,9 @@ export const invoiceSplits = pgTable("invoice_splits", {
 export const transactionTypeEnum = pgEnum("transaction_type", ["invoice_payment", "direct_payment", "withdrawal", "refund", "platform_fee"]);
 export const transactionStatusEnum = pgEnum("transaction_status", ["pending", "completed", "failed", "cancelled"]);
 
+// `originalTransactionId` is added via ALTER TABLE in migration 0014 to avoid
+// a self-reference cycle in the column definition. The schema declares it as
+// a plain uuid here; the foreign key + index live in the migration.
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),
@@ -374,11 +381,46 @@ export const transactions = pgTable("transactions", {
   description: text("description").notNull(),
   whopTransferId: text("whop_transfer_id"),
   whopCheckoutId: text("whop_checkout_id"),
+  // Refund-only: the Whop refund/event id that produced this row, and a
+  // pointer back to the original (positive) transaction this reverses.
+  whopRefundId: text("whop_refund_id"),
+  originalTransactionId: uuid("original_transaction_id"),
   paymentUrl: text("payment_url"),
   senderId: uuid("sender_id").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { mode: "date" }),
 });
+
+// ── Disputes (chargebacks) ──
+//
+// We don't process payments — Whop does — so disputes are tracked here for
+// visibility only. We never freeze balances on dispute open; if the dispute
+// is lost we attempt a clawback transfer, surfaced via `clawbackStatus`.
+export const disputeStatusEnum = pgEnum("dispute_status", [
+  "open",
+  "under_review",
+  "won",
+  "lost",
+  "closed",
+]);
+
+export const disputes = pgTable(
+  "disputes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    transactionId: uuid("transaction_id").notNull().references(() => transactions.id),
+    whopDisputeId: text("whop_dispute_id").notNull(),
+    status: disputeStatusEnum("status").default("open").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    reason: text("reason"),
+    // 'pending' until we attempt the clawback; 'recovered' / 'failed' after.
+    // Null when status is still open or when we won the dispute.
+    clawbackStatus: text("clawback_status"),
+    openedAt: timestamp("opened_at", { mode: "date" }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+  },
+  (t) => [uniqueIndex("disputes_whop_dispute_id_uq").on(t.whopDisputeId)]
+);
 
 export const withdrawals = pgTable("withdrawals", {
   id: uuid("id").defaultRandom().primaryKey(),

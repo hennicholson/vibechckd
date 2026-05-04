@@ -9,6 +9,7 @@ import {
   withdrawals,
   conversations,
   users,
+  disputes,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { whopsdk } from "@/lib/whop-client";
@@ -94,14 +95,22 @@ async function dispatchEvent(event: AnyWebhookEvent): Promise<void> {
       // memberships today, but log so we can wire it up later.
       console.log(`[whop] membership event: ${action}`);
       break;
+    case "payment.refunded":
     case "refund.created":
     case "refund.updated":
-      // Same: log + skip; no refund-handling product flow yet.
-      console.log(`[whop] refund event: ${action}`);
+      await handleRefund(event as unknown as Record<string, unknown>);
       break;
     case "dispute.created":
+    case "payment.dispute.created":
+      await handleDispute(event as unknown as Record<string, unknown>, "open");
+      break;
     case "dispute.updated":
-      console.log(`[whop] dispute event: ${action}`);
+    case "payment.dispute.updated":
+      await handleDispute(event as unknown as Record<string, unknown>, "update");
+      break;
+    case "dispute.closed":
+    case "payment.dispute.closed":
+      await handleDispute(event as unknown as Record<string, unknown>, "close");
       break;
     default:
       // Unhandled event types are intentionally a no-op so adding new
@@ -598,4 +607,293 @@ async function handleWithdrawalFailed(payload: Record<string, any>) {
         eq(transactions.amountCents, -withdrawal.amountCents)
       )
     );
+}
+
+// ── Refund handler ──
+//
+// Per our terms (vibechckd is a facilitator; Whop processes payments) we
+// reflect the refund in our DB but never initiate one ourselves. When a
+// payment is refunded by Whop, we:
+//   1. Locate the original `transactions` row via whopCheckoutId or
+//      metadata.transactionId — same matchers as handlePaymentSucceeded.
+//   2. Insert a reversing transaction (negative amount, type='refund').
+//   3. Attempt to claw back the recipient's ledger transfer if we'd already
+//      forwarded their share. If they've already withdrawn from Whop, the
+//      clawback fails — we mark `whop_refund_id` and let ops reconcile.
+async function handleRefund(payload: Record<string, any>): Promise<void> {
+  const data = payload.data || {};
+  const refundId: string | undefined =
+    data.id || data.refund_id || payload.refund_id;
+  const checkoutId: string | undefined =
+    data.checkout_configuration_id ||
+    data.checkout_session_id ||
+    data.checkout_id ||
+    data.checkout_configuration?.id ||
+    data.payment?.checkout_configuration_id;
+  const metadataTxId: string | undefined =
+    data.metadata?.transactionId ||
+    data.payment?.metadata?.transactionId;
+  const refundAmountCents: number | undefined =
+    typeof data.amount === "number"
+      ? Math.round(data.amount * 100)
+      : typeof data.amount_cents === "number"
+        ? data.amount_cents
+        : undefined;
+
+  console.log(
+    "refund webhook: refundId=",
+    refundId,
+    "checkoutId=",
+    checkoutId,
+    "metaTxId=",
+    metadataTxId
+  );
+
+  let originalTx = null;
+  if (metadataTxId) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, metadataTxId))
+      .limit(1);
+    if (found) originalTx = found;
+  }
+  if (!originalTx && checkoutId) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.whopCheckoutId, checkoutId))
+      .limit(1);
+    if (found) originalTx = found;
+  }
+
+  if (!originalTx) {
+    console.warn("refund webhook: no matching original transaction");
+    return;
+  }
+
+  // Compare-and-swap: only the first delivery for this refund id creates the
+  // reversing row. We use whopRefundId as the dedupe key. Without a refundId
+  // (rare) we fall back to status-flip on the original.
+  const amount = refundAmountCents ?? originalTx.amountCents;
+
+  if (refundId) {
+    const existingRefund = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(eq(transactions.whopRefundId, refundId))
+      .limit(1);
+    if (existingRefund.length > 0) {
+      console.log("refund webhook: already recorded", refundId);
+      return;
+    }
+  }
+
+  await db.insert(transactions).values({
+    userId: originalTx.userId,
+    projectId: originalTx.projectId,
+    invoiceId: originalTx.invoiceId,
+    senderId: originalTx.senderId,
+    type: "refund",
+    status: "completed",
+    amountCents: -amount,
+    description: `Refund: ${originalTx.description}`,
+    whopRefundId: refundId ?? null,
+    originalTransactionId: originalTx.id,
+    completedAt: new Date(),
+  });
+
+  // System message in the project chat for visibility.
+  if (originalTx.projectId) {
+    const displayAmount = (amount / 100).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    await db.insert(messages).values({
+      projectId: originalTx.projectId,
+      senderId: null,
+      content: `Refund issued · -$${displayAmount}\n${originalTx.description}\nProcessed by Whop. Disputes are handled by Whop and the card networks.`,
+      messageType: "system",
+      fileUrl: null,
+    });
+  }
+
+  // Attempt clawback of the creator's ledger transfer if we'd already
+  // forwarded their share. If the creator has already withdrawn, this fails
+  // — that's expected; the refund liability is between the creator and Whop.
+  const companyId = process.env.WHOP_COMPANY_ID;
+  if (!companyId || !originalTx.whopTransferId) return;
+  const [recipient] = await db
+    .select({ whopUserId: users.whopUserId })
+    .from(users)
+    .where(eq(users.id, originalTx.userId))
+    .limit(1);
+  if (!recipient?.whopUserId) return;
+  try {
+    await whopsdk.transfers.create({
+      amount: amount / 100,
+      currency: "usd",
+      origin_id: recipient.whopUserId,
+      destination_id: companyId,
+      idempotence_key: `clawback_${originalTx.id}`,
+      notes: `Refund clawback ${originalTx.id.slice(0, 8)}`.slice(0, 50),
+    });
+    console.log("refund webhook: clawback succeeded for", originalTx.id);
+  } catch (err) {
+    console.warn(
+      "refund webhook: clawback failed (likely already withdrawn) for",
+      originalTx.id,
+      "-",
+      err instanceof Error ? err.message : "unknown"
+    );
+  }
+}
+
+// ── Dispute (chargeback) handler ──
+//
+// vibechckd never freezes balances on dispute. Whop holds disputed funds at
+// the card-network layer; our job is to record the dispute against the
+// transaction so the dashboard can show it, and to attempt a clawback if
+// the dispute resolves as `lost`.
+async function handleDispute(
+  payload: Record<string, any>,
+  phase: "open" | "update" | "close"
+): Promise<void> {
+  const data = payload.data || {};
+  const disputeId: string | undefined = data.id || data.dispute_id;
+  if (!disputeId) {
+    console.warn("dispute webhook: missing dispute id");
+    return;
+  }
+  const checkoutId: string | undefined =
+    data.checkout_configuration_id ||
+    data.payment?.checkout_configuration_id ||
+    data.checkout_session_id;
+  const metadataTxId: string | undefined =
+    data.metadata?.transactionId ||
+    data.payment?.metadata?.transactionId;
+  const reason: string | undefined = data.reason || data.dispute_reason;
+  const amountCents =
+    typeof data.amount === "number"
+      ? Math.round(data.amount * 100)
+      : typeof data.amount_cents === "number"
+        ? data.amount_cents
+        : 0;
+
+  // Map Whop's status string to our enum, defaulting cautiously.
+  const rawStatus = (data.status || data.outcome || "").toLowerCase();
+  const status: "open" | "under_review" | "won" | "lost" | "closed" =
+    rawStatus === "won" || rawStatus === "won_by_merchant"
+      ? "won"
+      : rawStatus === "lost" || rawStatus === "lost_by_merchant"
+        ? "lost"
+        : rawStatus === "closed"
+          ? "closed"
+          : phase === "open"
+            ? "open"
+            : "under_review";
+
+  // Locate the original transaction.
+  let originalTx = null;
+  if (metadataTxId) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, metadataTxId))
+      .limit(1);
+    if (found) originalTx = found;
+  }
+  if (!originalTx && checkoutId) {
+    const [found] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.whopCheckoutId, checkoutId))
+      .limit(1);
+    if (found) originalTx = found;
+  }
+  if (!originalTx) {
+    console.warn("dispute webhook: no matching transaction for", disputeId);
+    return;
+  }
+
+  // Upsert the dispute row by whop_dispute_id (unique).
+  const [existing] = await db
+    .select()
+    .from(disputes)
+    .where(eq(disputes.whopDisputeId, disputeId))
+    .limit(1);
+
+  if (!existing) {
+    await db.insert(disputes).values({
+      transactionId: originalTx.id,
+      whopDisputeId: disputeId,
+      status,
+      amountCents: amountCents || originalTx.amountCents,
+      reason: reason ?? null,
+      resolvedAt: phase === "close" || status === "won" || status === "lost"
+        ? new Date()
+        : null,
+    });
+  } else {
+    await db
+      .update(disputes)
+      .set({
+        status,
+        reason: reason ?? existing.reason,
+        resolvedAt:
+          phase === "close" || status === "won" || status === "lost"
+            ? new Date()
+            : existing.resolvedAt,
+      })
+      .where(eq(disputes.id, existing.id));
+  }
+
+  // Project chat note on open so both parties see it. Quiet on update/close.
+  if (phase === "open" && originalTx.projectId) {
+    await db.insert(messages).values({
+      projectId: originalTx.projectId,
+      senderId: null,
+      content: `Payment disputed by the cardholder.\nWhop is reviewing under their dispute process. We don't process payments — chargeback decisions are made by Whop and the card network.`,
+      messageType: "system",
+      fileUrl: null,
+    });
+  }
+
+  // If the dispute is lost, attempt a clawback (idempotent via key).
+  if (status === "lost") {
+    const companyId = process.env.WHOP_COMPANY_ID;
+    if (!companyId || !originalTx.whopTransferId) return;
+    const [recipient] = await db
+      .select({ whopUserId: users.whopUserId })
+      .from(users)
+      .where(eq(users.id, originalTx.userId))
+      .limit(1);
+    if (!recipient?.whopUserId) return;
+    const amt = (amountCents || originalTx.amountCents) / 100;
+    try {
+      await whopsdk.transfers.create({
+        amount: amt,
+        currency: "usd",
+        origin_id: recipient.whopUserId,
+        destination_id: companyId,
+        idempotence_key: `dispute_clawback_${disputeId}`,
+        notes: `Dispute lost ${disputeId.slice(0, 8)}`.slice(0, 50),
+      });
+      await db
+        .update(disputes)
+        .set({ clawbackStatus: "recovered" })
+        .where(eq(disputes.whopDisputeId, disputeId));
+    } catch (err) {
+      await db
+        .update(disputes)
+        .set({ clawbackStatus: "failed" })
+        .where(eq(disputes.whopDisputeId, disputeId));
+      console.warn(
+        "dispute webhook: clawback failed for",
+        disputeId,
+        "-",
+        err instanceof Error ? err.message : "unknown"
+      );
+    }
+  }
 }

@@ -10,10 +10,12 @@ import {
   conversations,
 } from "@/db/schema";
 import { eq, and, ne, desc } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { createInvoice } from "@/lib/whop";
 import { emails } from "@/lib/email";
 import { parseBody, z } from "@/lib/validation";
 import { publishConversationEvent } from "@/lib/conversation-bus";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Local HTML escape helper — duplicated intentionally (src/lib/email.ts is
 // owned by another agent and out-of-scope for this edit).
@@ -59,6 +61,21 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 10 invoice creates per minute per user. Stops accidental loops + abuse.
+  const rl = checkRateLimit(`invoices:${session.user.id}`, 10, 60_000);
+  if (!rl.allowed) {
+    return Response.json(
+      {
+        error:
+          "Too many invoices in a row — give it a minute and try again.",
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+      }
+    );
   }
 
   try {
@@ -132,6 +149,24 @@ export async function POST(request: NextRequest) {
     // Whop API expects dollars in initial_price (e.g. 25 = $25.00)
     const amountDollars = amount / 100;
     const saveDraft = !email;
+
+    // Deterministic idempotency key derived from the payload — a client
+    // retry (network blip, double-tap) returns the same Whop invoice
+    // instead of creating two. Different invoices hash differently.
+    const idempotencyKey = createHash("sha256")
+      .update(
+        JSON.stringify({
+          sender: session.user.id,
+          projectId,
+          description,
+          amount,
+          dueDate,
+          splits,
+        })
+      )
+      .digest("hex")
+      .slice(0, 32);
+
     const whopInvoice = await createInvoice({
       customerEmail: email,
       customerName: name,
@@ -140,6 +175,7 @@ export async function POST(request: NextRequest) {
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       lineItems: lineItems?.map((li) => ({ ...li, unitPrice: li.unitPrice / 100 })),
       saveDraft,
+      idempotencyKey,
     });
 
     // Format amount for display (amount comes in as cents from chat)
@@ -177,6 +213,7 @@ export async function POST(request: NextRequest) {
       .values({
         projectId,
         whopInvoiceId: whopInvoice.id,
+        whopCheckoutConfigId: whopInvoice.checkoutConfigId ?? null,
         senderId: session.user.id,
         recipientId,
         description,

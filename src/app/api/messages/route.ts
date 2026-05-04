@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
     dueDate: Date | null;
     paidAt: Date | null;
     paymentUrl: string | null;
+    whopCheckoutConfigId: string | null;
     senderId: string | null;
     recipientId: string | null;
   };
@@ -125,6 +126,7 @@ export async function GET(request: NextRequest) {
         dueDate: invoices.dueDate,
         paidAt: invoices.paidAt,
         paymentUrl: invoices.paymentUrl,
+        whopCheckoutConfigId: invoices.whopCheckoutConfigId,
         senderId: invoices.senderId,
         recipientId: invoices.recipientId,
       })

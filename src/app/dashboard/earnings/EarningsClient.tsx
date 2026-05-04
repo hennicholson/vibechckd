@@ -37,6 +37,10 @@ interface Transaction {
   completedAt: string | null;
   projectId: string | null;
   invoiceId: string | null;
+  // Set when this transaction has an open or resolved chargeback dispute.
+  // Null = no dispute. Whop holds disputed funds at the network layer; we
+  // surface the badge so the creator knows funds are not yet confirmed.
+  disputeStatus?: "open" | "under_review" | "won" | "lost" | "closed" | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -547,11 +551,27 @@ export default function EarningsPage() {
                   {/* Description */}
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-medium text-text-primary truncate">{tx.description}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-[11px] font-mono text-text-muted">{formatDate(tx.createdAt)}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-muted text-text-muted font-medium">
                         {typeLabel(tx.type)}
                       </span>
+                      {tx.disputeStatus && tx.disputeStatus !== "won" && (
+                        <span
+                          title="Chargeback dispute — handled by Whop. We'll update when it resolves."
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            tx.disputeStatus === "lost"
+                              ? "bg-negative/10 text-negative"
+                              : "bg-amber-500/10 text-amber-700"
+                          }`}
+                        >
+                          {tx.disputeStatus === "lost"
+                            ? "Chargeback lost"
+                            : tx.disputeStatus === "closed"
+                              ? "Dispute closed"
+                              : "Disputed"}
+                        </span>
+                      )}
                       {hasProject && (
                         <span className="text-[10px] text-text-muted hidden sm:flex items-center gap-0.5">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

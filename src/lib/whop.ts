@@ -1,3 +1,22 @@
+// Whop REST helpers — thin wrappers over `@whop/sdk` so call sites can stay
+// terse and stable while the SDK handles auth, base URL, and typing.
+//
+// Why a wrapper at all? Two reasons:
+//   1. We want to keep the existing call signatures across all consumers
+//      (api routes, webhook handler, etc.) so we don't have to refactor
+//      every site each time the SDK shape shifts.
+//   2. A handful of operations need our company id baked in or specific
+//      defaults applied (idempotency keys, payouts portal `use_case`,
+//      etc.) — encapsulating those here keeps callers from getting them
+//      wrong.
+//
+// `sendInvoice` is the lone holdout still using raw fetch: the SDK does
+// not expose a `whopsdk.invoices.send(id, ...)` method (sending is
+// configured at create time via `collection_method: 'send_invoice'`).
+// When/if the SDK adds it, drop the fetch and switch over.
+
+import { whopsdk } from "@/lib/whop-client";
+
 const WHOP_BASE_URL = "https://api.whop.com/api/v1";
 
 function getKey() {
@@ -7,10 +26,12 @@ function getKey() {
 }
 
 function getCompanyId() {
-  return process.env.WHOP_COMPANY_ID || "";
+  const id = process.env.WHOP_COMPANY_ID || "";
+  if (!id) throw new Error("WHOP_COMPANY_ID is not configured");
+  return id;
 }
 
-function headers() {
+function rawHeaders() {
   return {
     Authorization: `Bearer ${getKey()}`,
     "Content-Type": "application/json",
@@ -31,18 +52,34 @@ export interface CreateInvoiceParams {
   dueDate: string; // ISO date
   lineItems?: { label: string; unitPrice: number; quantity: number }[];
   saveDraft?: boolean;
+  // Optional caller-supplied key. We forward it to Whop so a client retry
+  // (network blip, double-tap) doesn't create two invoices. Use a hash of
+  // the payload for natural deduplication.
+  idempotencyKey?: string;
 }
 
 export interface InvoiceResult {
   id: string;
   status: string;
   paymentUrl?: string;
+  // The hosted-checkout configuration id. Stored on `invoices` so the
+  // chat pay button can render the in-iframe modal via `iframeSdk.openCheckout`.
+  checkoutConfigId?: string;
 }
 
 export async function createInvoice(
   params: CreateInvoiceParams
 ): Promise<InvoiceResult> {
-  const { customerEmail, customerName, description, amount, dueDate, lineItems, saveDraft } = params;
+  const {
+    customerEmail,
+    customerName,
+    description,
+    amount,
+    dueDate,
+    lineItems,
+    saveDraft,
+    idempotencyKey,
+  } = params;
 
   const formattedLineItems: LineItem[] = lineItems
     ? lineItems.map((item) => ({
@@ -52,126 +89,87 @@ export async function createInvoice(
       }))
     : [{ label: description, unit_price: amount, quantity: 1 }];
 
-  const body: Record<string, unknown> = {
+  // SDK accepts the same shape as the raw POST. We cast where our older
+  // signature predates the SDK's typed parameters (the SDK union has many
+  // optional shapes; we use the "with_product" variant).
+  const body = {
     company_id: getCompanyId(),
-    collection_method: "send_invoice",
+    collection_method: saveDraft ? "charge_automatically" : "send_invoice",
     product: { title: description },
     plan: {
       initial_price: amount,
       plan_type: "one_time",
     },
     line_items: formattedLineItems,
+    ...(saveDraft
+      ? { save_as_draft: true }
+      : {
+          email_address: customerEmail,
+          customer_name: customerName,
+          due_date: dueDate,
+        }),
   };
 
-  if (saveDraft) {
-    body.save_as_draft = true;
-  } else {
-    body.email_address = customerEmail;
-    body.customer_name = customerName;
-    body.due_date = dueDate;
-  }
-
-  const res = await fetch(`${WHOP_BASE_URL}/invoices`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    try {
-      const errJson = JSON.parse(errorText);
-      throw new Error(errJson?.error?.message || `Invoice failed (${res.status})`);
-    } catch (e) {
-      if (e instanceof Error && !e.message.includes("Invoice failed")) throw e;
-      throw new Error(`Invoice failed (${res.status}): ${errorText}`);
-    }
-  }
-
-  const data = await res.json();
+  const data = (await whopsdk.invoices.create(
+    body as unknown as Parameters<typeof whopsdk.invoices.create>[0],
+    idempotencyKey
+      ? { headers: { "Idempotency-Key": idempotencyKey } }
+      : undefined
+  )) as unknown as Record<string, unknown>;
 
   return {
-    id: data.id,
-    status: data.status || "sent",
-    paymentUrl: data.payment_url || data.checkout_url || undefined,
+    id: data.id as string,
+    status: (data.status as string) || "sent",
+    paymentUrl:
+      (data.payment_url as string | undefined) ||
+      (data.checkout_url as string | undefined) ||
+      undefined,
+    checkoutConfigId:
+      (data.checkout_configuration_id as string | undefined) ||
+      ((data.checkout_configuration as Record<string, unknown> | undefined)
+        ?.id as string | undefined),
   };
 }
 
-export async function getInvoice(invoiceId: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`${WHOP_BASE_URL}/invoices/${invoiceId}`, {
-    method: "GET",
-    headers: headers(),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Whop API error (${res.status}): ${errorText}`);
-  }
-
-  return res.json();
+export async function getInvoice(
+  invoiceId: string
+): Promise<Record<string, unknown>> {
+  return (await whopsdk.invoices.retrieve(invoiceId)) as unknown as Record<
+    string,
+    unknown
+  >;
 }
 
 export async function listInvoices(): Promise<Record<string, unknown>[]> {
-  const res = await fetch(
-    `${WHOP_BASE_URL}/invoices?company_id=${getCompanyId()}`,
-    {
-      method: "GET",
-      headers: headers(),
-    }
-  );
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Whop API error (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
-  return data.data || data;
+  const page = await whopsdk.invoices.list({ company_id: getCompanyId() });
+  return page.data as unknown as Record<string, unknown>[];
 }
 
 export async function sendInvoice(
   invoiceId: string,
   email?: string
 ): Promise<void> {
+  // No SDK method for resending — fall back to raw fetch.
   const body: Record<string, unknown> = {};
-  if (email) {
-    body.email_address = email;
-  }
+  if (email) body.email_address = email;
 
   const res = await fetch(`${WHOP_BASE_URL}/invoices/${invoiceId}/send`, {
     method: "POST",
-    headers: headers(),
+    headers: rawHeaders(),
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Whop API error (${res.status}): ${errorText}`);
+    throw new Error(`Whop API error (${res.status}): ${await res.text()}`);
   }
 }
 
 export async function voidInvoice(invoiceId: string): Promise<void> {
-  const res = await fetch(`${WHOP_BASE_URL}/invoices/${invoiceId}/void`, {
-    method: "POST",
-    headers: headers(),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Whop API error (${res.status}): ${errorText}`);
-  }
+  await whopsdk.invoices.void(invoiceId);
 }
 
 export async function markPaid(invoiceId: string): Promise<void> {
-  const res = await fetch(`${WHOP_BASE_URL}/invoices/${invoiceId}/mark_paid`, {
-    method: "POST",
-    headers: headers(),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Whop API error (${res.status}): ${errorText}`);
-  }
+  await whopsdk.invoices.markPaid(invoiceId);
 }
 
 export async function createCheckoutSession(params: {
@@ -180,7 +178,7 @@ export async function createCheckoutSession(params: {
   metadata?: Record<string, string>;
   redirectUrl?: string;
 }): Promise<{ id: string; purchaseUrl: string }> {
-  const body: Record<string, unknown> = {
+  const body = {
     mode: "payment",
     plan: {
       company_id: getCompanyId(),
@@ -189,53 +187,24 @@ export async function createCheckoutSession(params: {
       initial_price: params.amount,
       product: {
         title: params.description,
-        external_identifier: params.metadata?.transactionId || crypto.randomUUID(),
+        external_identifier:
+          params.metadata?.transactionId || crypto.randomUUID(),
       },
     },
     metadata: params.metadata || {},
+    ...(params.redirectUrl ? { redirect_url: params.redirectUrl } : {}),
   };
-  if (params.redirectUrl) body.redirect_url = params.redirectUrl;
 
-  const res = await fetch(`${WHOP_BASE_URL}/checkout_configurations`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
+  const data = (await whopsdk.checkoutConfigurations.create(
+    body as unknown as Parameters<
+      typeof whopsdk.checkoutConfigurations.create
+    >[0]
+  )) as unknown as { id: string; purchase_url?: string };
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Checkout creation failed (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
   return {
     id: data.id,
     purchaseUrl: data.purchase_url || "",
   };
-}
-
-export async function createWhopWithdrawal(params: {
-  amountDollars: number;
-}): Promise<{ id: string; status: string }> {
-  const body = {
-    amount: params.amountDollars,
-    company_id: getCompanyId(),
-    currency: "usd",
-  };
-
-  const res = await fetch(`${WHOP_BASE_URL}/withdrawals`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Withdrawal failed (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
-  return { id: data.id, status: data.status || "pending" };
 }
 
 export async function createConnectedAccount(params: {
@@ -243,29 +212,16 @@ export async function createConnectedAccount(params: {
   name: string;
   internalUserId: string;
 }): Promise<{ companyId: string }> {
-  const body = {
+  const data = (await whopsdk.companies.create({
     email: params.email,
     parent_company_id: getCompanyId(),
     title: params.name,
     metadata: {
       internal_user_id: params.internalUserId,
     },
+  } as unknown as Parameters<typeof whopsdk.companies.create>[0])) as unknown as {
+    id: string;
   };
-
-  const res = await fetch(`${WHOP_BASE_URL}/companies`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(
-      `Connected account creation failed (${res.status}): ${errorText}`
-    );
-  }
-
-  const data = await res.json();
   return { companyId: data.id };
 }
 
@@ -278,27 +234,19 @@ export async function createPayoutTransfer(params: {
   description: string;
   idempotencyKey: string;
 }): Promise<{ id: string; feeAmount: number; status: string }> {
-  const body = {
+  const data = (await whopsdk.transfers.create({
     amount: params.amountDollars,
     currency: "usd",
     origin_id: getCompanyId(),
     destination_id: params.destinationId,
     idempotence_key: params.idempotencyKey,
     notes: params.description.slice(0, 50),
+  } as unknown as Parameters<typeof whopsdk.transfers.create>[0])) as unknown as {
+    id: string;
+    fee_amount?: number;
+    status?: string;
   };
 
-  const res = await fetch(`${WHOP_BASE_URL}/transfers`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Transfer failed (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
   return {
     id: data.id,
     feeAmount: data.fee_amount || 0,
@@ -309,18 +257,11 @@ export async function createPayoutTransfer(params: {
 export async function generatePayoutPortalToken(
   connectedCompanyId: string
 ): Promise<string> {
-  const res = await fetch(`${WHOP_BASE_URL}/access_tokens`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ company_id: connectedCompanyId }),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Token generation failed (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
+  const data = (await whopsdk.accessTokens.create({
+    company_id: connectedCompanyId,
+  } as unknown as Parameters<typeof whopsdk.accessTokens.create>[0])) as unknown as {
+    token: string;
+  };
   return data.token;
 }
 
@@ -328,22 +269,13 @@ export async function generatePayoutPortalLink(params: {
   connectedCompanyId: string;
   returnUrl: string;
 }): Promise<string> {
-  const res = await fetch(`${WHOP_BASE_URL}/account_links`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({
-      company_id: params.connectedCompanyId,
-      use_case: "payouts_portal",
-      return_url: params.returnUrl,
-      refresh_url: params.returnUrl,
-    }),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Payout portal link failed (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
+  const data = (await whopsdk.accountLinks.create({
+    company_id: params.connectedCompanyId,
+    use_case: "payouts_portal",
+    return_url: params.returnUrl,
+    refresh_url: params.returnUrl,
+  } as unknown as Parameters<
+    typeof whopsdk.accountLinks.create
+  >[0])) as unknown as { url: string };
   return data.url;
 }

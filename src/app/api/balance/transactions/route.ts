@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { transactions } from "@/db/schema";
+import { transactions, disputes } from "@/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -33,10 +33,29 @@ export async function GET(request: NextRequest) {
       .from(transactions)
       .where(whereClause);
 
-    // Get paginated results
+    // Get paginated results, left-joining the latest dispute (if any) so
+    // the UI can render a badge without a second round-trip per row.
     const rows = await db
-      .select()
+      .select({
+        id: transactions.id,
+        userId: transactions.userId,
+        projectId: transactions.projectId,
+        invoiceId: transactions.invoiceId,
+        type: transactions.type,
+        status: transactions.status,
+        amountCents: transactions.amountCents,
+        description: transactions.description,
+        whopTransferId: transactions.whopTransferId,
+        whopCheckoutId: transactions.whopCheckoutId,
+        whopRefundId: transactions.whopRefundId,
+        originalTransactionId: transactions.originalTransactionId,
+        senderId: transactions.senderId,
+        createdAt: transactions.createdAt,
+        completedAt: transactions.completedAt,
+        disputeStatus: disputes.status,
+      })
       .from(transactions)
+      .leftJoin(disputes, eq(disputes.transactionId, transactions.id))
       .where(whereClause)
       .orderBy(desc(transactions.createdAt))
       .limit(limit)
