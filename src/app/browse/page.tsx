@@ -40,36 +40,23 @@ import {
 
 import BrowseSidebar from "@/components/browse/BrowseSidebar";
 import BrowseSearchBar from "@/components/browse/BrowseSearchBar";
-import BrowseFilterPills from "@/components/browse/BrowseFilterPills";
-import BrowseStats from "@/components/browse/BrowseStats";
 import BrowseCoderCard from "@/components/browse/BrowseCoderCard";
 
 type Filter = "all" | Specialty;
-type SortKey = "best" | "rate_asc" | "rate_desc" | "recent";
 
-const SORT_LABELS: Record<SortKey, string> = {
-  best: "Best match",
-  rate_asc: "Rate (low to high)",
-  rate_desc: "Rate (high to low)",
-  recent: "Recently added",
-};
-
-function parseRate(rate: string): number | null {
-  if (!rate) return null;
-  const nums = rate.match(/\d+/g);
-  if (!nums) return null;
-  const parsed = nums.map((n) => parseInt(n, 10)).filter((n) => Number.isFinite(n));
-  if (parsed.length === 0) return null;
-  if (parsed.length === 1) return parsed[0];
-  return Math.round((parsed[0] + parsed[1]) / 2);
-}
-
-function SortDropdown({
-  value,
-  onChange,
+// ── "Project types" dropdown — vetted.cv-style single-trigger filter
+//    that replaces the multi-pill row + sort dropdown on the main view.
+//    Clicking a specialty applies it; "All" resets. Counts come from the
+//    parent's already-computed specialty-aware tallies so the menu
+//    reflects the current search context.
+function SpecialtyDropdown({
+  filter,
+  onFilterChange,
+  counts,
 }: {
-  value: SortKey;
-  onChange: (v: SortKey) => void;
+  filter: Filter;
+  onFilterChange: (f: Filter) => void;
+  counts: Record<string, number>;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -90,17 +77,23 @@ function SortDropdown({
     };
   }, [open]);
 
+  const label =
+    filter === "all" ? "Project types" : SPECIALTY_LABELS[filter] || "Project types";
+
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 h-7 px-2 text-[11px] font-mono uppercase tracking-wider text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${
+          filter !== "all"
+            ? "bg-surface-muted text-text-primary"
+            : "text-text-muted hover:text-text-primary"
+        }`}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span>Sort:</span>
-        <span className="text-text-primary">{SORT_LABELS[value]}</span>
+        <span>{label}</span>
         <svg
           className={`w-3 h-3 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
           fill="none"
@@ -118,28 +111,49 @@ function SortDropdown({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full mt-1.5 min-w-[180px] bg-background border border-border rounded-md shadow-[0_6px_24px_-8px_rgba(0,0,0,0.08)] py-1 z-30"
+            className="absolute left-0 top-full mt-1.5 min-w-[220px] bg-background border border-border rounded-md shadow-[0_6px_24px_-8px_rgba(0,0,0,0.08)] py-1 z-30"
             role="listbox"
           >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-              <li key={key}>
-                <button
-                  onClick={() => {
-                    onChange(key);
-                    setOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 text-[12px] transition-colors cursor-pointer ${
-                    value === key
-                      ? "text-text-primary font-medium bg-surface-muted"
-                      : "text-text-secondary hover:bg-background-alt hover:text-text-primary"
-                  }`}
-                  role="option"
-                  aria-selected={value === key}
-                >
-                  {SORT_LABELS[key]}
-                </button>
-              </li>
-            ))}
+            <li>
+              <button
+                onClick={() => {
+                  onFilterChange("all");
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer ${
+                  filter === "all"
+                    ? "text-text-primary font-medium bg-surface-muted"
+                    : "text-text-secondary hover:bg-background-alt hover:text-text-primary"
+                }`}
+                role="option"
+                aria-selected={filter === "all"}
+              >
+                All
+              </button>
+            </li>
+            {SPECIALTIES.map((s) => {
+              const n = counts[s] ?? 0;
+              return (
+                <li key={s}>
+                  <button
+                    onClick={() => {
+                      onFilterChange(s);
+                      setOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[13px] transition-colors cursor-pointer ${
+                      filter === s
+                        ? "text-text-primary font-medium bg-surface-muted"
+                        : "text-text-secondary hover:bg-background-alt hover:text-text-primary"
+                    }`}
+                    role="option"
+                    aria-selected={filter === s}
+                  >
+                    <span>{SPECIALTY_LABELS[s]}</span>
+                    <span className="text-[11px] font-mono text-text-muted tabular-nums">{n}</span>
+                  </button>
+                </li>
+              );
+            })}
           </motion.ul>
         )}
       </AnimatePresence>
@@ -300,7 +314,6 @@ export default function BrowsePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<SortKey>("best");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
 
@@ -385,34 +398,21 @@ export default function BrowsePage() {
   }, [searchFiltered]);
 
   const filteredCoders = useMemo(() => {
-    let list = searchFiltered;
-    if (filter !== "all") {
-      list = list.filter((c) => (c.specialties || []).includes(filter));
-    }
-    // Sort
-    const sorted = [...list];
-    switch (sort) {
-      case "rate_asc":
-        sorted.sort((a, b) => (parseRate(a.hourlyRate) ?? Infinity) - (parseRate(b.hourlyRate) ?? Infinity));
-        break;
-      case "rate_desc":
-        sorted.sort((a, b) => (parseRate(b.hourlyRate) ?? -Infinity) - (parseRate(a.hourlyRate) ?? -Infinity));
-        break;
-      case "recent":
-        sorted.sort((a, b) => (b.joinedAt || "").localeCompare(a.joinedAt || ""));
-        break;
-      case "best":
-      default:
-        // featured + available first, then verified, then by name
-        sorted.sort((a, b) => {
-          const score = (c: Coder) =>
-            (c.featured ? 2 : 0) + (c.availability === "available" ? 1 : 0) + (c.verified ? 0.5 : 0);
-          return score(b) - score(a);
-        });
-        break;
-    }
-    return sorted;
-  }, [searchFiltered, filter, sort]);
+    const list =
+      filter === "all"
+        ? searchFiltered
+        : searchFiltered.filter((c) => (c.specialties || []).includes(filter));
+    // Single ranking: featured + available first, then verified, then leave
+    // input order. The simplified browse only shows "Featured" — sort
+    // controls live elsewhere if/when needed.
+    return [...list].sort((a, b) => {
+      const score = (c: Coder) =>
+        (c.featured ? 2 : 0) +
+        (c.availability === "available" ? 1 : 0) +
+        (c.verified ? 0.5 : 0);
+      return score(b) - score(a);
+    });
+  }, [searchFiltered, filter]);
 
   return (
     <div className="h-[100dvh] bg-background flex overflow-hidden">
@@ -432,62 +432,33 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        {/* Sticky filter + sort row on mobile. The MobileTopBar above is
-            already sticky at top-0 — this row docks just below it so users
-            can re-filter without scrolling back to the top of the grid.
-            top-[100px] = MobileTopBar's logo row (48px) + its search row
-            (~52px). z-30 < the top bar's z-40 so they layer correctly. */}
-        <div className="md:hidden sticky top-[100px] z-30 bg-background/95 backdrop-blur-md border-b border-border px-4 py-2">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-mono text-text-muted tabular-nums">
-              {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
-            </p>
-            <SortDropdown value={sort} onChange={setSort} />
-          </div>
-          <BrowseFilterPills
-            filter={filter}
-            onFilterChange={setFilter}
-            counts={specialtyCounts}
-            totalCount={searchFiltered.length}
-          />
-        </div>
-
-        <div className="w-full px-4 md:px-8 pt-4 md:pt-6 pb-6">
-          {/* Desktop search — sits above the header row */}
-          <div className="hidden md:block mb-4">
+        <div className="w-full px-4 md:px-12 lg:px-16 pt-6 md:pt-10 pb-10">
+          {/* Desktop search — calmer, more breathing room above */}
+          <div className="hidden md:block mb-6 max-w-[920px]">
             <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
           </div>
 
-          {/* Desktop header row: VERIFIED · N coders   /   SORT */}
-          <div className="hidden md:flex items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-text-muted">
-              <span className="inline-flex items-center gap-1.5 text-text-primary">
-                Verified
-                <VerifiedSeal size="xs" />
-              </span>
-              <span className="text-text-muted/60">·</span>
-              <span className="tabular-nums">
-                {filteredCoders.length} coder{filteredCoders.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <SortDropdown value={sort} onChange={setSort} />
-          </div>
-
-          {/* Filter pills — desktop only. On mobile, the sticky row above
-              the content container handles this so the pills stay visible
-              while the user scrolls the grid. */}
-          <div className="hidden md:block mb-4">
-            <BrowseFilterPills
+          {/* Tab strip — "Featured" + "Project types ▾" filter dropdown.
+              Replaces the previous count + sort + pill row to keep the
+              top of the page calm; sort + advanced filters move into the
+              sidebar / overlay so the grid is the protagonist. */}
+          <div className="flex items-center gap-1 mb-8 md:mb-10 -mx-1">
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${
+                filter === "all"
+                  ? "bg-surface-muted text-text-primary"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              Featured
+            </button>
+            <SpecialtyDropdown
               filter={filter}
               onFilterChange={setFilter}
               counts={specialtyCounts}
-              totalCount={searchFiltered.length}
             />
-          </div>
-
-          {/* Stats */}
-          <div className="mb-6">
-            <BrowseStats coders={filteredCoders} />
           </div>
 
           {/* Grid */}
@@ -509,7 +480,7 @@ export default function BrowsePage() {
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-x-6 gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
@@ -535,7 +506,7 @@ export default function BrowsePage() {
               </div>
             ) : (
               <LayoutGroup>
-                <motion.div layout className="grid gap-3 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 xl:grid-cols-4">
+                <motion.div layout className="grid gap-x-6 gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 nav:grid-cols-3">
                   <AnimatePresence mode="popLayout">
                     {filteredCoders.map((coder, i) => (
                       <BrowseCoderCard
