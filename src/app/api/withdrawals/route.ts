@@ -74,41 +74,68 @@ export async function POST(request: NextRequest) {
     }
     transactionId = pendingTxId;
 
-    // Check if user has a connected Whop company (check coderProfiles first, then users)
-    let whopCompanyId: string | null = null;
+    // Pick the transfer destination.
+    //
+    // 1. SSO'd creators (signed in via Whop) → transfer directly to their
+    //    whop_user_id. Funds land in their native Whop wallet — they manage
+    //    payout methods on whop.com directly, no sub-company / portal needed.
+    // 2. Native vibechckd creators → we provision (or reuse) a connected
+    //    sub-company under our parent and surface a payouts portal link so
+    //    they can hook up a bank/Venmo/CashApp.
+    let destinationId: string | null = null;
+    const isWhopUser = !!user.whopUserId;
 
-    const [profile] = await db
-      .select({ whopCompanyId: coderProfiles.whopCompanyId })
-      .from(coderProfiles)
-      .where(eq(coderProfiles.userId, userId))
-      .limit(1);
+    if (isWhopUser) {
+      destinationId = user.whopUserId;
+    } else {
+      const [profile] = await db
+        .select({ whopCompanyId: coderProfiles.whopCompanyId })
+        .from(coderProfiles)
+        .where(eq(coderProfiles.userId, userId))
+        .limit(1);
 
-    whopCompanyId = profile?.whopCompanyId ?? user.whopCompanyId ?? null;
+      let whopCompanyId = profile?.whopCompanyId ?? user.whopCompanyId ?? null;
 
-    // If no connected account exists, create one
-    if (!whopCompanyId) {
-      const result = await createConnectedAccount({
-        email: user.email,
-        name: user.name || user.email,
-        internalUserId: userId,
-      });
-      whopCompanyId = result.companyId;
+      if (!whopCompanyId) {
+        const result = await createConnectedAccount({
+          email: user.email,
+          name: user.name || user.email,
+          internalUserId: userId,
+        });
+        whopCompanyId = result.companyId;
 
-      // Save to coderProfiles if profile exists, otherwise save to users table
-      if (profile) {
-        await db
-          .update(coderProfiles)
-          .set({ whopCompanyId })
-          .where(eq(coderProfiles.userId, userId));
-      } else {
-        await db
-          .update(users)
-          .set({ whopCompanyId })
-          .where(eq(users.id, userId));
+        try {
+          if (profile) {
+            await db
+              .update(coderProfiles)
+              .set({ whopCompanyId })
+              .where(eq(coderProfiles.userId, userId));
+          } else {
+            await db
+              .update(users)
+              .set({ whopCompanyId })
+              .where(eq(users.id, userId));
+          }
+        } catch (persistErr) {
+          // The Whop sub-company exists but we couldn't store its id. Log so
+          // it can be reconciled manually; abort the withdrawal cleanly.
+          console.error(
+            "ORPHAN whop sub-company — created but DB persist failed",
+            { userId, whopCompanyId, err: persistErr }
+          );
+          throw new Error(
+            "Could not save your payout account — please retry in a moment"
+          );
+        }
       }
+
+      destinationId = whopCompanyId;
     }
 
-    const idempotencyKey = crypto.randomUUID();
+    if (!destinationId) {
+      throw new Error("Could not resolve a payout destination");
+    }
+
     const amountDollars = amountCents / 100;
 
     // The pending withdrawal *transaction* row was already inserted by
@@ -132,12 +159,13 @@ export async function POST(request: NextRequest) {
       .set({ description: `Withdrawal of $${amountDollars.toFixed(2)}` })
       .where(eq(transactions.id, pendingTxId));
 
-    // Execute the payout transfer via Whop
+    // Use the durable withdrawal row id as the idempotence key so client
+    // retries dedupe at Whop instead of double-charging.
     const transferResult = await createPayoutTransfer({
-      destinationCompanyId: whopCompanyId,
+      destinationId,
       amountDollars,
       description: "Withdrawal",
-      idempotencyKey,
+      idempotencyKey: `withdrawal_${withdrawal.id}`,
     });
 
     // Update withdrawal and transaction to "completed"
@@ -159,17 +187,20 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(transactions.id, pendingTxId));
 
-    // Generate payout portal link so creator can claim funds
+    // Only non-SSO creators need the connected-account payout portal.
+    // SSO users withdraw via whop.com on their own wallet.
     let payoutPortalUrl: string | null = null;
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
-      payoutPortalUrl = await generatePayoutPortalLink({
-        connectedCompanyId: whopCompanyId,
-        returnUrl: `${baseUrl}/dashboard/earnings`,
-      });
-    } catch (err) {
-      console.error("Failed to generate payout portal link:", err);
-      // Non-blocking -- transfer already succeeded
+    if (!isWhopUser) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+        payoutPortalUrl = await generatePayoutPortalLink({
+          connectedCompanyId: destinationId,
+          returnUrl: `${baseUrl}/dashboard/earnings`,
+        });
+      } catch (err) {
+        console.error("Failed to generate payout portal link:", err);
+        // Non-blocking -- transfer already succeeded
+      }
     }
 
     // Fire-and-forget withdrawal confirmation email

@@ -302,7 +302,10 @@ export async function createConnectedAccount(params: {
 }
 
 export async function createPayoutTransfer(params: {
-  destinationCompanyId: string;
+  // Whop accepts user_xxx, biz_xxx, or ldgr_xxx as a destination.
+  // SSO'd creators get their whop_user_id here so funds land in their existing
+  // wallet; non-Whop creators get a sub-company id we provisioned for them.
+  destinationId: string;
   amountDollars: number;
   description: string;
   idempotencyKey: string;
@@ -311,7 +314,7 @@ export async function createPayoutTransfer(params: {
     amount: params.amountDollars,
     currency: "usd",
     origin_id: getCompanyId(),
-    destination_id: params.destinationCompanyId,
+    destination_id: params.destinationId,
     idempotence_key: params.idempotencyKey,
     notes: params.description.slice(0, 50),
   };

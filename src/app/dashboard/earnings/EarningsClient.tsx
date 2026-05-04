@@ -323,7 +323,15 @@ export default function EarningsPage() {
         return;
       }
 
-      toast("On the way — funds settle in 2–3 business days.");
+      const data = await res.json().catch(() => ({}));
+      // Non-Whop creators: the API hands back a one-time payouts portal URL.
+      // Whop-SSO creators get null and use their existing whop.com wallet.
+      if (data.payoutPortalUrl) {
+        toast("Funds queued — connect your payout method to claim.");
+        window.open(data.payoutPortalUrl, "_blank", "noopener,noreferrer");
+      } else {
+        toast("On the way — funds settle in 2–3 business days.");
+      }
       setShowWithdraw(false);
       await fetchBalance();
       await fetchTransactions();
