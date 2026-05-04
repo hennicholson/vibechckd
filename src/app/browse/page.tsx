@@ -415,14 +415,14 @@ export default function BrowsePage() {
   }, [searchFiltered, filter, sort]);
 
   return (
-    <div className="h-[100dvh] bg-background flex md:overflow-hidden">
+    <div className="h-[100dvh] bg-background flex overflow-hidden">
       <BrowseSidebar
         filter={filter}
         onFilterChange={setFilter}
         counts={specialtyCounts}
       />
 
-      <main className="flex-1 min-w-0 flex flex-col md:h-full md:overflow-y-auto">
+      <main className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto">
         <MobileTopBar
           filter={filter}
           onFilterChange={setFilter}
