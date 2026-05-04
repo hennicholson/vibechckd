@@ -12,7 +12,10 @@ export async function GET() {
   try {
     const userId = session.user.id;
 
-    // Available balance: sum of all completed transactions
+    // Available balance: completed transactions, minus pending withdrawals
+    // (already locked by request_withdrawal()). Without subtracting pending
+    // withdrawals, the UI shows a stale balance during the brief window
+    // between the atomic balance check and the Whop transfer settling.
     const [available] = await db
       .select({
         total: sql<number>`coalesce(sum(${transactions.amountCents}), 0)`,
@@ -21,7 +24,9 @@ export async function GET() {
       .where(
         and(
           eq(transactions.userId, userId),
-          eq(transactions.status, "completed")
+          sql`(${transactions.status} = 'completed'
+               OR (${transactions.status} = 'pending'
+                   AND ${transactions.type} = 'withdrawal'))`
         )
       );
 

@@ -222,26 +222,23 @@ async function handleInvoiceEvent(
       .where(eq(invoiceSplits.invoiceId, invoice.id));
 
     if (splits.length > 0) {
-      // Mark every split paid (idempotent).
-      await db
-        .update(invoiceSplits)
-        .set({ paid: true })
-        .where(eq(invoiceSplits.invoiceId, invoice.id));
-
       for (const s of splits) {
-        if (s.paid) continue; // already credited on a previous webhook delivery
-        const [existing] = await db
-          .select({ id: transactions.id })
-          .from(transactions)
+        // Compare-and-swap: only the first webhook delivery that observes
+        // paid=false flips it and proceeds to credit + transfer. Any later
+        // delivery sees 0 rows updated and short-circuits, so a crash
+        // mid-loop on delivery #1 doesn't strand splits 2..N as "paid"
+        // with no matching transaction. The Neon HTTP driver doesn't
+        // support row-level locks — this conditional UPDATE is the
+        // equivalent atomic primitive.
+        const claim = await db
+          .update(invoiceSplits)
+          .set({ paid: true })
           .where(
-            and(
-              eq(transactions.invoiceId, invoice.id),
-              eq(transactions.userId, s.userId),
-              eq(transactions.type, "invoice_payment")
-            )
+            and(eq(invoiceSplits.id, s.id), eq(invoiceSplits.paid, false))
           )
-          .limit(1);
-        if (existing) continue;
+          .returning({ id: invoiceSplits.id });
+        if (claim.length === 0) continue;
+
         const [tx] = await db
           .insert(transactions)
           .values({
@@ -422,14 +419,24 @@ async function handlePaymentSucceeded(payload: Record<string, any>) {
     return;
   }
 
-  // Update transaction to completed
-  await db
+  // Compare-and-swap: only the first webhook delivery that observes the
+  // pending state flips it. A duplicate delivery sees 0 rows updated and
+  // exits before re-posting the system message or re-firing the ledger
+  // transfer (which is also independently idempotent via its key).
+  const claim = await db
     .update(transactions)
     .set({
       status: "completed",
       completedAt: new Date(),
     })
-    .where(eq(transactions.id, transaction.id));
+    .where(
+      and(eq(transactions.id, transaction.id), eq(transactions.status, "pending"))
+    )
+    .returning({ id: transactions.id });
+  if (claim.length === 0) {
+    console.log("payment.succeeded: another delivery already settled this");
+    return;
+  }
 
   // Post system message if linked to a project
   if (transaction.projectId) {

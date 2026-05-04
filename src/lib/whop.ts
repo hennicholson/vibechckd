@@ -214,38 +214,6 @@ export async function createCheckoutSession(params: {
   };
 }
 
-export async function createTransfer(params: {
-  fromAccount: string;
-  toAccount: string;
-  amount: number; // dollars
-  description?: string;
-  metadata?: Record<string, string>;
-}): Promise<{ id: string; status: string }> {
-  const body: Record<string, unknown> = {
-    amount: params.amount,
-    currency: "usd",
-    origin_id: params.fromAccount,
-    destination_id: params.toAccount,
-    idempotence_key: crypto.randomUUID(),
-  };
-  if (params.description) body.notes = params.description.slice(0, 50);
-  if (params.metadata) body.metadata = params.metadata;
-
-  const res = await fetch(`${WHOP_BASE_URL}/transfers`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Transfer failed (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
-  return { id: data.id, status: data.status || "completed" };
-}
-
 export async function createWhopWithdrawal(params: {
   amountDollars: number;
 }): Promise<{ id: string; status: string }> {
