@@ -505,17 +505,14 @@ export default function BrowsePage() {
           counts={specialtyCounts}
         />
 
-        {/* Sticky desktop header — innovation note:
-            The page reads top-down as a single quiet thought. A whisper
-            of marketplace context (the ticker) sits above the search,
-            so the visitor sees "real, live, vetted" before they see
-            the input. The search itself is borderless, type-as-hero.
-            No outline, no kbd hint, no panel chrome — just the
-            magnifier and the user's words.
-
-            Visible separation comes from typographic weight + spacing,
-            not borders. backdrop-blur lets the grid scroll behind. */}
-        <div className="hidden md:block sticky top-0 z-20 bg-background/85 backdrop-blur-md">
+        {/* Sticky desktop header — solid bg, smooth fade-out beneath.
+            Mirrors the dashboard pattern (DashboardClient.tsx, settings,
+            projects): solid bg-background up top so scrolling content
+            is fully masked, then an absolutely-positioned gradient
+            sliver underneath that fades the bottom edge into transparent
+            so the grid doesn't visually slam into a hard line.
+            No backdrop-blur — keeps the page calm and crisp. */}
+        <div className="hidden md:block sticky top-0 z-20 bg-background">
           <div className="px-4 md:px-12 lg:px-16 pt-4 pb-1">
             <BrowseStats coders={filteredCoders} />
           </div>
@@ -524,6 +521,8 @@ export default function BrowsePage() {
               <BrowseSearchBar value={searchQuery} onChange={setSearchQuery} />
             </div>
           </div>
+          {/* Smooth fade — the strip that hides the abrupt bg edge. */}
+          <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
         </div>
 
         <div className="w-full px-4 md:px-12 lg:px-16 pt-5 md:pt-6 pb-10">
