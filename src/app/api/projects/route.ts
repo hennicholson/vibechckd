@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { projects, projectMembers, messages, users } from "@/db/schema";
-import { eq, desc, sql, and, ne } from "drizzle-orm";
+import { eq, desc, sql, and, ne, inArray, asc } from "drizzle-orm";
 import { parseBody, z } from "@/lib/validation";
 
 const projectMemberSchema = z
@@ -87,46 +87,44 @@ export async function GET(req: Request) {
       return true;
     });
 
-    // Member avatars per project — fetch the top-4 (by join order) for the
-    // projects we're returning, so the cards can render a stacked-avatar
-    // group instead of a bare member count. One round-trip, no N+1.
+    // Member avatars per project — single typed query via Drizzle, then
+    // group + take-first-4 client-side. Replaces an earlier raw SQL CTE
+    // that broke neon-http parameter binding for `uuid[]` and made the
+    // outer route 500, hiding every project from the UI. One round-trip,
+    // no N+1.
     const projectIds = dedupedRows.map((r) => r.id);
     const memberPreviews: Record<
       string,
       Array<{ id: string; name: string | null; image: string | null }>
     > = {};
     if (projectIds.length > 0) {
-      const previewRows = (await db.execute(sql`
-        WITH ranked AS (
-          SELECT pm.project_id,
-                 u.id, u.name, u.image,
-                 row_number() OVER (
-                   PARTITION BY pm.project_id
-                   ORDER BY pm.joined_at ASC NULLS LAST
-                 ) AS rn
-          FROM project_members pm
-          JOIN users u ON u.id = pm.user_id
-          WHERE pm.project_id = ANY(${projectIds}::uuid[])
-        )
-        SELECT project_id, id, name, image
-        FROM ranked
-        WHERE rn <= 4
-        ORDER BY project_id, rn
-      `)) as unknown as {
-        rows: Array<{
-          project_id: string;
-          id: string;
-          name: string | null;
-          image: string | null;
-        }>;
-      };
-      for (const m of previewRows.rows ?? []) {
-        if (!memberPreviews[m.project_id]) memberPreviews[m.project_id] = [];
-        memberPreviews[m.project_id].push({
-          id: m.id,
-          name: m.name,
-          image: m.image,
-        });
+      try {
+        const memberRows = await db
+          .select({
+            projectId: projectMembers.projectId,
+            id: users.id,
+            name: users.name,
+            image: users.image,
+            addedAt: projectMembers.addedAt,
+          })
+          .from(projectMembers)
+          .innerJoin(users, eq(users.id, projectMembers.userId))
+          .where(inArray(projectMembers.projectId, projectIds))
+          .orderBy(
+            asc(projectMembers.projectId),
+            asc(projectMembers.addedAt)
+          );
+
+        for (const m of memberRows) {
+          const list = (memberPreviews[m.projectId] ||= []);
+          if (list.length < 4) {
+            list.push({ id: m.id, name: m.name, image: m.image });
+          }
+        }
+      } catch (err) {
+        // Avatar preview is a nice-to-have — never fail the whole list
+        // because of it. Log + continue with empty members arrays.
+        console.warn("Project member preview query failed:", err);
       }
     }
 

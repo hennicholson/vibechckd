@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import Button from "@/components/Button";
 import { useToast } from "@/components/Toast";
 
@@ -207,6 +208,21 @@ function ContextMenu({
 //   [pinned ★]  [👤👤👤+2]  · tags: tag1 tag2
 // ---------------------------------------------------------------------------
 
+// Stagger variants — parent grid sets `staggerChildren`, each card
+// inherits via these variants and lifts in 6px while fading. Subtle
+// enough to feel snappy, layered enough to read as "the cards arrived
+// just now". Same curve as app/template.tsx so cross-page motion is
+// consistent.
+const EASE_OUT_QUART: [number, number, number, number] = [0.16, 1, 0.3, 1];
+const cardVariants = {
+  hidden: { opacity: 0, y: 6 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.32, ease: EASE_OUT_QUART },
+  },
+};
+
 function ProjectCard({
   project,
   onOpen,
@@ -217,7 +233,8 @@ function ProjectCard({
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   return (
-    <div
+    <motion.div
+      variants={cardVariants}
       onClick={onOpen}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => {
@@ -302,7 +319,7 @@ function ProjectCard({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -533,14 +550,28 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Loading skeletons — match the new card footprint */}
-      {isLoading && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[124px] bg-surface-muted rounded-[12px] animate-pulse" />
-          ))}
-        </div>
-      )}
+      {/* Skeleton → grid swap is wrapped in AnimatePresence so the
+          loader fades out as the cards stagger in, instead of an
+          instant flicker. mode="wait" keeps the layout from jumping. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {isLoading && (
+          <motion.div
+            key="skeletons"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-3"
+          >
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-[124px] bg-surface-muted rounded-[12px] animate-pulse"
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Empty — bigger, more inviting */}
       {!isLoading && filtered.length === 0 && (
@@ -567,9 +598,19 @@ export default function ProjectsPage() {
       )}
 
       {/* Grouped grid — Pinned · Active · Other. Each section only
-          renders when it has projects. 2-col on lg+, single-col below. */}
+          renders when it has projects. Cards stagger in via the
+          parent motion container's variants — feels like the board
+          is laying itself out, not flashing into existence. */}
       {!isLoading && filtered.length > 0 && (
-        <div className="space-y-7">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: {},
+            show: { transition: { staggerChildren: 0.045 } },
+          }}
+          className="space-y-7"
+        >
           {[
             { key: "pinned", label: "Pinned", items: buckets.pinned },
             { key: "active", label: "Active", items: buckets.active },
@@ -584,14 +625,17 @@ export default function ProjectsPage() {
                   (buckets.active.length > 0 ? 1 : 0) +
                   (buckets.other.length > 0 ? 1 : 0) >
                   1 && (
-                  <div className="flex items-center gap-2 mb-3">
+                  <motion.div
+                    variants={cardVariants}
+                    className="flex items-center gap-2 mb-3"
+                  >
                     <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
                       {g.label}
                     </p>
                     <span className="text-[10px] font-mono text-text-muted/60 tabular-nums">
                       {g.items.length}
                     </span>
-                  </div>
+                  </motion.div>
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
                   {g.items.map((project) => (
@@ -605,7 +649,7 @@ export default function ProjectsPage() {
                 </div>
               </section>
             ))}
-        </div>
+        </motion.div>
       )}
 
       </div>
