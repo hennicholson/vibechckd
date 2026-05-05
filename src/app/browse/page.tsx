@@ -42,6 +42,7 @@ import BrowseSidebar from "@/components/browse/BrowseSidebar";
 import BrowseSearchBar from "@/components/browse/BrowseSearchBar";
 import BrowseCoderCard from "@/components/browse/BrowseCoderCard";
 import BrowseStats from "@/components/browse/BrowseStats";
+import BrowseLoadingLottie from "@/components/browse/BrowseLoadingLottie";
 
 type Filter = "all" | Specialty;
 
@@ -275,28 +276,6 @@ function MobileTopBar({
           </>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Skeleton card matching final card dimensions ──
-function SkeletonCard() {
-  return (
-    <div className="rounded-[10px] overflow-hidden border border-border bg-background">
-      <div className="aspect-[16/10] bg-surface-muted animate-pulse" />
-      <div className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-surface-muted animate-pulse flex-shrink-0" />
-          <div className="h-3 bg-surface-muted animate-pulse rounded w-28" />
-          <div className="h-3 bg-surface-muted animate-pulse rounded w-14 ml-auto" />
-        </div>
-        <div className="h-2.5 bg-surface-muted animate-pulse rounded w-40 ml-8" />
-        <div className="flex gap-1.5">
-          <div className="h-5 w-14 bg-surface-muted animate-pulse rounded-md" />
-          <div className="h-5 w-16 bg-surface-muted animate-pulse rounded-md" />
-          <div className="h-5 w-12 bg-surface-muted animate-pulse rounded-md" />
-        </div>
-      </div>
     </div>
   );
 }
@@ -570,11 +549,10 @@ export default function BrowsePage() {
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="grid gap-x-5 gap-y-9 sm:gap-x-6 sm:gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <SkeletonCard key={i} />
-                ))}
-              </div>
+              // Center-stage Lottie loader instead of the skeleton grid —
+              // the marketplace is the page's protagonist, so the wait
+              // gets one calm focal point, not six placeholder cards.
+              <BrowseLoadingLottie />
             ) : filteredCoders.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]">
                 <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
