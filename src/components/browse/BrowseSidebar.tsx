@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import VerifiedSeal from "@/components/VerifiedSeal";
+import { QuickActions } from "@/components/dashboard/DashboardSidebar";
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
 import {
   navItems,
@@ -162,18 +163,26 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
       </div>
 
       {/* Primary nav — same items, ordering, and role-gating as the dashboard
-          rail so transitions /whop ↔ /dashboard don't visually jolt. */}
+          rail so transitions /whop ↔ /dashboard don't visually jolt.
+          Each active item also expands its quickActions below it (when
+          defined). For the /browse item we skip the quick actions panel
+          because the dedicated specialty filter section below IS its
+          quick actions surface — no point doubling the affordance. */}
       <div className="px-2 nav:px-3 py-3 space-y-0.5">
-        {filteredNav.map((item) => (
-          <NavItem
-            key={item.href}
-            href={item.href}
-            active={isItemActive(item, pathname)}
-            icon={item.icon}
-          >
-            {item.label}
-          </NavItem>
-        ))}
+        {filteredNav.map((item) => {
+          const active = isItemActive(item, pathname);
+          const isBrowseItem = item.href === "/browse";
+          return (
+            <div key={item.href}>
+              <NavItem href={item.href} active={active} icon={item.icon}>
+                {item.label}
+              </NavItem>
+              {!isBrowseItem && (
+                <QuickActions item={item} active={active} viewerRole={role} />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Filter section — full list visible only above nav. At compact widths

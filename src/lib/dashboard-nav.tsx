@@ -11,6 +11,16 @@ import type { ReactNode } from "react";
 
 export type DashboardRole = "client" | "creator";
 
+// A page-scoped shortcut that appears inline beneath its parent nav item
+// when that item is active. Keep these to 2-4 per page max — the goal is
+// "rhythm + immediate next step", not a second nav level.
+export type QuickAction = {
+  label: string;
+  href: string;
+  // When present, the action is hidden unless the viewer's role matches.
+  roles?: DashboardRole[];
+};
+
 export type NavItem = {
   href: string;
   label: string;
@@ -20,6 +30,10 @@ export type NavItem = {
   // /whop renders BrowsePage, so the "Browse Talent" item should highlight
   // for both /browse and /whop.
   matchPrefixes?: string[];
+  // Inline shortcuts that expand below this item when it's the active page.
+  // Example: clicking "Jobs" reveals "Post a job / Drafts / Closed".
+  // Keep terse — these read as a vertical sub-menu, not a list of features.
+  quickActions?: QuickAction[];
 };
 
 const cls = "w-4 h-4";
@@ -56,6 +70,11 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Start blank", href: "/dashboard/teams/new" },
+      { label: "Browse to invite", href: "/browse" },
+      { label: "From a job brief", href: "/dashboard/jobs", roles: ["client"] },
+    ],
   },
   {
     href: "/dashboard/jobs",
@@ -67,6 +86,11 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M21 13.255A23.93 23.93 0 0 1 12 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2m4 6h.01M5 20h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Post a job", href: "/dashboard/jobs/new" },
+      { label: "Drafts", href: "/dashboard/jobs?status=draft" },
+      { label: "Closed", href: "/dashboard/jobs?status=closed" },
+    ],
   },
   {
     // Creators see the public job board where verified members apply
@@ -81,6 +105,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M21 13.255A23.93 23.93 0 0 1 12 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2m4 6h.01M5 20h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Open jobs", href: "/jobs" },
+      { label: "My applications", href: "/dashboard/application" },
+    ],
   },
   {
     // Client's "Profile" — actually their company info; relabeled so both
@@ -93,6 +121,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Edit company", href: "/dashboard/company" },
+      { label: "Account settings", href: "/dashboard/settings" },
+    ],
   },
   {
     // Creator's "Profile" — their public marketplace listing.
@@ -104,6 +136,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Edit profile", href: "/dashboard/profile" },
+      { label: "Manage portfolio", href: "/dashboard/portfolio" },
+    ],
   },
   {
     href: "/dashboard/portfolio",
@@ -114,6 +150,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
     ),
+    quickActions: [
+      { label: "Add a project", href: "/dashboard/portfolio?new=1" },
+      { label: "Reorder", href: "/dashboard/portfolio?reorder=1" },
+    ],
   },
   {
     href: "/dashboard/application",
@@ -124,6 +164,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Continue application", href: "/dashboard/application" },
+      { label: "Job applications", href: "/dashboard/application#jobs" },
+    ],
   },
   {
     href: "/dashboard/earnings",
@@ -135,6 +179,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M2 10h20M16 14h2" />
       </svg>
     ),
+    quickActions: [
+      { label: "Withdraw", href: "/dashboard/earnings?withdraw=1" },
+      { label: "Transactions", href: "/dashboard/earnings#transactions" },
+    ],
   },
   {
     href: "/dashboard/projects",
@@ -145,6 +193,11 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
     ),
+    quickActions: [
+      { label: "Start project", href: "/dashboard/teams/new", roles: ["client"] },
+      { label: "Active", href: "/dashboard/projects?status=active" },
+      { label: "Completed", href: "/dashboard/projects?status=completed" },
+    ],
   },
   {
     href: "/dashboard/inbox",
@@ -155,6 +208,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Unread", href: "/dashboard/inbox?unread=1" },
+      { label: "New message", href: "/dashboard/inbox?new=1" },
+    ],
   },
   {
     href: "/dashboard/settings",
@@ -166,6 +223,10 @@ export const navItems: NavItem[] = [
         <path {...stroke} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
+    quickActions: [
+      { label: "Account", href: "/dashboard/settings#account" },
+      { label: "Notifications", href: "/dashboard/settings#notifications" },
+    ],
   },
 ];
 

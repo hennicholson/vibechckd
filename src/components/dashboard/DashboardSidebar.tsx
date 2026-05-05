@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { motion, AnimatePresence } from "framer-motion";
 import VerifiedSeal from "@/components/VerifiedSeal";
 import {
   navItems,
@@ -11,8 +12,57 @@ import {
   uiRole,
   isItemActive,
   type NavItem,
+  type DashboardRole,
 } from "@/lib/dashboard-nav";
 
+
+// Inline quick-action panel that expands beneath the active nav item.
+// Hidden in icon-only sidebar mode (sub-`nav` breakpoint). Subtle motion:
+// height + opacity from 0 to auto, fast spring, no layout jank.
+export function QuickActions({
+  item,
+  active,
+  viewerRole,
+}: {
+  item: NavItem;
+  active: boolean;
+  viewerRole: DashboardRole | undefined;
+}) {
+  const actions = (item.quickActions || []).filter(
+    (a) => !a.roles || (viewerRole && a.roles.includes(viewerRole))
+  );
+  if (actions.length === 0) return null;
+
+  return (
+    <AnimatePresence initial={false}>
+      {active && (
+        <motion.ul
+          key={`qa-${item.href}`}
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{
+            opacity: { duration: 0.12 },
+            height: { type: "spring", stiffness: 480, damping: 36 },
+          }}
+          className="hidden nav:block overflow-hidden ml-7 mt-0.5 mb-1 border-l border-border"
+          aria-label={`${item.label} quick actions`}
+        >
+          {actions.map((qa) => (
+            <li key={qa.href}>
+              <Link
+                href={qa.href}
+                className="block pl-3 pr-2 py-1 text-[12px] text-text-muted hover:text-text-primary transition-colors"
+              >
+                {qa.label}
+              </Link>
+            </li>
+          ))}
+        </motion.ul>
+      )}
+    </AnimatePresence>
+  );
+}
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
@@ -106,33 +156,41 @@ export default function DashboardSidebar() {
           </Link>
         </div>
 
-        {/* Nav */}
+        {/* Nav — each item has an optional quickActions panel that expands
+            below it when the item is the active page. Pattern matches the
+            existing /browse filter rail so users learn one gesture: tap
+            into a section, see its top shortcuts inline. */}
         <div className="px-2 nav:px-3 py-3 space-y-0.5 flex-1">
-          {filteredItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              className={`group relative flex items-center justify-center gap-2 px-0 nav:justify-start nav:px-2 py-1.5 rounded-md text-[13px] transition-colors ${
-                isActive(item)
-                  ? "text-text-primary font-medium bg-surface-muted"
-                  : "text-text-muted hover:text-text-primary hover:bg-background-alt"
-              }`}
-            >
-              {item.icon}
-              <span className="hidden nav:inline flex-1">{item.label}</span>
-              {/* Hover tooltip in icon-only mode (sub-`nav` breakpoint) —
-                  small dark pill with arrow appears to the right of the
-                  icon. Hidden when full labels are visible. */}
-              <span className="nav:hidden pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-md bg-text-primary px-2 py-1 text-[11px] font-medium text-background opacity-0 group-hover:opacity-100 transition-opacity duration-100 shadow-md">
-                {item.label}
-                <span
-                  aria-hidden
-                  className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-[4px] border-y-transparent border-r-[5px] border-r-text-primary"
-                />
-              </span>
-            </Link>
-          ))}
+          {filteredItems.map((item) => {
+            const active = isActive(item);
+            return (
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  title={item.label}
+                  className={`group relative flex items-center justify-center gap-2 px-0 nav:justify-start nav:px-2 py-1.5 rounded-md text-[13px] transition-colors ${
+                    active
+                      ? "text-text-primary font-medium bg-surface-muted"
+                      : "text-text-muted hover:text-text-primary hover:bg-background-alt"
+                  }`}
+                >
+                  {item.icon}
+                  <span className="hidden nav:inline flex-1">{item.label}</span>
+                  {/* Hover tooltip in icon-only mode (sub-`nav` breakpoint) —
+                      small dark pill with arrow appears to the right of the
+                      icon. Hidden when full labels are visible. */}
+                  <span className="nav:hidden pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-md bg-text-primary px-2 py-1 text-[11px] font-medium text-background opacity-0 group-hover:opacity-100 transition-opacity duration-100 shadow-md">
+                    {item.label}
+                    <span
+                      aria-hidden
+                      className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-y-[4px] border-y-transparent border-r-[5px] border-r-text-primary"
+                    />
+                  </span>
+                </Link>
+                <QuickActions item={item} active={active} viewerRole={role} />
+              </div>
+            );
+          })}
         </div>
 
         {/* User */}
