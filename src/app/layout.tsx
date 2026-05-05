@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { WhopIframeSdkProvider } from "@whop/react";
 import { ToastProvider } from "@/components/Toast";
+import QuickChatButton from "@/components/QuickChatButton";
 import { auth } from "@/lib/auth";
 import "./globals.css";
 
@@ -103,7 +104,14 @@ export default async function RootLayout({
               an `isInIframe` boolean, falling back to native window.open /
               <a> behaviour outside Whop. */}
           <WhopIframeSdkProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              {children}
+              {/* Floating bottom-right quick-chat shortcut. Hides itself
+                  on /dashboard/inbox and the auth/apply flows. Shares
+                  the same useUnreadCount() hook the sidebar consumes,
+                  so the dot is always in lockstep with the inbox icon. */}
+              <QuickChatButton />
+            </ToastProvider>
           </WhopIframeSdkProvider>
         </SessionProvider>
       </body>

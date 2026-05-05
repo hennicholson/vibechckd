@@ -22,6 +22,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import VerifiedSeal from "@/components/VerifiedSeal";
 import { QuickActions } from "@/components/dashboard/DashboardSidebar";
+import { useUnreadCount } from "@/lib/use-unread-count";
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
 import {
   navItems,
@@ -43,17 +44,22 @@ function NavItem({
   active,
   icon,
   children,
+  unread,
 }: {
   href: string;
   active?: boolean;
   icon: React.ReactNode;
   children: React.ReactNode;
+  // When > 0, render a small dot on the icon (icon-only mode) and a
+  // pill count next to the label (expanded mode). Used for /dashboard/inbox.
+  unread?: number;
 }) {
   // Below `nav` (1100px) the rail collapses to icons-only and the label is
   // hidden — frees ~150px for content. Inverted to `nav:` only because the
   // `max-{breakpoint}` variant from Tailwind v4 custom theme breakpoints
   // wasn't being applied reliably; `nav:` (min-width) compiles correctly.
   const label = typeof children === "string" ? children : undefined;
+  const hasUnread = (unread ?? 0) > 0;
   return (
     <Link
       href={href}
@@ -64,8 +70,21 @@ function NavItem({
           : "text-text-muted hover:text-text-primary hover:bg-background-alt"
       }`}
     >
-      {icon}
+      <span className="relative inline-flex items-center justify-center">
+        {icon}
+        {hasUnread && (
+          <span
+            aria-label="Unread messages"
+            className="absolute -top-1 -right-1 inline-flex w-2 h-2 rounded-full bg-text-primary ring-2 ring-background"
+          />
+        )}
+      </span>
       <span className="hidden nav:inline flex-1">{children}</span>
+      {hasUnread && (
+        <span className="hidden nav:inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-text-primary text-background text-[10px] font-mono tabular-nums">
+          {unread! > 99 ? "99+" : unread}
+        </span>
+      )}
       {/* Hover tooltip — only rendered when the rail is icon-only (sub-`nav`
           breakpoint). Sits to the right of the icon with a subtle arrow,
           opacity-fades in via group-hover. `pointer-events-none` so it
@@ -121,10 +140,14 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
   const rawRole = (session?.user as { role?: string } | undefined)?.role;
   const role = uiRole(rawRole);
   const [vetted, setVetted] = useState(false);
+  const unread = useUnreadCount();
 
   // Once a creator is verified, the standalone Application item moves
   // into Settings (matches DashboardSidebar). Don't fetch for clients.
+  // Also captures the creator's `slug` so the footer can surface a
+  // "View public profile" sub-link.
   const userIdForProfile = session?.user?.id;
+  const [profileSlug, setProfileSlug] = useState<string | null>(null);
   useEffect(() => {
     if (status !== "authenticated" || !userIdForProfile || rawRole === "client") return;
     let cancelled = false;
@@ -133,6 +156,7 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
       .then((d) => {
         if (cancelled) return;
         if (d?.vetted) setVetted(true);
+        if (d?.slug) setProfileSlug(d.slug);
       })
       .catch(() => {});
     return () => {
@@ -196,9 +220,15 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
           {filteredNav.map((item) => {
             const active = isItemActive(item, pathname);
             const isBrowseItem = item.href === "/browse";
+            const isInbox = item.href === "/dashboard/inbox";
             return (
               <div key={item.href}>
-                <NavItem href={item.href} active={active} icon={item.icon}>
+                <NavItem
+                  href={item.href}
+                  active={active}
+                  icon={item.icon}
+                  unread={isInbox ? unread : 0}
+                >
                   {item.label}
                 </NavItem>
                 {!isBrowseItem && (
@@ -234,20 +264,25 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
         </div>
       </div>
 
-      {/* User footer — matches DashboardSidebar's footer shape so the rail
-          looks identical on /browse, /whop, and /dashboard/*. The only extras
-          are the role-aware "Set a password" prompt for cookieless Whop users. */}
+      {/* User footer — Profile entry (avatar + name → /dashboard/profile or
+          /dashboard/company), public-profile sub-link for creators with
+          a slug, sign-out at the bottom. Matches the DashboardSidebar
+          footer shape so the rail reads the same across surfaces. */}
       <div className="border-t border-border flex-shrink-0">
         {status === "authenticated" && session?.user ? (
           <div className="px-2 nav:px-3 py-3">
-            <div className="flex items-center justify-center gap-2 px-1 nav:px-2 nav:justify-start mb-2">
+            <Link
+              href={role === "client" ? "/dashboard/company" : "/dashboard/profile"}
+              title={`${session.user.name || "Your profile"} — open profile`}
+              className="group flex items-center justify-center nav:justify-start gap-2 px-1 nav:px-2 py-1 rounded-md hover:bg-background-alt transition-colors"
+            >
               <div
                 className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted flex-shrink-0"
                 title={session.user.name || undefined}
               >
                 {session.user.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
-              <div className="hidden nav:flex flex-col min-w-0">
+              <div className="hidden nav:flex flex-col min-w-0 flex-1">
                 <span className="text-[12px] text-text-primary truncate">{session.user.name}</span>
                 <span className="text-[10px] font-mono text-text-muted">
                   {role === "creator" ? (
@@ -260,11 +295,33 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
                   ) : null}
                 </span>
               </div>
-            </div>
+              <svg
+                className="hidden nav:block w-3 h-3 text-text-muted group-hover:text-text-primary transition-colors flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+
+            {profileSlug && (
+              <Link
+                href={`/coders/${profileSlug}`}
+                className="hidden nav:flex items-center gap-1 px-2 py-1 mt-0.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
+              >
+                View public profile
+                <svg className="w-2.5 h-2.5 -mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </Link>
+            )}
+
             {showSetPassword && (
               <Link
                 href="/dashboard/settings"
-                className="hidden nav:block px-2 py-1.5 text-[12px] text-text-primary hover:opacity-80 transition-opacity"
+                className="hidden nav:block px-2 py-1 mt-0.5 text-[11px] text-text-primary hover:opacity-80 transition-opacity"
               >
                 Set a password →
               </Link>
@@ -272,7 +329,7 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               title="Sign out"
-              className="w-full text-center nav:text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              className="w-full text-center nav:text-left px-2 py-1.5 mt-1 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             >
               <span className="hidden nav:inline">Sign out</span>
               <span className="nav:hidden inline-flex items-center justify-center w-full" aria-hidden>

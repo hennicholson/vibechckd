@@ -64,7 +64,7 @@ export const navItems: NavItem[] = [
   {
     href: "/dashboard/teams/new",
     label: "Build a Team",
-    roles: ["client", "creator"],
+    roles: ["client"],
     icon: (
       <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path {...stroke} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -110,37 +110,11 @@ export const navItems: NavItem[] = [
       { label: "My applications", href: "/jobs?tab=applied" },
     ],
   },
-  {
-    // Client's "Profile" — actually their company info; relabeled so both
-    // roles share the same word in the nav rail.
-    href: "/dashboard/company",
-    label: "Profile",
-    roles: ["client"],
-    icon: (
-      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path {...stroke} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-    quickActions: [
-      { label: "Edit company", href: "/dashboard/company" },
-      { label: "Account settings", href: "/dashboard/settings" },
-    ],
-  },
-  {
-    // Creator's "Profile" — their public marketplace listing.
-    href: "/dashboard/profile",
-    label: "Profile",
-    roles: ["creator"],
-    icon: (
-      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path {...stroke} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-    quickActions: [
-      { label: "Edit profile", href: "/dashboard/profile" },
-      { label: "Manage portfolio", href: "/dashboard/portfolio" },
-    ],
-  },
+  // Note: Profile (client + creator) used to be top-level nav items.
+  // They've moved into the sidebar footer — the avatar / name row is
+  // the primary entry point now, with a public-profile sub-link
+  // beneath it for creators. Keeps the rail focused on day-to-day
+  // surfaces (Browse, Jobs, Projects, Inbox, etc.).
   {
     href: "/dashboard/portfolio",
     label: "Portfolio",

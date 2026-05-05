@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import VerifiedSeal from "@/components/VerifiedSeal";
+import { useUnreadCount } from "@/lib/use-unread-count";
 import {
   navItems,
   adminItem,
@@ -14,6 +15,30 @@ import {
   type NavItem,
   type DashboardRole,
 } from "@/lib/dashboard-nav";
+
+// Tiny wrapper that overlays an unread dot on the icon of nav items
+// the user wants to know are "live" — currently just Inbox. The dot
+// sits in the top-right, never grows past 6×6, and pulses softly so
+// it draws the eye without being noisy.
+function NavIconWithBadge({
+  icon,
+  showBadge,
+}: {
+  icon: React.ReactNode;
+  showBadge: boolean;
+}) {
+  return (
+    <span className="relative inline-flex items-center justify-center">
+      {icon}
+      {showBadge && (
+        <span
+          aria-label="Unread messages"
+          className="absolute -top-1 -right-1 inline-flex w-2 h-2 rounded-full bg-text-primary ring-2 ring-background"
+        />
+      )}
+    </span>
+  );
+}
 
 
 // Inline quick-action panel that expands beneath the active nav item.
@@ -69,6 +94,7 @@ export default function DashboardSidebar() {
   const { data: session } = useSession();
   const [profileSlug, setProfileSlug] = useState<string | null>(null);
   const [vetted, setVetted] = useState<boolean>(false);
+  const unread = useUnreadCount();
   const rawRole = (session?.user as any)?.role as string | undefined;
   // Track userId, not the full user object — SessionProvider can swap object
   // identity on every render, which made this effect re-fire on each parent
@@ -176,6 +202,7 @@ export default function DashboardSidebar() {
           <div className="px-2 nav:px-3 py-3 space-y-0.5">
           {filteredItems.map((item) => {
             const active = isActive(item);
+            const isInbox = item.href === "/dashboard/inbox";
             return (
               <div key={item.href}>
                 <Link
@@ -187,8 +214,17 @@ export default function DashboardSidebar() {
                       : "text-text-muted hover:text-text-primary hover:bg-background-alt"
                   }`}
                 >
-                  {item.icon}
+                  {isInbox ? (
+                    <NavIconWithBadge icon={item.icon} showBadge={unread > 0} />
+                  ) : (
+                    item.icon
+                  )}
                   <span className="hidden nav:inline flex-1">{item.label}</span>
+                  {isInbox && unread > 0 && (
+                    <span className="hidden nav:inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-text-primary text-background text-[10px] font-mono tabular-nums">
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
                   {/* Hover tooltip in icon-only mode (sub-`nav` breakpoint) —
                       small dark pill with arrow appears to the right of the
                       icon. Hidden when full labels are visible. */}
@@ -207,17 +243,26 @@ export default function DashboardSidebar() {
           </div>
         </div>
 
-        {/* User — flex-shrink-0 so it never collapses; always visible. */}
+        {/* Footer — Profile entry (avatar + name → /dashboard/profile or
+            /dashboard/company), public-profile sub-link for creators
+            with a slug, sign-out at the bottom. flex-shrink-0 so the
+            footer never collapses, even on short viewports. */}
         <div className="px-2 nav:px-3 py-3 border-t border-border flex-shrink-0">
-          <div className="flex items-center justify-center nav:justify-start gap-2 px-1 nav:px-2 mb-2">
+          <Link
+            href={role === "client" ? "/dashboard/company" : "/dashboard/profile"}
+            title={`${session?.user?.name || "Your profile"} — open profile`}
+            className="group flex items-center justify-center nav:justify-start gap-2 px-1 nav:px-2 py-1 rounded-md hover:bg-background-alt transition-colors"
+          >
             <div
-              className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted"
+              className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted overflow-hidden flex-shrink-0"
               title={session?.user?.name || undefined}
             >
               {session?.user?.name?.charAt(0) || "?"}
             </div>
-            <div className="hidden nav:flex flex-col min-w-0">
-              <span className="text-[12px] text-text-primary truncate">{session?.user?.name || "User"}</span>
+            <div className="hidden nav:flex flex-col min-w-0 flex-1">
+              <span className="text-[12px] text-text-primary truncate group-hover:text-text-primary transition-colors">
+                {session?.user?.name || "Your profile"}
+              </span>
               <span className="text-[10px] font-mono text-text-muted">
                 {rawRole === "admin" ? (
                   <span className="inline-flex items-center gap-1">
@@ -232,25 +277,38 @@ export default function DashboardSidebar() {
                     Creator
                   </span>
                 ) : role === "client" ? (
-                  <span className="inline-flex items-center gap-1">
-                    Client
-                  </span>
+                  "Client"
                 ) : null}
               </span>
             </div>
-          </div>
+            {/* Tiny chevron at expanded width as the affordance cue */}
+            <svg
+              className="hidden nav:block w-3 h-3 text-text-muted group-hover:text-text-primary transition-colors flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+
           {profileSlug && (
             <Link
               href={`/coders/${profileSlug}`}
-              className="hidden nav:block px-2 py-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
+              className="hidden nav:flex items-center gap-1 px-2 py-1 mt-0.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
             >
               View public profile
+              <svg className="w-2.5 h-2.5 -mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </Link>
           )}
+
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             title="Sign out"
-            className="w-full text-center nav:text-left px-2 py-1.5 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+            className="w-full text-center nav:text-left px-2 py-1.5 mt-1 text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
           >
             <span className="hidden nav:inline">Sign out</span>
             <span className="nav:hidden inline-flex items-center justify-center w-full" aria-hidden>
