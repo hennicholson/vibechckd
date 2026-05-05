@@ -1049,11 +1049,25 @@ export default function InboxPage() {
       <div
         className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}
       >
-        {/* Header */}
-        <div className="px-4 pt-4 md:pt-5 pb-2 flex items-center justify-between">
-          <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
-            Inbox
-          </h1>
+        {/* Header — same shell as the other dashboard pages so the
+            "Inbox" word lands at the same x-padding + baseline. The
+            rail itself is narrower than the main content area, so
+            the title CAN'T sit at the same global x-coordinate as
+            "Projects" / "Earnings" — but the local padding +
+            typography are identical, which is what makes the
+            cross-page transition read as continuous. */}
+        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
+              Inbox
+            </h1>
+            {!isLoading && conversations.length > 0 && (
+              <p className="text-[11px] font-mono text-text-muted mt-0.5 tabular-nums">
+                {conversations.length} thread
+                {conversations.length === 1 ? "" : "s"}
+              </p>
+            )}
+          </div>
           <InboxMenu
             onOpenContacts={() => {
               setShowContacts(true);
@@ -1068,7 +1082,7 @@ export default function InboxPage() {
         </div>
 
         {/* Search */}
-        <div className="px-3 pt-1 pb-2 border-b border-border">
+        <div className="px-3 md:px-4 pt-1 pb-3 border-b border-border">
           <div className="flex items-center gap-2 bg-surface-muted rounded-md px-2.5 py-1.5">
             <span className="text-text-muted flex-shrink-0">
               <SearchIcon />
@@ -1098,9 +1112,24 @@ export default function InboxPage() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
+          {/* Skeleton rows — match the real conversation row footprint
+              (avatar + 2-line text block) so the layout doesn't pop
+              when data arrives. Subtle pulse, not aggressive. */}
           {isLoading && (
-            <div className="px-4 py-6 text-center">
-              <span className="text-[12px] text-text-muted font-mono">Loading…</span>
+            <div className="py-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-3 md:px-4 py-3"
+                  style={{ opacity: 1 - i * 0.08 }}
+                >
+                  <div className="w-9 h-9 rounded-full bg-surface-muted animate-pulse flex-shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="h-2.5 rounded bg-surface-muted animate-pulse w-[60%]" />
+                    <div className="h-2 rounded bg-surface-muted animate-pulse w-[80%]" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
           {!isLoading && filtered.length === 0 && (
