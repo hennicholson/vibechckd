@@ -297,6 +297,24 @@ export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
 
+  // Scroll-aware sticky header: at the top of the page the ticker sits
+  // above the search; as soon as the user scrolls the grid (>24px) the
+  // ticker fades + collapses and only the search stays pinned. Listens
+  // on the inner <main> element since that's the actual scroll
+  // container (the page has overflow:hidden on its outer shell).
+  const mainRef = useRef<HTMLElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      setScrolled(el.scrollTop > 24);
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
   // Card primary-action handler. Client → team-builder pre-filled; creator
   // → open or create a 1:1 DM thread (POST /api/dm/threads is find-or-
   // create so we get back the threadId regardless).
@@ -474,7 +492,10 @@ export default function BrowsePage() {
         counts={specialtyCounts}
       />
 
-      <main className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto">
+      <main
+        ref={mainRef}
+        className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto"
+      >
         <MobileTopBar
           filter={filter}
           onFilterChange={setFilter}
@@ -492,7 +513,19 @@ export default function BrowsePage() {
             so the grid doesn't visually slam into a hard line.
             No backdrop-blur — keeps the page calm and crisp. */}
         <div className="hidden md:block sticky top-0 z-20 bg-background">
-          <div className="px-4 md:px-12 lg:px-16 pt-4 pb-1">
+          {/* Ticker — full opacity + height when at the top of the page,
+              fades + collapses to 0 once the user starts scrolling so
+              only the search bar stays locked. The transitions on
+              opacity, max-height, and padding all run at the same
+              duration so the collapse reads as one motion. */}
+          <div
+            aria-hidden={scrolled}
+            className={`px-4 md:px-12 lg:px-16 overflow-hidden transition-[opacity,max-height,padding] duration-300 ease-out ${
+              scrolled
+                ? "opacity-0 max-h-0 pt-0 pb-0 pointer-events-none"
+                : "opacity-100 max-h-12 pt-4 pb-1"
+            }`}
+          >
             <BrowseStats coders={filteredCoders} />
           </div>
           <div className="w-full px-4 md:px-12 lg:px-16 pb-5">
