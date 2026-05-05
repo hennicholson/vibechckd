@@ -157,19 +157,23 @@ export default function DashboardSidebar() {
           labels. Item `title` attrs surface the label on hover at compact
           widths. */}
       <aside className="hidden md:flex flex-col w-[52px] nav:w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen transition-[width] duration-150 bg-background z-30">
-        {/* Logo */}
-        <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border">
-          <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1" title="vibechckd">
-            <span className="hidden nav:inline">vibechckd</span>
+        {/* Logo — flex-shrink-0 + min-w-0 so the wordmark + verified seal
+            never spill past the rail's right edge at any viewport. */}
+        <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border flex-shrink-0 min-w-0">
+          <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1 min-w-0 max-w-full" title="vibechckd">
+            <span className="hidden nav:inline truncate">vibechckd</span>
             <VerifiedSeal size="sm" />
           </Link>
         </div>
 
-        {/* Nav — each item has an optional quickActions panel that expands
-            below it when the item is the active page. Pattern matches the
-            existing /browse filter rail so users learn one gesture: tap
-            into a section, see its top shortcuts inline. */}
-        <div className="px-2 nav:px-3 py-3 space-y-0.5 flex-1">
+        {/* Scrollable middle — primary nav + per-page quickActions. The
+            wrapper is flex-1 min-h-0 overflow-y-auto so any combination
+            of nav items + expanded actions can scroll within the rail
+            without ever pushing the user footer past the viewport.
+            scrollbar-none keeps the chrome clean while still letting
+            mouse/wheel scroll work. */}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
+          <div className="px-2 nav:px-3 py-3 space-y-0.5">
           {filteredItems.map((item) => {
             const active = isActive(item);
             return (
@@ -200,10 +204,11 @@ export default function DashboardSidebar() {
               </div>
             );
           })}
+          </div>
         </div>
 
-        {/* User */}
-        <div className="px-2 nav:px-3 py-3 border-t border-border">
+        {/* User — flex-shrink-0 so it never collapses; always visible. */}
+        <div className="px-2 nav:px-3 py-3 border-t border-border flex-shrink-0">
           <div className="flex items-center justify-center nav:justify-start gap-2 px-1 nav:px-2 mb-2">
             <div
               className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted"

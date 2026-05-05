@@ -178,64 +178,66 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
     <aside className="hidden md:flex flex-col w-[52px] nav:w-[200px] border-r border-border flex-shrink-0 sticky top-0 h-screen bg-background transition-[width] duration-150 z-30">
       {/* Logo — at compact widths show only the verified seal so the rail
           stays tight; full wordmark returns at nav (1100px+). */}
-      <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border">
-        <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1" title="vibechckd">
-          <span className="hidden nav:inline">vibechckd</span>
+      <div className="px-3 nav:px-4 h-[48px] flex items-center justify-center nav:justify-start border-b border-border flex-shrink-0 min-w-0">
+        <Link href="/" className="text-[14px] font-semibold text-text-primary inline-flex items-center gap-1 min-w-0 max-w-full" title="vibechckd">
+          <span className="hidden nav:inline truncate">vibechckd</span>
           <VerifiedSeal size="sm" />
         </Link>
       </div>
 
-      {/* Primary nav — same items, ordering, and role-gating as the dashboard
-          rail so transitions /whop ↔ /dashboard don't visually jolt.
-          Each active item also expands its quickActions below it (when
-          defined). For the /browse item we skip the quick actions panel
-          because the dedicated specialty filter section below IS its
-          quick actions surface — no point doubling the affordance. */}
-      <div className="px-2 nav:px-3 py-3 space-y-0.5">
-        {filteredNav.map((item) => {
-          const active = isItemActive(item, pathname);
-          const isBrowseItem = item.href === "/browse";
-          return (
-            <div key={item.href}>
-              <NavItem href={item.href} active={active} icon={item.icon}>
-                {item.label}
-              </NavItem>
-              {!isBrowseItem && (
-                <QuickActions item={item} active={active} viewerRole={role} />
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* Scrollable middle — primary nav + filter list. Wrapped in a
+          flex-1 min-h-0 overflow-y-auto so the inner content can be
+          arbitrarily tall (long specialty filter list, expanded
+          quickActions, etc.) without ever pushing the user footer
+          off the viewport. The footer is positioned in its own row
+          BELOW this region so it's always visible. */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
+        <div className="px-2 nav:px-3 py-3 space-y-0.5">
+          {filteredNav.map((item) => {
+            const active = isItemActive(item, pathname);
+            const isBrowseItem = item.href === "/browse";
+            return (
+              <div key={item.href}>
+                <NavItem href={item.href} active={active} icon={item.icon}>
+                  {item.label}
+                </NavItem>
+                {!isBrowseItem && (
+                  <QuickActions item={item} active={active} viewerRole={role} />
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-      {/* Filter section — full list visible only above nav. At compact widths
-          the BrowseFilterPills row at the top of the page does the filtering. */}
-      <div className="hidden nav:block px-3 pt-2 pb-1 border-t border-border mt-1">
-        <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-1 mt-2">
-          Filter
-        </p>
-        <div className="space-y-0.5">
-          <FilterButton
-            active={filter === "all"}
-            label="All coders"
-            onClick={() => onFilterChange("all")}
-          />
-          {SPECIALTIES.map((s) => (
+        {/* Filter section — full list visible only above nav. At compact widths
+            the dropdown at the top of the page does the filtering. */}
+        <div className="hidden nav:block px-3 pt-2 pb-3 border-t border-border mt-1">
+          <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted px-2 mb-1 mt-2">
+            Filter
+          </p>
+          <div className="space-y-0.5">
             <FilterButton
-              key={s}
-              active={filter === s}
-              label={SPECIALTY_LABELS[s]}
-              count={counts[s] ?? 0}
-              onClick={() => onFilterChange(s)}
+              active={filter === "all"}
+              label="All coders"
+              onClick={() => onFilterChange("all")}
             />
-          ))}
+            {SPECIALTIES.map((s) => (
+              <FilterButton
+                key={s}
+                active={filter === s}
+                label={SPECIALTY_LABELS[s]}
+                count={counts[s] ?? 0}
+                onClick={() => onFilterChange(s)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
       {/* User footer — matches DashboardSidebar's footer shape so the rail
           looks identical on /browse, /whop, and /dashboard/*. The only extras
           are the role-aware "Set a password" prompt for cookieless Whop users. */}
-      <div className="mt-auto border-t border-border">
+      <div className="border-t border-border flex-shrink-0">
         {status === "authenticated" && session?.user ? (
           <div className="px-2 nav:px-3 py-3">
             <div className="flex items-center justify-center gap-2 px-1 nav:px-2 nav:justify-start mb-2">

@@ -96,7 +96,9 @@ export async function GET() {
       .limit(1);
     const applyEligible = profile?.status === "active";
 
-    const rows = await db
+    // 1. Open jobs feed — current open jobs, with an `applied` flag for
+    //    each based on the viewer's existing applications.
+    const openRows = await db
       .select({
         id: jobs.id,
         title: jobs.title,
@@ -106,7 +108,6 @@ export async function GET() {
         timeline: jobs.timeline,
         status: jobs.status,
         createdAt: jobs.createdAt,
-        // 1 if the current creator already applied to this job
         appliedFlag: sql<number>`COUNT(${jobApplications.id})::int`.as("applied_flag"),
       })
       .from(jobs)
@@ -121,10 +122,35 @@ export async function GET() {
       .groupBy(jobs.id)
       .orderBy(desc(jobs.createdAt));
 
+    // 2. Past + current applications — every job the creator has applied
+    //    to, including closed/filled ones, with the application status
+    //    so the UI can show "Hired" / "Shortlisted" / "Rejected" badges.
+    //    Drives the "Your applications" section on /jobs so the page is
+    //    fully inclusive (browse + history in one place).
+    const appRows = await db
+      .select({
+        id: jobs.id,
+        title: jobs.title,
+        description: jobs.description,
+        projectType: jobs.projectType,
+        budgetRange: jobs.budgetRange,
+        timeline: jobs.timeline,
+        status: jobs.status,
+        createdAt: jobs.createdAt,
+        applicationStatus: jobApplications.status,
+        appliedAt: jobApplications.createdAt,
+      })
+      .from(jobApplications)
+      .innerJoin(jobs, eq(jobs.id, jobApplications.jobId))
+      .where(eq(jobApplications.creatorId, session.user.id))
+      .orderBy(desc(jobApplications.createdAt));
+
     return NextResponse.json({
-      jobs: rows.map((r) => ({
+      jobs: openRows.map((r) => ({ ...r, applied: r.appliedFlag > 0 })),
+      myApplications: appRows.map((r) => ({
         ...r,
-        applied: r.appliedFlag > 0,
+        appliedAt: r.appliedAt ? r.appliedAt.toISOString() : null,
+        createdAt: r.createdAt ? r.createdAt.toISOString() : null,
       })),
       applyEligible,
     });
