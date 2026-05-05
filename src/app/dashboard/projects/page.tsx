@@ -8,6 +8,12 @@ import { useToast } from "@/components/Toast";
 
 type ProjectStatus = "draft" | "proposal" | "active" | "review" | "completed" | "cancelled";
 
+type ProjectMember = {
+  id: string;
+  name: string | null;
+  image: string | null;
+};
+
 type Project = {
   id: string;
   title: string;
@@ -16,6 +22,7 @@ type Project = {
   tags: string[];
   pinned: boolean;
   memberCount: number;
+  members?: ProjectMember[];
   lastActivity: string;
 };
 
@@ -23,18 +30,18 @@ const STATUS_LABELS: Record<string, string> = {
   active: "Active",
   draft: "Draft",
   proposal: "Proposal",
-  review: "Review",
+  review: "In review",
   completed: "Completed",
   cancelled: "Cancelled",
 };
 
-const STATUS_COLORS: Record<string, { text: string; bg: string }> = {
-  active: { text: "#22c55e", bg: "#22c55e14" },
-  draft: { text: "#a3a3a3", bg: "#f5f5f5" },
-  proposal: { text: "#f59e0b", bg: "#f59e0b14" },
-  review: { text: "#3b82f6", bg: "#3b82f614" },
-  completed: { text: "#a3a3a3", bg: "#f5f5f5" },
-  cancelled: { text: "#a3a3a3", bg: "#f5f5f5" },
+const STATUS_DOT: Record<string, string> = {
+  active: "bg-positive",
+  draft: "bg-text-muted/40",
+  proposal: "bg-warning",
+  review: "bg-blue-500",
+  completed: "bg-text-muted/30",
+  cancelled: "bg-text-muted/30",
 };
 
 function formatUpdated(dateStr: string): string {
@@ -45,7 +52,46 @@ function formatUpdated(dateStr: string): string {
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// Stacked avatar group — up to 4 visible, "+N" overflow chip when more.
+// Ring matches the card surface so they read as cleanly nested.
+function MemberStack({
+  members,
+  total,
+}: {
+  members: ProjectMember[];
+  total: number;
+}) {
+  const visible = members.slice(0, 4);
+  const extra = Math.max(0, total - visible.length);
+  return (
+    <div className="flex items-center -space-x-1.5">
+      {visible.map((m) => (
+        <div
+          key={m.id}
+          title={m.name || undefined}
+          className="w-6 h-6 rounded-full bg-surface-muted border border-background overflow-hidden flex items-center justify-center text-[9px] font-medium text-text-muted"
+        >
+          {m.image ? (
+            // Native <img> — these are tiny, the optimizer adds more bytes
+            // than it saves at this size.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={m.image} alt="" className="w-full h-full object-cover" />
+          ) : (
+            (m.name || "?").charAt(0).toUpperCase()
+          )}
+        </div>
+      ))}
+      {extra > 0 && (
+        <div className="w-6 h-6 rounded-full bg-surface-muted border border-background flex items-center justify-center text-[9px] font-mono text-text-muted">
+          +{extra}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +193,115 @@ function ContextMenu({
           Delete
         </button>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Project Card — the single cell in the new grid layout. Distinct
+// shape vs the sidebar nav rows so projects feel tactile + scannable
+// at a glance. Layout:
+//
+//   [● Active]  Title                                   [right-aligned date]
+//   description (max 2 lines)
+//   [pinned ★]  [👤👤👤+2]  · tags: tag1 tag2
+// ---------------------------------------------------------------------------
+
+function ProjectCard({
+  project,
+  onOpen,
+  onContextMenu,
+}: {
+  project: Project;
+  onOpen: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      onClick={onOpen}
+      onContextMenu={onContextMenu}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="group relative bg-background border border-border rounded-[12px] p-4 md:p-5 cursor-pointer transition-all hover:border-border-hover hover:-translate-y-px hover:shadow-[0_4px_20px_-12px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:border-text-primary"
+      aria-label={`Open project ${project.title}`}
+    >
+      {/* Top row: status dot + label, then date right-aligned */}
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              STATUS_DOT[project.status] || "bg-text-muted/40"
+            }`}
+          />
+          <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+            {STATUS_LABELS[project.status]}
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-text-muted tabular-nums flex-shrink-0">
+          {formatUpdated(project.lastActivity)}
+        </span>
+      </div>
+
+      {/* Title + pin marker */}
+      <div className="flex items-start gap-2 mb-1">
+        {project.pinned && (
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            stroke="currentColor"
+            strokeWidth="1"
+            className="text-text-primary flex-shrink-0 mt-[3px]"
+            aria-label="Pinned"
+          >
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+        )}
+        <h3 className="text-[15px] md:text-[16px] font-semibold text-text-primary leading-tight tracking-[-0.01em] line-clamp-2">
+          {project.title}
+        </h3>
+      </div>
+
+      {/* Description — 2 lines max so cards stay even-height in the grid */}
+      {project.description ? (
+        <p className="text-[12px] text-text-muted line-clamp-2 leading-relaxed mb-3 min-h-[34px]">
+          {project.description}
+        </p>
+      ) : (
+        <p className="text-[12px] text-text-muted/60 italic mb-3 min-h-[34px]">
+          No description yet
+        </p>
+      )}
+
+      {/* Footer — member avatars left, tags right */}
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/60">
+        <MemberStack
+          members={project.members ?? []}
+          total={project.memberCount}
+        />
+        <div className="flex items-center gap-1.5 min-w-0">
+          {(project.tags || []).slice(0, 2).map((tag) => (
+            <span
+              key={tag}
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-surface-muted text-text-muted whitespace-nowrap"
+            >
+              {tag}
+            </span>
+          ))}
+          {(project.tags || []).length > 2 && (
+            <span className="text-[10px] font-mono text-text-muted/60">
+              +{project.tags.length - 2}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -262,13 +417,45 @@ export default function ProjectsPage() {
     toast("Link copied", "success");
   };
 
+  // Group projects into "Pinned · Active · Other" buckets so the page
+  // reads as a board and not a flat list. Pinned always first; Active
+  // groups everything that's actually live work; Other catches drafts +
+  // completed when the user toggles those filters in.
+  const buckets = (() => {
+    const pinned: Project[] = [];
+    const active: Project[] = [];
+    const other: Project[] = [];
+    for (const p of filtered) {
+      if (p.pinned) pinned.push(p);
+      else if (p.status === "active" || p.status === "review" || p.status === "proposal") active.push(p);
+      else other.push(p);
+    }
+    return { pinned, active, other };
+  })();
+
+  const counts = {
+    total: projects.length,
+    active: projects.filter((p) =>
+      p.status === "active" || p.status === "review" || p.status === "proposal"
+    ).length,
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-[20px] font-semibold text-text-primary">Projects</h1>
-          <Button variant="secondary" size="sm" onClick={() => router.push("/dashboard/teams/new")}>
+      {/* Sticky hero header — bigger title, count subtitle, primary CTA. */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-5 md:pt-7 pb-3">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-[24px] md:text-[28px] font-semibold text-text-primary tracking-[-0.02em] leading-tight">
+              Projects
+            </h1>
+            <p className="text-[12px] text-text-muted mt-1">
+              {counts.total === 0
+                ? "Nothing in flight yet."
+                : `${counts.total} project${counts.total === 1 ? "" : "s"}${counts.active > 0 ? ` · ${counts.active} active` : ""}`}
+            </p>
+          </div>
+          <Button variant="primary" size="sm" onClick={() => router.push("/dashboard/teams/new")}>
             Start project
           </Button>
         </div>
@@ -276,24 +463,22 @@ export default function ProjectsPage() {
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-10 pt-3">
 
-      {/* Search + tag filter */}
-      <div className="mb-4 space-y-2">
-        <div className="relative">
+      {/* Filter rail — search left, status tabs right. Keeps everything
+          on one row at md+ so the cards get more vertical real estate. */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-[420px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects..."
-            className="w-full text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-9 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
+            placeholder="Search projects…"
+            className="w-full text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-transparent rounded-md pl-9 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
           />
         </div>
-        {/* Status pills — also driven by sidebar quick actions
-            (?status=active | ?status=completed). Reset to "All" via the
-            same control. */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-0.5 ml-auto">
           {(["all", "active", "completed"] as const).map((s) => (
             <button
               key={s}
@@ -304,32 +489,41 @@ export default function ProjectsPage() {
                 else url.searchParams.set("status", s);
                 router.replace(url.pathname + (url.search || ""));
               }}
-              className={`text-[11px] font-medium px-2 py-0.5 rounded-md cursor-pointer transition-colors capitalize ${
+              className={`relative px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer capitalize ${
                 statusFilter === s
-                  ? "bg-[#171717] text-white"
-                  : "bg-surface-muted text-text-muted hover:text-text-secondary"
+                  ? "text-text-primary"
+                  : "text-text-muted hover:text-text-primary"
               }`}
+              aria-selected={statusFilter === s}
             >
               {s}
+              {statusFilter === s && (
+                <span className="absolute left-3 right-3 -bottom-px h-[1.5px] bg-text-primary" />
+              )}
             </button>
           ))}
         </div>
+        {/* Tag filter only shows when projects use tags — otherwise it's noise */}
         {allTags.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+          <div className="basis-full flex items-center gap-1.5 overflow-x-auto">
             <button
               onClick={() => setFilterTag(null)}
-              className={`text-[10px] font-medium px-2 py-0.5 rounded-md whitespace-nowrap cursor-pointer transition-colors ${
-                !filterTag ? "bg-[#171717] text-white" : "bg-surface-muted text-text-muted hover:text-text-secondary"
+              className={`text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap cursor-pointer transition-colors ${
+                !filterTag
+                  ? "bg-text-primary text-background"
+                  : "bg-surface-muted text-text-muted hover:text-text-secondary"
               }`}
             >
-              All
+              All tags
             </button>
             {allTags.map((tag) => (
               <button
                 key={tag}
                 onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-                className={`text-[10px] font-medium px-2 py-0.5 rounded-md whitespace-nowrap cursor-pointer transition-colors ${
-                  filterTag === tag ? "bg-[#171717] text-white" : "bg-surface-muted text-text-muted hover:text-text-secondary"
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap cursor-pointer transition-colors ${
+                  filterTag === tag
+                    ? "bg-text-primary text-background"
+                    : "bg-surface-muted text-text-muted hover:text-text-secondary"
                 }`}
               >
                 {tag}
@@ -339,25 +533,30 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Loading */}
+      {/* Loading skeletons — match the new card footprint */}
       {isLoading && (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-surface-muted rounded-[10px] animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[124px] bg-surface-muted rounded-[12px] animate-pulse" />
           ))}
         </div>
       )}
 
-      {/* Empty */}
+      {/* Empty — bigger, more inviting */}
       {!isLoading && filtered.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-[13px] font-medium text-text-primary mb-1">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-12 h-12 rounded-full bg-surface-muted flex items-center justify-center mb-3">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <p className="text-[14px] font-medium text-text-primary mb-1">
             {searchQuery || filterTag ? "Nothing matches" : "Nothing in flight"}
           </p>
-          <p className="text-[12px] text-text-muted mb-4 max-w-sm">
+          <p className="text-[12px] text-text-muted mb-4 max-w-[320px] leading-relaxed">
             {searchQuery || filterTag
               ? "Loosen the filters or clear the search to see everything."
-              : "Start a project — chat, tasks, payments, all in one place."}
+              : "Start a project — chat, tasks, payments, deliverables, all in one place."}
           </p>
           {!searchQuery && !filterTag && (
             <Button variant="primary" size="md" onClick={() => router.push("/browse")}>
@@ -367,63 +566,45 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Project cards */}
+      {/* Grouped grid — Pinned · Active · Other. Each section only
+          renders when it has projects. 2-col on lg+, single-col below. */}
       {!isLoading && filtered.length > 0 && (
-        <div className="space-y-2">
-          {filtered.map((project) => {
-            const sc = STATUS_COLORS[project.status] || STATUS_COLORS.draft;
-            return (
-              <div
-                key={project.id}
-                onClick={() => router.push(`/dashboard/projects/${project.id}`)}
-                onContextMenu={(e) => handleContextMenu(e, project)}
-                className={`border border-border rounded-[10px] px-4 py-3 cursor-pointer transition-all hover:border-border-hover hover:shadow-sm group ${
-                  project.pinned ? "bg-surface-muted/30" : "bg-background"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      {project.pinned && (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" className="text-text-muted flex-shrink-0">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                      )}
-                      <span className="text-[14px] font-medium text-text-primary truncate">
-                        {project.title}
-                      </span>
-                      <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{ color: sc.text, backgroundColor: sc.bg }}
-                      >
-                        {STATUS_LABELS[project.status]}
-                      </span>
-                    </div>
-                    {project.description && (
-                      <p className="text-[12px] text-text-muted truncate">{project.description}</p>
-                    )}
-                    {(project.tags || []).length > 0 && (
-                      <div className="flex items-center gap-1 mt-1.5">
-                        {project.tags.map((tag) => (
-                          <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded bg-surface-muted text-text-muted font-medium">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+        <div className="space-y-7">
+          {[
+            { key: "pinned", label: "Pinned", items: buckets.pinned },
+            { key: "active", label: "Active", items: buckets.active },
+            { key: "other", label: "Other", items: buckets.other },
+          ]
+            .filter((g) => g.items.length > 0)
+            .map((g) => (
+              <section key={g.key}>
+                {/* Section header is hidden when only ONE bucket has data —
+                    no point shouting "Active" if there's nothing else. */}
+                {(buckets.pinned.length > 0 ? 1 : 0) +
+                  (buckets.active.length > 0 ? 1 : 0) +
+                  (buckets.other.length > 0 ? 1 : 0) >
+                  1 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+                      {g.label}
+                    </p>
+                    <span className="text-[10px] font-mono text-text-muted/60 tabular-nums">
+                      {g.items.length}
+                    </span>
                   </div>
-
-                  <div className="flex items-center gap-3 flex-shrink-0 pt-0.5">
-                    <span className="text-[11px] font-mono text-text-muted">{project.memberCount} members</span>
-                    <span className="text-[11px] font-mono text-text-muted">{formatUpdated(project.lastActivity)}</span>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted group-hover:text-text-primary transition-colors">
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                  </div>
+                )}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+                  {g.items.map((project) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      onOpen={() => router.push(`/dashboard/projects/${project.id}`)}
+                      onContextMenu={(e) => handleContextMenu(e, project)}
+                    />
+                  ))}
                 </div>
-              </div>
-            );
-          })}
+              </section>
+            ))}
         </div>
       )}
 

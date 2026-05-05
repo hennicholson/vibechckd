@@ -81,26 +81,70 @@ export async function GET(req: Request) {
 
     // Deduplicate by project ID (joins can produce duplicates)
     const seen = new Set<string>();
-    const result = rows
-      .filter((r) => {
-        if (seen.has(r.id)) return false;
-        seen.add(r.id);
-        return true;
-      })
-      .map((r) => ({
-        id: r.id,
-        title: r.title,
-        description: r.description || "",
-        status: r.status,
-        tags: r.tags || [],
-        pinned: r.pinned || false,
-        createdAt: r.createdAt?.toISOString(),
-        updatedAt: r.updatedAt?.toISOString(),
-        memberCount: r.memberCount || 1,
-        lastActivity: r.lastActivity
-          ? new Date(r.lastActivity).toISOString()
-          : r.updatedAt?.toISOString(),
-      }));
+    const dedupedRows = rows.filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+
+    // Member avatars per project — fetch the top-4 (by join order) for the
+    // projects we're returning, so the cards can render a stacked-avatar
+    // group instead of a bare member count. One round-trip, no N+1.
+    const projectIds = dedupedRows.map((r) => r.id);
+    const memberPreviews: Record<
+      string,
+      Array<{ id: string; name: string | null; image: string | null }>
+    > = {};
+    if (projectIds.length > 0) {
+      const previewRows = (await db.execute(sql`
+        WITH ranked AS (
+          SELECT pm.project_id,
+                 u.id, u.name, u.image,
+                 row_number() OVER (
+                   PARTITION BY pm.project_id
+                   ORDER BY pm.joined_at ASC NULLS LAST
+                 ) AS rn
+          FROM project_members pm
+          JOIN users u ON u.id = pm.user_id
+          WHERE pm.project_id = ANY(${projectIds}::uuid[])
+        )
+        SELECT project_id, id, name, image
+        FROM ranked
+        WHERE rn <= 4
+        ORDER BY project_id, rn
+      `)) as unknown as {
+        rows: Array<{
+          project_id: string;
+          id: string;
+          name: string | null;
+          image: string | null;
+        }>;
+      };
+      for (const m of previewRows.rows ?? []) {
+        if (!memberPreviews[m.project_id]) memberPreviews[m.project_id] = [];
+        memberPreviews[m.project_id].push({
+          id: m.id,
+          name: m.name,
+          image: m.image,
+        });
+      }
+    }
+
+    const result = dedupedRows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description || "",
+      status: r.status,
+      tags: r.tags || [],
+      pinned: r.pinned || false,
+      createdAt: r.createdAt?.toISOString(),
+      updatedAt: r.updatedAt?.toISOString(),
+      memberCount: r.memberCount || 1,
+      members: memberPreviews[r.id] ?? [],
+      lastActivity: r.lastActivity
+        ? new Date(r.lastActivity).toISOString()
+        : r.updatedAt?.toISOString(),
+    }));
 
     return NextResponse.json(result);
   } catch (error) {
