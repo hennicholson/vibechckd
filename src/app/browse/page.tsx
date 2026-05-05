@@ -43,6 +43,7 @@ import BrowseSearchBar from "@/components/browse/BrowseSearchBar";
 import BrowseCoderCard from "@/components/browse/BrowseCoderCard";
 import BrowseStats from "@/components/browse/BrowseStats";
 import BrowseLoadingLottie from "@/components/browse/BrowseLoadingLottie";
+import BrowseIntroOverlay from "@/components/browse/BrowseIntroOverlay";
 
 type Filter = "all" | Specialty;
 
@@ -297,6 +298,13 @@ export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCoder, setSelectedCoder] = useState<Coder | null>(null);
 
+  // Brand intro: every entry to /browse plays the full check-intro
+  // Lottie before the gallery is revealed. Re-asserts the "vetted"
+  // promise the marketplace is built on. The overlay manages its own
+  // lifecycle (Lottie onComplete or hard-timeout fallback) and calls
+  // back here when it's safe to show the page.
+  const [introDone, setIntroDone] = useState(false);
+
   // Scroll-aware sticky header: at the top of the page the ticker sits
   // above the search; as soon as the user scrolls the grid (>24px) the
   // ticker fades + collapses and only the search stays pinned. Listens
@@ -486,6 +494,12 @@ export default function BrowsePage() {
 
   return (
     <div className="h-[100dvh] bg-background flex overflow-hidden">
+      {/* Vetted intro overlay — plays the full check-intro Lottie every
+          time the user enters the gallery. The page underneath renders
+          and starts fetching immediately, so by the time the animation
+          completes the grid usually has data ready to stagger in. */}
+      {!introDone && <BrowseIntroOverlay onDone={() => setIntroDone(true)} />}
+
       <BrowseSidebar
         filter={filter}
         onFilterChange={setFilter}
