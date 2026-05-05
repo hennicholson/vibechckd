@@ -11,7 +11,16 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+// `lottie-react` uses requestAnimationFrame and needs a browser, so we
+// dynamic-import it with ssr:false. Next's default-export auto-unwrap
+// gets confused by the package's mixed exports (named hooks alongside
+// the default component), so we grab `.default` explicitly here — the
+// component otherwise mounts as `undefined` and React silently keeps
+// showing the fallback.
+const Lottie = dynamic(
+  () => import("lottie-react").then((m) => m.default),
+  { ssr: false }
+);
 
 interface BrowseLoadingLottieProps {
   // Tunable so other surfaces can reuse the component.
