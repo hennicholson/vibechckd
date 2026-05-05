@@ -59,7 +59,12 @@ export default function BrowseSearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[18px] md:text-[22px] tracking-[-0.01em] text-text-primary placeholder:text-text-muted/70 placeholder:font-normal py-2 md:py-3"
+        // Override the global *:focus-visible outline declared in globals.css
+        // — for a borderless typographic search the outline ring reads as a
+        // box and breaks the calm. Focus state still moves the magnifier
+        // icon to text-primary so keyboard users get a visible cue.
+        className="flex-1 min-w-0 bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none text-[18px] md:text-[22px] tracking-[-0.01em] text-text-primary placeholder:text-text-muted/70 placeholder:font-normal py-2 md:py-3"
+        style={{ outline: "none" }}
         aria-label="Search coders"
       />
       {value && (
