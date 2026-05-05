@@ -110,53 +110,17 @@ export const navItems: NavItem[] = [
       { label: "My applications", href: "/jobs?tab=applied" },
     ],
   },
-  // Note: Profile (client + creator) used to be top-level nav items.
-  // They've moved into the sidebar footer — the avatar / name row is
-  // the primary entry point now, with a public-profile sub-link
-  // beneath it for creators. Keeps the rail focused on day-to-day
+  // Order from here on follows the user's daily flow:
+  //   Projects → Inbox → Portfolio → Earnings → Application(if unvetted)
+  // Active work and conversations sit higher than showcase / financial
+  // surfaces because they're touched many times per day; Application
+  // drops to just-before-Settings since it's a status check, not a
+  // working surface (and disappears entirely once verified).
+  //
+  // Profile (client + creator) used to be top-level nav items. They've
+  // moved into the sidebar footer — the avatar / name row is the
+  // primary entry point now. Keeps the rail focused on day-to-day
   // surfaces (Browse, Jobs, Projects, Inbox, etc.).
-  {
-    href: "/dashboard/portfolio",
-    label: "Portfolio",
-    roles: ["creator"],
-    icon: (
-      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path {...stroke} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-    ),
-    quickActions: [
-      { label: "Add a project", href: "/dashboard/portfolio?new=1" },
-    ],
-  },
-  {
-    href: "/dashboard/application",
-    label: "Application",
-    roles: ["creator"],
-    icon: (
-      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path {...stroke} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-    quickActions: [
-      { label: "Continue application", href: "/dashboard/application" },
-      { label: "Job applications", href: "/dashboard/application#jobs" },
-    ],
-  },
-  {
-    href: "/dashboard/earnings",
-    label: "Earnings",
-    roles: ["creator"],
-    icon: (
-      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <rect x="2" y="6" width="20" height="14" rx="2" {...stroke} />
-        <path {...stroke} d="M2 10h20M16 14h2" />
-      </svg>
-    ),
-    quickActions: [
-      { label: "Withdraw", href: "/dashboard/earnings?withdraw=1" },
-      { label: "Transactions", href: "/dashboard/earnings#transactions" },
-    ],
-  },
   {
     href: "/dashboard/projects",
     label: "Projects",
@@ -184,6 +148,48 @@ export const navItems: NavItem[] = [
     quickActions: [
       { label: "Unread", href: "/dashboard/inbox?unread=1" },
       { label: "New message", href: "/dashboard/inbox?new=1" },
+    ],
+  },
+  {
+    href: "/dashboard/portfolio",
+    label: "Portfolio",
+    roles: ["creator"],
+    icon: (
+      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path {...stroke} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+    quickActions: [
+      { label: "Add a project", href: "/dashboard/portfolio?new=1" },
+    ],
+  },
+  {
+    href: "/dashboard/earnings",
+    label: "Earnings",
+    roles: ["creator"],
+    icon: (
+      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <rect x="2" y="6" width="20" height="14" rx="2" {...stroke} />
+        <path {...stroke} d="M2 10h20M16 14h2" />
+      </svg>
+    ),
+    quickActions: [
+      { label: "Withdraw", href: "/dashboard/earnings?withdraw=1" },
+      { label: "Transactions", href: "/dashboard/earnings#transactions" },
+    ],
+  },
+  {
+    href: "/dashboard/application",
+    label: "Application",
+    roles: ["creator"],
+    icon: (
+      <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path {...stroke} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    quickActions: [
+      { label: "Continue application", href: "/dashboard/application" },
+      { label: "Job applications", href: "/dashboard/application#jobs" },
     ],
   },
   {

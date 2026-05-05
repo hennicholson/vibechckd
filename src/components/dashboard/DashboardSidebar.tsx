@@ -92,7 +92,6 @@ export function QuickActions({
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const [profileSlug, setProfileSlug] = useState<string | null>(null);
   const [vetted, setVetted] = useState<boolean>(false);
   const unread = useUnreadCount();
   const rawRole = (session?.user as any)?.role as string | undefined;
@@ -106,7 +105,6 @@ export default function DashboardSidebar() {
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.slug) setProfileSlug(data.slug);
         if (data?.vetted) setVetted(true);
       })
       .catch(() => {});
@@ -292,18 +290,6 @@ export default function DashboardSidebar() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </Link>
-
-          {profileSlug && (
-            <Link
-              href={`/coders/${profileSlug}`}
-              className="hidden nav:flex items-center gap-1 px-2 py-1 mt-0.5 text-[11px] text-text-muted hover:text-text-primary transition-colors"
-            >
-              View public profile
-              <svg className="w-2.5 h-2.5 -mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </Link>
-          )}
 
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
