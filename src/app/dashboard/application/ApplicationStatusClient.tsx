@@ -204,7 +204,7 @@ export default function ApplicationStatusClient({
 
 function JobApplicationsSection({ items }: { items: JobApp[] }) {
   return (
-    <section className="mt-10 pt-8 border-t border-border">
+    <section id="jobs" className="mt-10 pt-8 border-t border-border scroll-mt-24">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[14px] font-medium text-text-primary">Job applications</h2>
         <Link

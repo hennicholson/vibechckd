@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import dynamic from "next/dynamic";
 
@@ -273,6 +273,7 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 export default function EarningsPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [balance, setBalance] = useState<BalanceData | null>(null);
@@ -280,6 +281,18 @@ export default function EarningsPage() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [showWithdraw, setShowWithdraw] = useState(false);
+
+  // Sidebar quick action: clicking "Withdraw" navigates here with
+  // ?withdraw=1 — open the modal automatically and strip the param so
+  // a refresh doesn't re-trigger.
+  useEffect(() => {
+    if (searchParams.get("withdraw") === "1") {
+      setShowWithdraw(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("withdraw");
+      router.replace(url.pathname + (url.search || ""));
+    }
+  }, [searchParams, router]);
   const [withdrawing, setWithdrawing] = useState(false);
   const [page, setPage] = useState(1);
   const [totalTx, setTotalTx] = useState(0);
@@ -491,7 +504,7 @@ export default function EarningsPage() {
       )}
 
       {/* Transaction history */}
-      <div className="border border-border rounded-[10px] overflow-hidden">
+      <div id="transactions" className="border border-border rounded-[10px] overflow-hidden scroll-mt-24">
         <div className="px-4 md:px-5 py-4 border-b border-border">
           <div className="flex items-center justify-between">
             <h3 className="text-[14px] font-medium text-text-primary">Transaction history</h3>

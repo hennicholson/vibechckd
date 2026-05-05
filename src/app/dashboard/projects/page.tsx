@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/Button";
 import { useToast } from "@/components/Toast";
@@ -155,14 +155,27 @@ function ContextMenu({
 // Page
 // ---------------------------------------------------------------------------
 
+type StatusFilter = "all" | "active" | "completed";
+
 export default function ProjectsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const s = searchParams.get("status");
+    return s === "active" || s === "completed" ? s : "all";
+  });
+
+  // Re-sync status from URL when sidebar quick action navigates here.
+  useEffect(() => {
+    const s = searchParams.get("status");
+    setStatusFilter(s === "active" || s === "completed" ? s : "all");
+  }, [searchParams]);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -186,6 +199,12 @@ export default function ProjectsPage() {
 
   // Filter + search
   const filtered = projects.filter((p) => {
+    if (statusFilter === "active") {
+      if (p.status === "completed" || p.status === "cancelled") return false;
+    }
+    if (statusFilter === "completed") {
+      if (p.status !== "completed") return false;
+    }
     if (filterTag && !(p.tags || []).includes(filterTag)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -270,6 +289,30 @@ export default function ProjectsPage() {
             placeholder="Search projects..."
             className="w-full text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md pl-9 pr-3 py-2 outline-none focus:border-border-hover transition-colors"
           />
+        </div>
+        {/* Status pills — also driven by sidebar quick actions
+            (?status=active | ?status=completed). Reset to "All" via the
+            same control. */}
+        <div className="flex items-center gap-1.5">
+          {(["all", "active", "completed"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                setStatusFilter(s);
+                const url = new URL(window.location.href);
+                if (s === "all") url.searchParams.delete("status");
+                else url.searchParams.set("status", s);
+                router.replace(url.pathname + (url.search || ""));
+              }}
+              className={`text-[11px] font-medium px-2 py-0.5 rounded-md cursor-pointer transition-colors capitalize ${
+                statusFilter === s
+                  ? "bg-[#171717] text-white"
+                  : "bg-surface-muted text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
         {allTags.length > 0 && (
           <div className="flex items-center gap-1.5 overflow-x-auto">

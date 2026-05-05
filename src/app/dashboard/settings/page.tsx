@@ -364,7 +364,7 @@ export default function SettingsPage() {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
         {/* Account */}
-        <div className="border border-border rounded-[10px] p-5 mb-4">
+        <div id="account" className="border border-border rounded-[10px] p-5 mb-4 scroll-mt-24">
           <h2 className="text-[14px] font-medium text-text-primary mb-4">Account</h2>
 
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -552,7 +552,7 @@ export default function SettingsPage() {
         )}
 
         {/* Notifications */}
-        <div className="border border-border rounded-[10px] p-5 mb-4">
+        <div id="notifications" className="border border-border rounded-[10px] p-5 mb-4 scroll-mt-24">
           <h2 className="text-[14px] font-medium text-text-primary mb-4">Notifications</h2>
 
           <div className="space-y-4">

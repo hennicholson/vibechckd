@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { PortfolioItem } from "@/lib/mock-data";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
@@ -74,6 +74,21 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
+
+  // Sidebar quick action: ?new=1 → open the new-project editor on mount
+  // and strip the param so a refresh doesn't re-open it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("new") === "1") {
+      setEditingItem(null);
+      setEditorOpen(true);
+      sp.delete("new");
+      const url =
+        window.location.pathname + (sp.toString() ? `?${sp.toString()}` : "");
+      window.history.replaceState({}, "", url);
+    }
+  }, []);
 
   function openEditor(item: PortfolioItem | null) {
     setEditingItem(item);

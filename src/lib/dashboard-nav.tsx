@@ -88,7 +88,7 @@ export const navItems: NavItem[] = [
     ),
     quickActions: [
       { label: "Post a job", href: "/dashboard/jobs/new" },
-      { label: "Drafts", href: "/dashboard/jobs?status=draft" },
+      { label: "Open", href: "/dashboard/jobs?status=open" },
       { label: "Closed", href: "/dashboard/jobs?status=closed" },
     ],
   },
@@ -152,7 +152,6 @@ export const navItems: NavItem[] = [
     ),
     quickActions: [
       { label: "Add a project", href: "/dashboard/portfolio?new=1" },
-      { label: "Reorder", href: "/dashboard/portfolio?reorder=1" },
     ],
   },
   {

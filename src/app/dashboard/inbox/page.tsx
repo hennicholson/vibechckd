@@ -857,6 +857,7 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState(false);
 
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
@@ -940,8 +941,33 @@ export default function InboxPage() {
     }
   }, []);
 
+  // Sidebar quick actions: ?unread=1 → Unread filter, ?new=1 → open the
+  // contact picker so the user can start a fresh DM. Both strip their
+  // params after applying so they don't re-fire on refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    let touched = false;
+    if (sp.get("unread") === "1") {
+      setUnreadOnly(true);
+      sp.delete("unread");
+      touched = true;
+    }
+    if (sp.get("new") === "1") {
+      setShowContacts(true);
+      sp.delete("new");
+      touched = true;
+    }
+    if (touched) {
+      const url =
+        window.location.pathname + (sp.toString() ? `?${sp.toString()}` : "");
+      router.replace(url);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Derived ──
-  const filtered = search.trim()
+  const queryFiltered = search.trim()
     ? conversations.filter((c) => {
         const title = (c.title || "").toLowerCase();
         const last = (c.lastMessageContent || "").toLowerCase();
@@ -949,6 +975,10 @@ export default function InboxPage() {
         return title.includes(q) || last.includes(q);
       })
     : conversations;
+
+  const filtered = unreadOnly
+    ? queryFiltered.filter((c) => c.unreadCount > 0)
+    : queryFiltered;
 
   const selected = conversations.find((c) => c.id === selectedId) || null;
   const otherParticipant = selected?.participants?.find((p) => p.id !== currentUserId) || null;
@@ -1051,6 +1081,19 @@ export default function InboxPage() {
               className="flex-1 text-[16px] md:text-[12px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none"
             />
           </div>
+          {unreadOnly && (
+            <div className="flex items-center justify-between mt-2 px-1">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+                Unread only
+              </span>
+              <button
+                onClick={() => setUnreadOnly(false)}
+                className="text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
         {/* List */}

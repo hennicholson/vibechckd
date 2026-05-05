@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface JobRow {
   id: string;
@@ -34,9 +35,25 @@ function relativeTime(iso: string): string {
   return `${months}mo ago`;
 }
 
+type StatusFilter = "all" | "open" | "closed" | "filled";
+
 export default function JobsListClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const s = searchParams.get("status");
+    if (s === "open" || s === "closed" || s === "filled") return s;
+    return "all";
+  });
+
+  useEffect(() => {
+    const s = searchParams.get("status");
+    setStatusFilter(
+      s === "open" || s === "closed" || s === "filled" ? s : "all"
+    );
+  }, [searchParams]);
 
   useEffect(() => {
     fetch("/api/jobs")
@@ -44,6 +61,11 @@ export default function JobsListClient() {
       .then((d) => setJobs(d?.jobs ?? []))
       .catch(() => setError("Couldn't load jobs"));
   }, []);
+
+  const visibleJobs =
+    jobs && statusFilter !== "all"
+      ? jobs.filter((j) => j.status === statusFilter)
+      : jobs;
 
   return (
     <div className="max-w-3xl h-full flex flex-col">
@@ -69,6 +91,30 @@ export default function JobsListClient() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+        {/* Status filter pills — also driven by sidebar quick actions
+            (?status=open|closed). Reset to All via the same control. */}
+        <div className="flex items-center gap-1.5 mb-4">
+          {(["all", "open", "closed", "filled"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                setStatusFilter(s);
+                const url = new URL(window.location.href);
+                if (s === "all") url.searchParams.delete("status");
+                else url.searchParams.set("status", s);
+                router.replace(url.pathname + (url.search || ""));
+              }}
+              className={`text-[11px] font-medium px-2 py-0.5 rounded-md cursor-pointer transition-colors capitalize ${
+                statusFilter === s
+                  ? "bg-[#171717] text-white"
+                  : "bg-surface-muted text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
         {error && <p className="text-[13px] text-negative">{error}</p>}
 
         {jobs === null && (
@@ -94,9 +140,26 @@ export default function JobsListClient() {
           </div>
         )}
 
-        {jobs && jobs.length > 0 && (
+        {visibleJobs && jobs && jobs.length > 0 && visibleJobs.length === 0 && (
+          <p className="text-[12px] text-text-muted">
+            No {statusFilter} jobs.{" "}
+            <button
+              onClick={() => {
+                setStatusFilter("all");
+                const url = new URL(window.location.href);
+                url.searchParams.delete("status");
+                router.replace(url.pathname);
+              }}
+              className="underline cursor-pointer hover:text-text-primary"
+            >
+              Show all
+            </button>
+          </p>
+        )}
+
+        {visibleJobs && visibleJobs.length > 0 && (
           <ul className="space-y-3">
-            {jobs.map((j) => (
+            {visibleJobs.map((j) => (
               <li key={j.id}>
                 <Link
                   href={`/dashboard/jobs/${j.id}`}
