@@ -68,6 +68,7 @@ export default function DashboardSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [profileSlug, setProfileSlug] = useState<string | null>(null);
+  const [vetted, setVetted] = useState<boolean>(false);
   const rawRole = (session?.user as any)?.role as string | undefined;
   // Track userId, not the full user object — SessionProvider can swap object
   // identity on every render, which made this effect re-fire on each parent
@@ -78,7 +79,10 @@ export default function DashboardSidebar() {
     if (!userId || rawRole === "client") return;
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data?.slug) setProfileSlug(data.slug); })
+      .then((data) => {
+        if (data?.slug) setProfileSlug(data.slug);
+        if (data?.vetted) setVetted(true);
+      })
       .catch(() => {});
   }, [userId, rawRole]);
   const role = uiRole(rawRole);
@@ -89,7 +93,12 @@ export default function DashboardSidebar() {
   // SessionProvider's initial server-rendered session takes over.
   const filteredItems: NavItem[] = role
     ? [
-        ...navItems.filter((item) => item.roles.includes(role)),
+        ...navItems
+          .filter((item) => item.roles.includes(role))
+          // Hide the standalone Application nav item once the creator is
+          // vetted — the link still lives in Settings → Application so
+          // they can review it, but it shouldn't crowd the rail.
+          .filter((item) => !(vetted && item.href === "/dashboard/application")),
         ...(rawRole === "admin" ? [adminItem] : []),
       ]
     : [];

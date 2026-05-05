@@ -120,10 +120,33 @@ export default function BrowseSidebar({ filter, onFilterChange, counts }: Browse
   const { data: session, status } = useSession();
   const rawRole = (session?.user as { role?: string } | undefined)?.role;
   const role = uiRole(rawRole);
+  const [vetted, setVetted] = useState(false);
+
+  // Once a creator is verified, the standalone Application item moves
+  // into Settings (matches DashboardSidebar). Don't fetch for clients.
+  const userIdForProfile = session?.user?.id;
+  useEffect(() => {
+    if (status !== "authenticated" || !userIdForProfile || rawRole === "client") return;
+    let cancelled = false;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.vetted) setVetted(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [status, userIdForProfile, rawRole]);
 
   const filteredNav = role
     ? [
-        ...navItems.filter((item) => item.roles.includes(role)),
+        ...navItems
+          .filter((item) => item.roles.includes(role))
+          .filter(
+            (item) => !(vetted && item.href === "/dashboard/application")
+          ),
         ...(rawRole === "admin" ? [adminItem] : []),
       ]
     : navItems.filter((item) => item.href === "/browse");

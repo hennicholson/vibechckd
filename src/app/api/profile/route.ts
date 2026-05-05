@@ -39,6 +39,9 @@ export async function GET() {
       websiteUrl: "",
       avatarUrl: "",
       gifPreviewUrl: "",
+      status: "draft",
+      verifiedAt: null,
+      vetted: false,
     });
   }
 
@@ -50,6 +53,12 @@ export async function GET() {
     .limit(1);
 
   const gifPreviewUrl = profile.gifPreviewUrl ?? "";
+
+  // Vetted = profile is active AND has been stamped with a verification
+  // timestamp. Drives sidebar logic (hide the Application item once they
+  // pass) and the role-switch flow in Settings.
+  const vetted =
+    profile.status === "active" && profile.verifiedAt !== null;
 
   return NextResponse.json({
     displayName: user?.name ?? "",
@@ -66,6 +75,9 @@ export async function GET() {
     websiteUrl: profile.websiteUrl ?? "",
     avatarUrl: profile.pfpUrl ?? "",
     gifPreviewUrl,
+    status: profile.status ?? "draft",
+    verifiedAt: profile.verifiedAt ? profile.verifiedAt.toISOString() : null,
+    vetted,
   });
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession, signOut } from "next-auth/react";
 import Input from "@/components/Input";
@@ -100,6 +101,58 @@ export default function SettingsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteShowPassword, setDeleteShowPassword] = useState(false);
+
+  // ── Account type / role-switch ──
+  // Vetted state controls whether we show the application status link
+  // here (creators only) and whether the role switcher reminds them they
+  // can keep their verified profile when switching back.
+  const [vetted, setVetted] = useState(false);
+  const [appStatus, setAppStatus] = useState<string>("draft");
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleSwitching, setRoleSwitching] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isCreator) return;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        if (typeof data.vetted === "boolean") setVetted(data.vetted);
+        if (typeof data.status === "string") setAppStatus(data.status);
+      })
+      .catch(() => {});
+  }, [isCreator]);
+
+  async function submitRoleSwitch() {
+    const target = isCreator ? "client" : "coder";
+    setRoleSwitching(true);
+    setRoleError(null);
+    try {
+      const res = await fetch("/api/account/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: target }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Couldn't switch your role");
+      }
+      toast(
+        target === "client"
+          ? "Switched to client. Refreshing…"
+          : "Switched to creator. Refreshing…",
+        "success"
+      );
+      // Force a full reload so the JWT + sidebar pick up the new role.
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 600);
+    } catch (err) {
+      setRoleError(err instanceof Error ? err.message : "Unknown error");
+      setRoleSwitching(false);
+    }
+  }
 
   // Hydrate localStorage-backed toggles on mount (client-only).
   useEffect(() => {
@@ -586,6 +639,84 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* Application status (creators only) — relocated from the sidebar
+            once the creator is vetted. Always linkable so they can review
+            their record / re-apply if rejected. */}
+        {isCreator && (
+          <div id="application" className="border border-border rounded-[10px] p-5 mb-4 scroll-mt-24">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[14px] font-medium text-text-primary">Application</h2>
+              <span
+                className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded ${
+                  vetted
+                    ? "text-positive bg-positive/10"
+                    : appStatus === "pending"
+                      ? "text-warning bg-warning/10"
+                      : appStatus === "suspended"
+                        ? "text-negative bg-negative/10"
+                        : "text-text-muted bg-surface-muted"
+                }`}
+              >
+                {vetted
+                  ? "Verified"
+                  : appStatus === "pending"
+                    ? "Under review"
+                    : appStatus === "suspended"
+                      ? "Suspended"
+                      : "Draft"}
+              </span>
+            </div>
+            <p className="text-[12px] text-text-muted mb-4 leading-relaxed">
+              {vetted
+                ? "You're a verified creator. Your profile is live in the marketplace."
+                : "Your application is in vibechckd's review queue. We'll email you when there's an update."}
+            </p>
+            <Link
+              href="/dashboard/application"
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-text-primary hover:opacity-80 transition-opacity"
+            >
+              Open application
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        )}
+
+        {/* Account type — the role switcher. Both directions go through
+            the same prompt; data is preserved either way (the creator
+            profile and client profile are separate rows, so switching
+            is non-destructive). */}
+        <div className="border border-border rounded-[10px] p-5 mb-4">
+          <h2 className="text-[14px] font-medium text-text-primary mb-3">Account type</h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-[13px] text-text-primary">
+                You're using vibechckd as a{" "}
+                <span className="font-medium">
+                  {isCreator ? "creator" : "client"}
+                </span>
+                .
+              </p>
+              <p className="text-[11px] text-text-muted mt-1 leading-relaxed">
+                {isCreator
+                  ? "Switch to client to brief jobs, build teams, and pay creators."
+                  : "Switch to creator to apply for jobs, list your portfolio, and earn."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setRoleError(null);
+                setShowRoleModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-text-primary border border-border rounded-md hover:bg-surface-muted transition-colors cursor-pointer flex-shrink-0"
+            >
+              {isCreator ? "Switch to client" : "Switch to creator"}
+            </button>
+          </div>
+        </div>
+
         {/* Danger Zone */}
         <div className="border border-border rounded-[10px] p-5 mb-4 border-t-negative/40 border-t-2">
           <h2 className="text-[14px] font-medium text-negative mb-4">Danger zone</h2>
@@ -658,6 +789,65 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Role-switch Confirmation Modal */}
+      <Modal
+        open={showRoleModal}
+        onClose={() => !roleSwitching && setShowRoleModal(false)}
+        title={isCreator ? "Switch to client" : "Switch to creator"}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-[13px] text-text-secondary leading-relaxed">
+            {isCreator
+              ? "You'll see the client view next time you load the dashboard — Jobs, Build a Team, Projects, and the company profile."
+              : "You'll see the creator view next time you load the dashboard — Portfolio, Application, Earnings, and your public profile."}
+          </p>
+          <ul className="text-[12px] text-text-muted space-y-1.5 leading-relaxed">
+            <li className="flex gap-2">
+              <span className="text-text-primary mt-1">·</span>
+              Your messages, projects, and transactions stay attached to your account.
+            </li>
+            <li className="flex gap-2">
+              <span className="text-text-primary mt-1">·</span>
+              {isCreator
+                ? "Your verified creator profile stays in our database — switching back later restores it."
+                : "Your existing client / company profile stays as-is."}
+            </li>
+            {isCreator && vetted && (
+              <li className="flex gap-2">
+                <span className="text-text-primary mt-1">·</span>
+                You'll keep your verified status if you switch back to creator.
+              </li>
+            )}
+          </ul>
+          {roleError && (
+            <p className="text-[12px] text-negative">{roleError}</p>
+          )}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowRoleModal(false)}
+              disabled={roleSwitching}
+              className="px-3 py-1.5 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitRoleSwitch}
+              disabled={roleSwitching}
+              className="px-4 py-1.5 text-[12px] font-medium bg-text-primary text-background rounded-md hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            >
+              {roleSwitching
+                ? "Switching…"
+                : isCreator
+                  ? "Yes, switch to client"
+                  : "Yes, switch to creator"}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Delete Confirmation Modal */}
