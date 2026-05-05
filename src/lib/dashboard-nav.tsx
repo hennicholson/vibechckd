@@ -106,8 +106,8 @@ export const navItems: NavItem[] = [
       </svg>
     ),
     quickActions: [
-      { label: "Open jobs", href: "/jobs" },
-      { label: "My applications", href: "/dashboard/application" },
+      { label: "Open jobs", href: "/jobs?tab=open" },
+      { label: "My applications", href: "/jobs?tab=applied" },
     ],
   },
   {

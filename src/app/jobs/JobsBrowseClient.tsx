@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface JobRow {
   id: string;
@@ -36,17 +37,50 @@ const APP_STATUS_LABEL: Record<MyApplication["applicationStatus"], string> = {
 };
 
 const APP_STATUS_TONE: Record<MyApplication["applicationStatus"], string> = {
-  applied: "text-text-muted bg-surface-muted",
+  applied: "text-text-secondary bg-surface-muted",
   shortlisted: "text-warning bg-warning/10",
   hired: "text-positive bg-positive/10",
   rejected: "text-negative bg-negative/10",
 };
 
+const JOB_STATUS_TONE: Record<JobRow["status"], string> = {
+  open: "text-positive bg-positive/10",
+  closed: "text-text-muted bg-surface-muted",
+  filled: "text-text-primary bg-text-primary/10",
+};
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+type Tab = "open" | "applied";
+
 export default function JobsBrowseClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [myApplications, setMyApplications] = useState<MyApplication[]>([]);
   const [applyEligible, setApplyEligible] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return t === "applied" ? "applied" : "open";
+  });
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    setTab(t === "applied" ? "applied" : "open");
+  }, [searchParams]);
 
   useEffect(() => {
     fetch("/api/jobs")
@@ -59,28 +93,48 @@ export default function JobsBrowseClient() {
       .catch(() => setError("Couldn't load jobs"));
   }, []);
 
+  const counts = useMemo(
+    () => ({ open: jobs?.length ?? 0, applied: myApplications.length }),
+    [jobs, myApplications]
+  );
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    router.replace(url.pathname + url.search);
+  }
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="w-full px-4 md:px-8 pt-4 md:pt-6 pb-8">
-        <div className="mb-8">
-          <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">Job board</p>
-          <h1 className="text-[26px] font-semibold text-text-primary tracking-[-0.02em]">Open jobs</h1>
-          <p className="text-[13px] text-text-secondary mt-1">
-            Briefs from vibechckd-vetted clients. Apply with one click — your profile is sent automatically.
+      <div className="w-full px-4 md:px-8 lg:px-12 pt-4 md:pt-6 pb-12 max-w-[1100px] mx-auto">
+        {/* Hero */}
+        <div className="mb-7">
+          <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">
+            Job board
+          </p>
+          <h1 className="text-[28px] md:text-[32px] font-semibold text-text-primary tracking-[-0.02em] leading-[1.1]">
+            Briefs from vetted clients.
+          </h1>
+          <p className="text-[13px] md:text-[14px] text-text-secondary mt-2 max-w-[560px] leading-relaxed">
+            Apply with one tap — your profile is sent automatically. Track every
+            application + its status here.
           </p>
         </div>
 
+        {/* Vetting prompt */}
         {!applyEligible && (
           <div className="border border-warning/30 bg-warning/5 rounded-[10px] p-4 mb-6">
             <p className="text-[13px] font-medium text-text-primary mb-1">
-              Finish your application to unlock applying
+              Finish your vetting application to start applying
             </p>
             <p className="text-[12px] text-text-muted leading-relaxed mb-3">
-              Only verified creators can apply to jobs. Submit your full vetting application to get listed in the gallery and start applying.
+              Only verified creators can apply to jobs. Once you're approved, your
+              profile is sent automatically with each application.
             </p>
             <Link
               href="/apply"
-              className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium"
+              className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
             >
               Continue your application
             </Link>
@@ -89,95 +143,175 @@ export default function JobsBrowseClient() {
 
         {error && <p className="text-[13px] text-negative mb-4">{error}</p>}
 
+        {/* Tabs — text-only with underline-on-active, matching the browse
+            page treatment so the visual language stays consistent. */}
+        <div className="flex items-center gap-1 mb-6 border-b border-border">
+          {(["open", "applied"] as const).map((t) => {
+            const active = tab === t;
+            const label = t === "open" ? "Open" : "Applied";
+            const count = counts[t];
+            return (
+              <button
+                key={t}
+                onClick={() => switchTab(t)}
+                className={`relative px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+                  active
+                    ? "text-text-primary"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                aria-selected={active}
+              >
+                <span>{label}</span>
+                <span className="ml-1.5 text-[11px] font-mono text-text-muted tabular-nums">
+                  {count}
+                </span>
+                {active && (
+                  <span className="absolute left-3 right-3 -bottom-px h-[1.5px] bg-text-primary" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Loading skeletons (only on initial load) */}
         {jobs === null && (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="border border-border rounded-[10px] h-[100px] animate-pulse bg-surface-muted" />
+              <div
+                key={i}
+                className="border border-border rounded-[10px] h-[100px] animate-pulse bg-surface-muted"
+              />
             ))}
           </div>
         )}
 
-        {jobs && jobs.length === 0 && (
-          <div className="border border-border rounded-[10px] p-8 text-center">
-            <p className="text-[13px] font-medium text-text-primary mb-1">No open briefs</p>
-            <p className="text-[12px] text-text-muted">New ones drop weekly — we&apos;ll ping you.</p>
-          </div>
-        )}
-
-        {jobs && jobs.length > 0 && (
-          <ul className="space-y-3">
-            {jobs.map((j) => (
-              <li key={j.id}>
-                <Link
-                  href={`/jobs/${j.id}`}
-                  className="block border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <p className="text-[14px] font-medium text-text-primary truncate">{j.title}</p>
-                    {j.applied && (
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-positive bg-positive/10 px-2 py-0.5 rounded">
-                        Applied
-                      </span>
-                    )}
-                  </div>
-                  {j.description && (
-                    <p className="text-[12px] text-text-muted line-clamp-2 mb-2">{j.description}</p>
-                  )}
-                  <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted">
-                    {j.projectType && <span>{j.projectType}</span>}
-                    {j.budgetRange && <span>· {j.budgetRange}</span>}
-                    {j.timeline && <span>· {j.timeline}</span>}
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Past + current applications — render only when the creator
-            has any history. Includes closed/filled jobs they applied
-            to so the page is fully inclusive (open feed + their record
-            in one place). Hired/Shortlisted/Not selected badges drive
-            the user's read-at-a-glance status. */}
-        {myApplications.length > 0 && (
-          <section className="mt-12">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[14px] font-medium text-text-primary">Your applications</h2>
-              <span className="text-[11px] font-mono text-text-muted tabular-nums">
-                {myApplications.length} total
-              </span>
-            </div>
-            <ul className="space-y-3">
-              {myApplications.map((a) => (
-                <li key={a.id}>
-                  <Link
-                    href={`/jobs/${a.id}`}
-                    className="block border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-1.5">
-                      <p className="text-[14px] font-medium text-text-primary truncate">{a.title}</p>
-                      <span
-                        className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded ${APP_STATUS_TONE[a.applicationStatus]}`}
-                      >
-                        {APP_STATUS_LABEL[a.applicationStatus]}
-                      </span>
-                    </div>
-                    {a.description && (
-                      <p className="text-[12px] text-text-muted line-clamp-2 mb-2">{a.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted">
-                      {a.projectType && <span>{a.projectType}</span>}
-                      {a.budgetRange && <span>· {a.budgetRange}</span>}
-                      {a.timeline && <span>· {a.timeline}</span>}
-                      {a.status !== "open" && (
-                        <span className="capitalize">· Job {a.status}</span>
+        {/* Open feed */}
+        {jobs !== null && tab === "open" && (
+          <>
+            {jobs.length === 0 ? (
+              <div className="border border-border rounded-[10px] p-8 text-center">
+                <p className="text-[13px] font-medium text-text-primary mb-1">
+                  No open briefs
+                </p>
+                <p className="text-[12px] text-text-muted">
+                  New ones drop weekly — we&apos;ll ping you.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {jobs.map((j) => (
+                  <li key={j.id}>
+                    <Link
+                      href={`/jobs/${j.id}`}
+                      className="group block border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                        <p className="text-[14px] md:text-[15px] font-medium text-text-primary truncate group-hover:underline underline-offset-4 decoration-from-font">
+                          {j.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {j.applied && (
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-positive bg-positive/10 px-2 py-0.5 rounded">
+                              Applied
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded ${JOB_STATUS_TONE[j.status]}`}
+                          >
+                            {j.status}
+                          </span>
+                        </div>
+                      </div>
+                      {j.description && (
+                        <p className="text-[12px] text-text-muted line-clamp-2 mb-2.5">
+                          {j.description}
+                        </p>
                       )}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+                      <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted flex-wrap">
+                        {j.projectType && <span>{j.projectType}</span>}
+                        {j.budgetRange && <span>· {j.budgetRange}</span>}
+                        {j.timeline && <span>· {j.timeline}</span>}
+                        <span className="ml-auto tabular-nums">
+                          Posted {relativeTime(j.createdAt)}
+                        </span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {/* Applied feed */}
+        {jobs !== null && tab === "applied" && (
+          <>
+            {myApplications.length === 0 ? (
+              <div className="border border-border rounded-[10px] p-8 text-center">
+                <p className="text-[13px] font-medium text-text-primary mb-1">
+                  No applications out yet
+                </p>
+                <p className="text-[12px] text-text-muted mb-4">
+                  Browse open briefs and apply — every one shows up here so you
+                  can track its status at a glance.
+                </p>
+                <button
+                  onClick={() => switchTab("open")}
+                  className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Browse open jobs
+                </button>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {myApplications.map((a) => (
+                  <li key={a.id}>
+                    <Link
+                      href={`/jobs/${a.id}`}
+                      className="group block border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                        <p className="text-[14px] md:text-[15px] font-medium text-text-primary truncate group-hover:underline underline-offset-4 decoration-from-font">
+                          {a.title}
+                        </p>
+                        <span
+                          className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded flex-shrink-0 ${APP_STATUS_TONE[a.applicationStatus]}`}
+                        >
+                          {APP_STATUS_LABEL[a.applicationStatus]}
+                        </span>
+                      </div>
+                      {a.description && (
+                        <p className="text-[12px] text-text-muted line-clamp-2 mb-2.5">
+                          {a.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted flex-wrap">
+                        {a.projectType && <span>{a.projectType}</span>}
+                        {a.budgetRange && <span>· {a.budgetRange}</span>}
+                        {a.timeline && <span>· {a.timeline}</span>}
+                        {a.status !== "open" && (
+                          <span className="capitalize">· Job {a.status}</span>
+                        )}
+                        <span className="ml-auto tabular-nums">
+                          Applied {relativeTime(a.appliedAt)}
+                        </span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-[11px] text-text-muted mt-6 text-center">
+              Conversations with each client appear in your{" "}
+              <Link
+                href="/dashboard/inbox"
+                className="underline underline-offset-2 hover:text-text-primary"
+              >
+                inbox
+              </Link>
+              .
+            </p>
+          </>
         )}
       </div>
     </div>

@@ -11,20 +11,6 @@ const TIMELINE: { id: AppStatus; label: string; description: string }[] = [
   { id: "approved", label: "Approved", description: "You're verified — your profile is live in the gallery." },
 ];
 
-type JobAppStatus = "applied" | "shortlisted" | "rejected" | "hired";
-
-interface JobApp {
-  applicationId: string;
-  jobId: string;
-  status: JobAppStatus;
-  pitch: string | null;
-  createdAt: string;
-  jobTitle: string;
-  jobStatus: "open" | "closed" | "filled";
-  jobBudget: string | null;
-  jobProjectType: string | null;
-}
-
 interface Props {
   application: {
     id: string;
@@ -35,21 +21,15 @@ interface Props {
   } | null;
   profileVerified: boolean;
   profileStatus: string | null;
-  jobApplications?: JobApp[];
+  // Kept on the type for back-compat with the server-side caller, but
+  // unused — job applications now live exclusively on /jobs (Applied tab).
+  jobApplications?: unknown[];
 }
-
-const jobAppStatusTone: Record<JobAppStatus, string> = {
-  applied: "text-text-secondary bg-surface-muted",
-  shortlisted: "text-positive bg-positive/10",
-  rejected: "text-negative bg-negative/10",
-  hired: "text-white bg-text-primary",
-};
 
 export default function ApplicationStatusClient({
   application,
   profileVerified,
   profileStatus,
-  jobApplications = [],
 }: Props) {
   if (!application) {
     return (
@@ -71,7 +51,6 @@ export default function ApplicationStatusClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>
-          <JobApplicationsSection items={jobApplications} />
         </div>
       </main>
     );
@@ -196,83 +175,33 @@ export default function ApplicationStatusClient({
           </Link>
         )}
 
-        <JobApplicationsSection items={jobApplications} />
+        {/* Job applications were here previously — they now live on /jobs
+            with proper tabs (Open / Applied) so creators have a single
+            inclusive job-board surface. Pointer kept here so anyone
+            landing on this page still finds them. */}
+        <section id="jobs" className="mt-10 pt-8 border-t border-border scroll-mt-24">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-medium text-text-primary">
+                Job applications
+              </h2>
+              <p className="text-[12px] text-text-muted mt-0.5">
+                Tracked alongside the open feed — see status at a glance.
+              </p>
+            </div>
+            <Link
+              href="/jobs?tab=applied"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-text-primary border border-border rounded-md hover:bg-surface-muted transition-colors flex-shrink-0"
+            >
+              Open job board
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </section>
       </div>
     </main>
-  );
-}
-
-function JobApplicationsSection({ items }: { items: JobApp[] }) {
-  return (
-    <section id="jobs" className="mt-10 pt-8 border-t border-border scroll-mt-24">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-medium text-text-primary">Job applications</h2>
-        <Link
-          href="/jobs"
-          className="text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors"
-        >
-          Browse jobs →
-        </Link>
-      </div>
-      {items.length === 0 ? (
-        <div className="border border-border rounded-[10px] p-5 text-center">
-          <p className="text-[13px] font-medium text-text-primary mb-1">
-            No applications out yet
-          </p>
-          <p className="text-[12px] text-text-muted mb-3">
-            Browse open jobs and apply with one tap — they&apos;ll land here.
-          </p>
-          <Link
-            href="/jobs"
-            className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-          >
-            Browse open jobs
-          </Link>
-        </div>
-      ) : (
-        <ul className="space-y-2.5">
-          {items.map((j) => (
-            <li
-              key={j.applicationId}
-              className="border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <Link
-                  href={`/jobs/${j.jobId}`}
-                  className="text-[13px] font-medium text-text-primary truncate hover:underline underline-offset-2"
-                >
-                  {j.jobTitle}
-                </Link>
-                <span
-                  className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0 ${jobAppStatusTone[j.status]}`}
-                >
-                  {j.status}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted mb-1">
-                {j.jobProjectType && <span>{j.jobProjectType}</span>}
-                {j.jobBudget && <span>· {j.jobBudget}</span>}
-                <span className="ml-auto">
-                  Applied {formatDate(j.createdAt)}
-                </span>
-              </div>
-              {j.jobStatus !== "open" && (
-                <p className="text-[11px] text-text-muted mt-1">
-                  This job is {j.jobStatus}.
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="text-[11px] text-text-muted mt-3 text-center">
-        Conversations with the client about each application appear in your{" "}
-        <Link href="/dashboard/inbox" className="underline underline-offset-2 hover:text-text-primary">
-          inbox
-        </Link>
-        .
-      </p>
-    </section>
   );
 }
 
