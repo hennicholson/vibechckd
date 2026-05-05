@@ -305,7 +305,7 @@ function ClientOverview({ name }: { name: string }) {
       {/* Fixed header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
+          <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
             {getGreeting()}, {name.split(" ")[0]}
           </h1>
           <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-muted px-1.5 py-0.5 rounded">
@@ -486,7 +486,7 @@ function CreatorOverview() {
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.03em]">
+              <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
                 {getGreeting()}, {userName.split(" ")[0]}
               </h1>
               <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-muted px-1.5 py-0.5 rounded">

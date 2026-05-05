@@ -459,20 +459,26 @@ export default function ProjectsPage() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Sticky hero header — bigger title, count subtitle, primary CTA. */}
-      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-5 md:pt-7 pb-3">
-        <div className="flex items-end justify-between gap-3 flex-wrap">
+      {/* Sticky header — same shell every dashboard page uses (px-4
+          md:px-8, pt-4 md:pt-6, pb-3, 20px h1, tracking-[-0.02em])
+          so the title left-edge + baseline lock together when the
+          user navigates between Projects → Earnings → Inbox etc.
+          The count subtitle reads under the title, never widening
+          the header. */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[24px] md:text-[28px] font-semibold text-text-primary tracking-[-0.02em] leading-tight">
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
               Projects
             </h1>
-            <p className="text-[12px] text-text-muted mt-1">
-              {counts.total === 0
-                ? "Nothing in flight yet."
-                : `${counts.total} project${counts.total === 1 ? "" : "s"}${counts.active > 0 ? ` · ${counts.active} active` : ""}`}
-            </p>
+            {counts.total > 0 && (
+              <p className="text-[11px] font-mono text-text-muted mt-0.5 tabular-nums">
+                {counts.total} total
+                {counts.active > 0 ? ` · ${counts.active} active` : ""}
+              </p>
+            )}
           </div>
-          <Button variant="primary" size="sm" onClick={() => router.push("/dashboard/teams/new")}>
+          <Button variant="secondary" size="sm" onClick={() => router.push("/dashboard/teams/new")}>
             Start project
           </Button>
         </div>

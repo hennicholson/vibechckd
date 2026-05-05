@@ -106,21 +106,29 @@ export default function JobsBrowseClient() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="w-full px-4 md:px-8 lg:px-12 pt-4 md:pt-6 pb-12 max-w-[1100px] mx-auto">
-        {/* Hero */}
-        <div className="mb-7">
-          <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">
-            Job board
-          </p>
-          <h1 className="text-[28px] md:text-[32px] font-semibold text-text-primary tracking-[-0.02em] leading-[1.1]">
-            Briefs from vetted clients.
-          </h1>
-          <p className="text-[13px] md:text-[14px] text-text-secondary mt-2 max-w-[560px] leading-relaxed">
-            Apply with one tap — your profile is sent automatically. Track every
-            application + its status here.
-          </p>
-        </div>
+    <div className="w-full h-full flex flex-col">
+      {/* Sticky header — same shell as the rest of the dashboard
+          (Portfolio / Earnings / Inbox / Settings) so the title
+          left-edge + baseline match when navigating between them. */}
+      <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
+        <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
+          Job board
+        </h1>
+        <p className="text-[11px] font-mono text-text-muted mt-0.5 tabular-nums">
+          {jobs === null
+            ? "Loading…"
+            : `${counts.open} open · ${counts.applied} applied`}
+        </p>
+        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-12 pt-3">
+        {/* Lede sentence — gives the page a voice without bloating the
+            sticky header. Sits inline with the body so it scrolls away. */}
+        <p className="text-[13px] text-text-secondary mb-6 max-w-[560px] leading-relaxed">
+          Briefs from vetted clients. Apply with one tap — your profile is sent
+          automatically. Track every application + its status here.
+        </p>
 
         {/* Vetting prompt */}
         {!applyEligible && (

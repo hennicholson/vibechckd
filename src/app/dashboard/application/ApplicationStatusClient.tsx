@@ -37,7 +37,7 @@ export default function ApplicationStatusClient({
         <div className="max-w-2xl">
           <div className="mb-6">
             <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">Application</p>
-            <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.02em]">Ready when you are</h1>
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Ready when you are</h1>
             <p className="text-[13px] text-text-secondary mt-1.5 leading-relaxed">
               Complete the vetting application to unlock your public profile in the gallery.
             </p>
@@ -66,7 +66,7 @@ export default function ApplicationStatusClient({
       <div className="max-w-2xl">
         <div className="mb-7">
           <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted mb-1">Application</p>
-          <h1 className="text-[22px] font-semibold text-text-primary tracking-[-0.02em]">
+          <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
             {statusHeadline(application.status)}
           </h1>
           <p className="text-[13px] text-text-secondary mt-1.5 leading-relaxed">
