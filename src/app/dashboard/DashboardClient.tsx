@@ -51,6 +51,22 @@ type ConversationData = {
   lastMessageAt: string;
 };
 
+type OpenJob = {
+  id: string;
+  title: string;
+  description: string | null;
+  projectType: string | null;
+  budgetRange: string | null;
+  timeline: string | null;
+  createdAt: string;
+  applied: boolean;
+};
+
+// Cap project lists on the overview so the page stays scannable. Anything
+// past this gets a "View all (N) →" footer that drops to /dashboard/projects.
+const MAX_PROJECTS_ON_OVERVIEW = 5;
+const MAX_JOBS_ON_OVERVIEW = 4;
+
 /* ── Profile completion calc ── */
 function calcProfileCompletion(profile: ProfileData | null): number {
   if (!profile) return 0;
@@ -76,6 +92,176 @@ function relativeTime(iso: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
+}
+
+/* ── Shared overview sections ── */
+
+// Renders the "Your projects" block: header with View-all link when the
+// list is longer than the overview cap, dedupe-by-id, sliced to 5,
+// row layout matching the rest of the dashboard. Used by both client
+// and creator overviews so the project surface is identical.
+function ProjectsSection({
+  loading,
+  projects,
+  emptyState,
+}: {
+  loading: boolean;
+  projects: ProjectData[];
+  emptyState: React.ReactNode;
+}) {
+  const deduped = projects.filter(
+    (p, i, arr) => arr.findIndex((x) => x.id === p.id) === i
+  );
+  const visible = deduped.slice(0, MAX_PROJECTS_ON_OVERVIEW);
+  const hasMore = deduped.length > MAX_PROJECTS_ON_OVERVIEW;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] font-mono uppercase text-text-muted">
+          Your projects
+        </p>
+        {deduped.length > 0 && (
+          <Link
+            href="/dashboard/projects"
+            className="text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors"
+          >
+            View all{hasMore ? ` (${deduped.length})` : ""}
+          </Link>
+        )}
+      </div>
+      {loading ? (
+        <div className="border border-border rounded-[10px] p-6">
+          <div className="h-4 w-32 bg-surface-muted rounded animate-pulse" />
+        </div>
+      ) : deduped.length === 0 ? (
+        emptyState
+      ) : (
+        <>
+          <div className="border border-border rounded-[10px] divide-y divide-border">
+            {visible.map((project) => (
+              <Link
+                key={project.id}
+                href={`/dashboard/projects/${project.id}`}
+                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-text-primary truncate">
+                    {project.title}
+                  </p>
+                  <p className="text-[11px] font-mono text-text-muted mt-0.5">
+                    {project.memberCount} member
+                    {project.memberCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <StatusBadge status={project.status} />
+                  <span className="text-[11px] font-mono text-text-muted">
+                    {relativeTime(project.lastActivity)}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {hasMore && (
+            <Link
+              href="/dashboard/projects"
+              className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-text-primary hover:opacity-80 transition-opacity"
+            >
+              View all {deduped.length} projects
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// "New on the job board" — fetches /api/jobs and renders the latest
+// open briefs (capped). Hidden when there's nothing to show, so the
+// section never appears as an empty placeholder. Creator-side only;
+// clients have their own /dashboard/jobs page.
+function JobBoardHighlight() {
+  const [jobs, setJobs] = useState<OpenJob[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/jobs")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const list: OpenJob[] = d?.jobs ?? [];
+        // Newest first — assume API already orders desc, but we sort
+        // defensively so the overview never lies.
+        list.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setJobs(list);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
+  if (jobs.length === 0) return null;
+
+  const visible = jobs.slice(0, MAX_JOBS_ON_OVERVIEW);
+  const hasMore = jobs.length > MAX_JOBS_ON_OVERVIEW;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] font-mono uppercase text-text-muted">
+          New on the job board
+        </p>
+        <Link
+          href="/jobs"
+          className="text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors"
+        >
+          View all{hasMore ? ` (${jobs.length})` : ""}
+        </Link>
+      </div>
+      <div className="border border-border rounded-[10px] divide-y divide-border">
+        {visible.map((j) => (
+          <Link
+            key={j.id}
+            href={`/jobs/${j.id}`}
+            className="flex items-start gap-4 p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-text-primary truncate">
+                {j.title}
+              </p>
+              {j.description && (
+                <p className="text-[11px] text-text-muted line-clamp-1 mt-0.5">
+                  {j.description}
+                </p>
+              )}
+              <div className="flex items-center gap-2 mt-1.5 text-[11px] font-mono text-text-muted">
+                {j.projectType && <span>{j.projectType}</span>}
+                {j.budgetRange && <span>· {j.budgetRange}</span>}
+                {j.timeline && <span>· {j.timeline}</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {j.applied ? (
+                <span className="text-[10px] font-mono uppercase tracking-wider text-positive bg-positive/10 px-2 py-0.5 rounded">
+                  Applied
+                </span>
+              ) : (
+                <span className="text-[11px] font-mono text-text-muted tabular-nums">
+                  {relativeTime(j.createdAt)}
+                </span>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /* ── Status badge ── */
@@ -180,16 +366,13 @@ function ClientOverview({ name }: { name: string }) {
         </div>
       </div>
 
-      {/* Active projects */}
-      <div className="mb-8">
-        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
-          Your projects
-        </p>
-        {loading ? (
-          <div className="border border-border rounded-[10px] p-6">
-            <div className="h-4 w-32 bg-surface-muted rounded animate-pulse" />
-          </div>
-        ) : projects.length === 0 ? (
+      {/* Active projects — capped to 5 with a "View all" footer when
+          the user has more so the overview never becomes an
+          infinite-scroll project list. */}
+      <ProjectsSection
+        loading={loading}
+        projects={projects}
+        emptyState={
           <div className="border border-border rounded-[10px] p-6 text-center">
             <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mx-auto mb-3">
               <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,31 +388,8 @@ function ClientOverview({ name }: { name: string }) {
               Find your first coder
             </Link>
           </div>
-        ) : (
-          <div className="border border-border rounded-[10px] divide-y divide-border">
-            {projects.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((project) => (
-              <Link
-                key={project.id}
-                href={`/dashboard/projects/${project.id}`}
-                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-text-primary truncate">{project.title}</p>
-                  <p className="text-[11px] font-mono text-text-muted mt-0.5">
-                    {project.memberCount} member{project.memberCount !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <StatusBadge status={project.status} />
-                  <span className="text-[11px] font-mono text-text-muted">
-                    {relativeTime(project.lastActivity)}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+        }
+      />
 
       {/* Recent conversations */}
       {conversations.length > 0 && (
@@ -472,75 +632,24 @@ function CreatorOverview() {
         </div>
       )}
 
-      {/* Active projects */}
-      <div className="mb-8">
-        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Projects</p>
-        {projects.length === 0 ? (
+      {/* Active projects — capped + paginated link, same as client view. */}
+      <ProjectsSection
+        loading={false}
+        projects={projects}
+        emptyState={
           <div className="border border-border rounded-[10px] p-6 text-center">
             <p className="text-[13px] text-text-muted">No active projects yet</p>
             <Link href="/browse" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
               Browse the gallery to get discovered
             </Link>
           </div>
-        ) : (
-          <div className="border border-border rounded-[10px] divide-y divide-border">
-            {projects.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((project) => (
-              <Link
-                key={project.id}
-                href={`/dashboard/projects/${project.id}`}
-                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-text-primary truncate">{project.title}</p>
-                  <p className="text-[11px] font-mono text-text-muted mt-0.5">
-                    {project.memberCount} member{project.memberCount !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <StatusBadge status={project.status} />
-                  <span className="text-[11px] font-mono text-text-muted">
-                    {relativeTime(project.lastActivity)}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+        }
+      />
 
-      {/* Quick links */}
-      <div className="border border-border rounded-[10px] p-5">
-        <p className="text-[11px] font-mono uppercase text-text-muted mb-3">Quick links</p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Link
-            href="/dashboard/profile"
-            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
-          >
-            Edit profile
-          </Link>
-          <span className="text-border hidden sm:inline">|</span>
-          <Link
-            href="/dashboard/portfolio"
-            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
-          >
-            Manage portfolio
-          </Link>
-          <span className="text-border hidden sm:inline">|</span>
-          <Link
-            href="/dashboard/earnings"
-            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
-          >
-            Earnings
-          </Link>
-          <span className="text-border hidden sm:inline">|</span>
-          <Link
-            href="/browse"
-            className="text-[12px] text-text-primary underline underline-offset-2 hover:text-accent-hover transition-colors"
-          >
-            Browse gallery
-          </Link>
-        </div>
-      </div>
+      {/* New on the job board — pulls the latest open briefs so creators
+          see fresh opportunities without leaving the overview. */}
+      <JobBoardHighlight />
+
       </div>{/* end scrollable content */}
     </div>
   );
