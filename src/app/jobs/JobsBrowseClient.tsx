@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { containerVariants, itemVariants } from "@/lib/motion";
+import PageIntroOverlay from "@/components/PageIntroOverlay";
+import { usePageIntro } from "@/lib/use-page-intro";
 
 interface JobRow {
   id: string;
@@ -68,6 +70,7 @@ function relativeTime(iso: string | null): string {
 type Tab = "open" | "applied";
 
 export default function JobsBrowseClient() {
+  const [showIntro, doneIntro] = usePageIntro("intro:jobs");
   const router = useRouter();
   const searchParams = useSearchParams();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
@@ -108,7 +111,25 @@ export default function JobsBrowseClient() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col">
+    // `relative` anchors the PageIntroOverlay below — the intro
+    // sits OVER the page shell while it plays, then fades to reveal
+    // the skeleton/data that's already laid out underneath. No cold
+    // layout pop when the lottie finishes.
+    <div className="w-full h-full flex flex-col relative">
+      {/* Intro overlay — only mounts while showIntro is true. Page
+          shell renders concurrently so by the time this fades the
+          skeleton (or data) is ready. */}
+      <AnimatePresence>
+        {showIntro && (
+          <PageIntroOverlay
+            key="jobs-intro"
+            lottiePath="/lottie/jobs-intro.json"
+            wordmark="JOBS"
+            onDone={doneIntro}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sticky header — same shell as the rest of the dashboard
           (Portfolio / Earnings / Inbox / Settings) so the title
           left-edge + baseline match when navigating between them. */}
@@ -116,11 +137,25 @@ export default function JobsBrowseClient() {
         <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
           Job board
         </h1>
-        <p className="text-[11px] font-mono text-text-muted mt-0.5 tabular-nums">
-          {jobs === null
-            ? "Loading…"
-            : `${counts.open} open · ${counts.applied} applied`}
-        </p>
+        <div className="mt-0.5 h-[16px] flex items-center">
+          {jobs === null ? (
+            // Subtle pulsing dot trio instead of "Loading…" so the
+            // counts line doesn't read as a stuck label during fetch.
+            <div className="flex items-center gap-1" aria-label="Loading">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-1 h-1 rounded-full bg-text-muted animate-pulse"
+                  style={{ animationDelay: `${i * 120}ms` }}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] font-mono text-text-muted tabular-nums">
+              {`${counts.open} open · ${counts.applied} applied`}
+            </p>
+          )}
+        </div>
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
@@ -183,29 +218,65 @@ export default function JobsBrowseClient() {
           })}
         </div>
 
-        {/* Loading skeletons (only on initial load) */}
+        {/* Loading skeletons — sit behind the intro overlay while it
+            plays, then become visible the moment the intro fades.
+            Shape matches the real card (title row + description
+            lines + meta row) so the layout doesn't jump when data
+            replaces them. */}
         {jobs === null && (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="border border-border rounded-[10px] h-[100px] animate-pulse bg-surface-muted"
-              />
+                className="border border-border rounded-[10px] p-5"
+                style={{ opacity: 1 - i * 0.08 }}
+              >
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="h-[14px] w-[55%] rounded bg-surface-muted animate-pulse" />
+                  <div className="h-[16px] w-[52px] rounded bg-surface-muted animate-pulse" />
+                </div>
+                <div className="h-[10px] w-[90%] rounded bg-surface-muted animate-pulse mb-1.5" />
+                <div className="h-[10px] w-[70%] rounded bg-surface-muted animate-pulse mb-3" />
+                <div className="flex items-center gap-3">
+                  <div className="h-[10px] w-[64px] rounded bg-surface-muted animate-pulse" />
+                  <div className="h-[10px] w-[80px] rounded bg-surface-muted animate-pulse" />
+                  <div className="h-[10px] w-[72px] rounded bg-surface-muted animate-pulse ml-auto" />
+                </div>
+              </div>
             ))}
           </div>
         )}
 
+        {/* Tab content — wrapped in AnimatePresence so switching
+            between Open / Applied crossfades instead of jumping. */}
+        <AnimatePresence mode="wait" initial={false}>
+
         {/* Open feed */}
         {jobs !== null && tab === "open" && (
-          <>
+          <motion.div
+            key="open-pane"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          >
             {jobs.length === 0 ? (
               <div className="border border-border rounded-[10px] p-8 text-center">
                 <p className="text-[13px] font-medium text-text-primary mb-1">
                   No open briefs
                 </p>
-                <p className="text-[12px] text-text-muted">
-                  New ones drop weekly — we&apos;ll ping you.
+                <p className="text-[12px] text-text-muted mb-4">
+                  New ones drop weekly — we&apos;ll ping you when one lands.
                 </p>
+                {counts.applied > 0 && (
+                  <button
+                    onClick={() => switchTab("applied")}
+                    className="inline-flex items-center h-8 px-3 rounded-md border border-border text-[12px] font-medium text-text-primary hover:bg-surface-muted transition-colors cursor-pointer"
+                  >
+                    View your {counts.applied} application
+                    {counts.applied === 1 ? "" : "s"}
+                  </button>
+                )}
               </div>
             ) : (
               <motion.ul
@@ -256,12 +327,18 @@ export default function JobsBrowseClient() {
                 ))}
               </motion.ul>
             )}
-          </>
+          </motion.div>
         )}
 
         {/* Applied feed */}
         {jobs !== null && tab === "applied" && (
-          <>
+          <motion.div
+            key="applied-pane"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          >
             {myApplications.length === 0 ? (
               <div className="border border-border rounded-[10px] p-8 text-center">
                 <p className="text-[13px] font-medium text-text-primary mb-1">
@@ -323,18 +400,22 @@ export default function JobsBrowseClient() {
                 ))}
               </motion.ul>
             )}
-            <p className="text-[11px] text-text-muted mt-6 text-center">
-              Conversations with each client appear in your{" "}
-              <Link
-                href="/dashboard/inbox"
-                className="underline underline-offset-2 hover:text-text-primary"
-              >
-                inbox
-              </Link>
-              .
-            </p>
-          </>
+            {myApplications.length > 0 && (
+              <p className="text-[11px] text-text-muted mt-6 text-center">
+                Conversations with each client appear in your{" "}
+                <Link
+                  href="/dashboard/inbox"
+                  className="underline underline-offset-2 hover:text-text-primary"
+                >
+                  inbox
+                </Link>
+                .
+              </p>
+            )}
+          </motion.div>
         )}
+
+        </AnimatePresence>
       </div>
     </div>
   );

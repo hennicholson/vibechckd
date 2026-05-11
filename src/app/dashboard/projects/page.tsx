@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import Button from "@/components/Button";
 import { useToast } from "@/components/Toast";
 import { itemVariants, containerVariants } from "@/lib/motion";
+import PageIntroOverlay from "@/components/PageIntroOverlay";
+import { usePageIntro } from "@/lib/use-page-intro";
 
 type ProjectStatus = "draft" | "proposal" | "active" | "review" | "completed" | "cancelled";
 
@@ -319,6 +321,7 @@ function ProjectCard({
 type StatusFilter = "all" | "active" | "completed";
 
 export default function ProjectsPage() {
+  const [showIntro, doneIntro] = usePageIntro("intro:projects");
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -447,7 +450,20 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    // `relative` anchors the PageIntroOverlay below — the intro plays
+    // OVER the page shell so the skeleton + header are already laid
+    // out when it fades. No cold layout pop on completion.
+    <div className="w-full h-full flex flex-col relative">
+      <AnimatePresence>
+        {showIntro && (
+          <PageIntroOverlay
+            key="projects-intro"
+            lottiePath="/lottie/projects-intro.json"
+            wordmark="PROJECTS"
+            onDone={doneIntro}
+          />
+        )}
+      </AnimatePresence>
       {/* Sticky header — same shell every dashboard page uses (px-4
           md:px-8, pt-4 md:pt-6, pb-3, 20px h1, tracking-[-0.02em])
           so the title left-edge + baseline lock together when the

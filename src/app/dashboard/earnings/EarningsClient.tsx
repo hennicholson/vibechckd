@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useToast } from "@/components/Toast";
 import {
   containerVariants,
@@ -12,6 +12,8 @@ import {
   denseContainerVariants,
 } from "@/lib/motion";
 import dynamic from "next/dynamic";
+import PageIntroOverlay from "@/components/PageIntroOverlay";
+import { usePageIntro } from "@/lib/use-page-intro";
 
 // Lazy load Whop Elements to avoid SSR issues
 const WhopWallet = dynamic(() => import("@/components/dashboard/WhopWallet"), {
@@ -278,6 +280,7 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 ];
 
 export default function EarningsPage() {
+  const [showIntro, doneIntro] = usePageIntro("intro:earnings");
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -393,7 +396,20 @@ export default function EarningsPage() {
   const withdrawn = balance?.totalWithdrawnCents || 0;
 
   return (
-    <div className="w-full h-full flex flex-col">
+    // `relative` anchors the PageIntroOverlay below — intro plays
+    // OVER the page shell so the skeleton + balance cards are
+    // already laid out when it fades.
+    <div className="w-full h-full flex flex-col relative">
+      <AnimatePresence>
+        {showIntro && (
+          <PageIntroOverlay
+            key="earnings-intro"
+            lottiePath="/lottie/earnings-intro.json"
+            wordmark="EARNINGS"
+            onDone={doneIntro}
+          />
+        )}
+      </AnimatePresence>
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-center justify-between">

@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { denseContainerVariants, itemVariants } from "@/lib/motion";
 import ProjectChat from "@/components/projects/ProjectChat";
 import { useToast, failed } from "@/components/Toast";
 import { useConversationStream } from "@/lib/use-conversation-stream";
 import { useTypingIndicator } from "@/lib/use-typing-indicator";
+import PageIntroOverlay from "@/components/PageIntroOverlay";
+import { usePageIntro } from "@/lib/use-page-intro";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -846,6 +848,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
 
 
 export default function InboxPage() {
+  const [showIntro, doneIntro] = usePageIntro("intro:inbox");
   const router = useRouter();
   const { toast } = useToast();
   const { data: session } = useSession();
@@ -1045,7 +1048,20 @@ export default function InboxPage() {
   const hasChatOpen = !!selectedId;
 
   return (
-    <div className="flex h-full md:h-[100dvh]">
+    // `relative` anchors the PageIntroOverlay below — intro plays
+    // OVER the inbox shell so the conversation rail + skeleton rows
+    // are already laid out when it fades.
+    <div className="flex h-full md:h-[100dvh] relative">
+      <AnimatePresence>
+        {showIntro && (
+          <PageIntroOverlay
+            key="inbox-intro"
+            lottiePath="/lottie/inbox-intro.json"
+            wordmark="INBOX"
+            onDone={doneIntro}
+          />
+        )}
+      </AnimatePresence>
       {/* ── Conversation list rail ── */}
       <div
         className={`${hasChatOpen ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r-0 md:border-r border-border flex-shrink-0 flex-col h-full bg-background`}
