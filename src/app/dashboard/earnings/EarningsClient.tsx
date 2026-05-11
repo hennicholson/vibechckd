@@ -3,7 +3,14 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { useToast } from "@/components/Toast";
+import {
+  containerVariants,
+  itemVariants,
+  sectionVariants,
+  denseContainerVariants,
+} from "@/lib/motion";
 import dynamic from "next/dynamic";
 
 // Lazy load Whop Elements to avoid SSR issues
@@ -411,13 +418,24 @@ export default function EarningsPage() {
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+      {/* Scrollable content — parent stagger so each block (balance
+          cards row, wallet, how-it-works, transaction list) lifts in
+          one after another. */}
+      <motion.div
+        className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2"
+        initial="hidden"
+        animate="show"
+        variants={containerVariants}
+      >
 
-      {/* Balance cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      {/* Balance cards — inner staggered grid so each metric lifts in
+          rather than all four arriving together. */}
+      <motion.div
+        variants={containerVariants}
+        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+      >
         {/* Available - highlighted */}
-        <div className="border border-border rounded-[10px] p-4 bg-surface-muted">
+        <motion.div variants={itemVariants} className="border border-border rounded-[10px] p-4 bg-surface-muted">
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-text-secondary"><IconWallet /></span>
             <p className="text-[11px] font-mono uppercase text-text-muted">Available</p>
@@ -425,9 +443,9 @@ export default function EarningsPage() {
           <p className="text-[28px] font-semibold text-text-primary tabular-nums tracking-tight">
             {formatCurrency(avail)}
           </p>
-        </div>
+        </motion.div>
 
-        <div className="border border-border rounded-[10px] p-4">
+        <motion.div variants={itemVariants} className="border border-border rounded-[10px] p-4">
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-warning"><IconClock /></span>
             <p className="text-[11px] font-mono uppercase text-text-muted">Pending</p>
@@ -435,9 +453,9 @@ export default function EarningsPage() {
           <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight">
             {formatCurrency(pending)}
           </p>
-        </div>
+        </motion.div>
 
-        <div className="border border-border rounded-[10px] p-4">
+        <motion.div variants={itemVariants} className="border border-border rounded-[10px] p-4">
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-positive"><IconTrendUp /></span>
             <p className="text-[11px] font-mono uppercase text-text-muted">Total earned</p>
@@ -445,9 +463,9 @@ export default function EarningsPage() {
           <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight">
             {formatCurrency(earned)}
           </p>
-        </div>
+        </motion.div>
 
-        <div className="border border-border rounded-[10px] p-4">
+        <motion.div variants={itemVariants} className="border border-border rounded-[10px] p-4">
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-text-muted"><IconArrowDown /></span>
             <p className="text-[11px] font-mono uppercase text-text-muted">Withdrawn</p>
@@ -455,20 +473,20 @@ export default function EarningsPage() {
           <p className="text-[24px] font-semibold text-text-primary tabular-nums tracking-tight">
             {formatCurrency(withdrawn)}
           </p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Settlement note */}
       {(earned > 0 || pending > 0) && (
-        <p className="text-[11px] text-text-muted mb-6 -mt-4">
+        <motion.p variants={itemVariants} className="text-[11px] text-text-muted mb-6 -mt-4">
           Payments typically settle within 2-3 business days before they can be withdrawn.
-        </p>
+        </motion.p>
       )}
 
       {/* Whop Wallet - native balance & withdrawal */}
-      <div id="whop-wallet">
+      <motion.div variants={sectionVariants} id="whop-wallet">
         <WhopWallet availableCents={avail} onWithdrawalComplete={() => { fetchBalance(); fetchTransactions(); }} />
-      </div>
+      </motion.div>
 
       {/* How it works section */}
       {earned === 0 && (
@@ -504,7 +522,7 @@ export default function EarningsPage() {
       )}
 
       {/* Transaction history */}
-      <div id="transactions" className="border border-border rounded-[10px] overflow-hidden scroll-mt-24">
+      <motion.div variants={sectionVariants} id="transactions" className="border border-border rounded-[10px] overflow-hidden scroll-mt-24">
         <div className="px-4 md:px-5 py-4 border-b border-border">
           <div className="flex items-center justify-between">
             <h3 className="text-[14px] font-medium text-text-primary">Transaction history</h3>
@@ -540,13 +558,19 @@ export default function EarningsPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={denseContainerVariants}
+            className="divide-y divide-border"
+          >
             {transactions.map((tx) => {
               const isCredit = tx.amountCents > 0;
               const hasProject = !!tx.projectId;
               return (
-                <div
+                <motion.div
                   key={tx.id}
+                  variants={itemVariants}
                   onClick={() => {
                     if (hasProject) router.push(`/dashboard/projects/${tx.projectId}`);
                   }}
@@ -610,10 +634,10 @@ export default function EarningsPage() {
                       <span className="text-[10px] font-medium capitalize">{tx.status}</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         )}
 
         {/* Pagination */}
@@ -638,9 +662,9 @@ export default function EarningsPage() {
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
 
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
+import { denseContainerVariants, itemVariants } from "@/lib/motion";
 import ProjectChat from "@/components/projects/ProjectChat";
 import { useToast, failed } from "@/components/Toast";
 import { useConversationStream } from "@/lib/use-conversation-stream";
@@ -1145,6 +1146,13 @@ export default function InboxPage() {
               </p>
             </div>
           )}
+          {!isLoading && filtered.length > 0 && (
+            <motion.div
+              key={`list-${unreadOnly}-${search}`}
+              initial="hidden"
+              animate="show"
+              variants={denseContainerVariants}
+            >
           {filtered.map((conv) => {
             const meta = kindMeta(conv);
             const unread = conv.unreadCount > 0 && selectedId !== conv.id;
@@ -1153,8 +1161,9 @@ export default function InboxPage() {
             const titleText = conv.title || "Conversation";
 
             return (
-              <div
+              <motion.div
                 key={conv.id}
+                variants={itemVariants}
                 onClick={() => selectConversation(conv.id)}
                 onMouseEnter={() => setHoveredId(conv.id)}
                 onMouseLeave={() => setHoveredId(null)}
@@ -1249,9 +1258,11 @@ export default function InboxPage() {
                     <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-text-primary flex-shrink-0" />
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
+            </motion.div>
+          )}
         </div>
       </div>
 

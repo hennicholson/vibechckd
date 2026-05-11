@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import Button from "@/components/Button";
 import { useToast } from "@/components/Toast";
+import { itemVariants, containerVariants } from "@/lib/motion";
 
 type ProjectStatus = "draft" | "proposal" | "active" | "review" | "completed" | "cancelled";
 
@@ -208,20 +209,8 @@ function ContextMenu({
 //   [pinned ★]  [👤👤👤+2]  · tags: tag1 tag2
 // ---------------------------------------------------------------------------
 
-// Stagger variants — parent grid sets `staggerChildren`, each card
-// inherits via these variants and lifts in 6px while fading. Subtle
-// enough to feel snappy, layered enough to read as "the cards arrived
-// just now". Same curve as app/template.tsx so cross-page motion is
-// consistent.
-const EASE_OUT_QUART: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const cardVariants = {
-  hidden: { opacity: 0, y: 6 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.32, ease: EASE_OUT_QUART },
-  },
-};
+// Card stagger now imported from the shared motion lib so every
+// dashboard surface uses the same curve + lift distance.
 
 function ProjectCard({
   project,
@@ -234,7 +223,7 @@ function ProjectCard({
 }) {
   return (
     <motion.div
-      variants={cardVariants}
+      variants={itemVariants}
       onClick={onOpen}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => {
@@ -611,10 +600,7 @@ export default function ProjectsPage() {
         <motion.div
           initial="hidden"
           animate="show"
-          variants={{
-            hidden: {},
-            show: { transition: { staggerChildren: 0.045 } },
-          }}
+          variants={containerVariants}
           className="space-y-7"
         >
           {[
@@ -632,7 +618,7 @@ export default function ProjectsPage() {
                   (buckets.other.length > 0 ? 1 : 0) >
                   1 && (
                   <motion.div
-                    variants={cardVariants}
+                    variants={itemVariants}
                     className="flex items-center gap-2 mb-3"
                   >
                     <p className="text-[11px] font-mono uppercase tracking-wider text-text-muted">

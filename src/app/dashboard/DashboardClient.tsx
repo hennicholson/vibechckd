@@ -2,8 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import VerifiedSeal from "@/components/VerifiedSeal";
+import {
+  containerVariants,
+  sectionVariants,
+  itemVariants,
+} from "@/lib/motion";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -318,11 +324,18 @@ function ClientOverview({ name }: { name: string }) {
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+      {/* Scrollable content — wrapped in a stagger container so each
+          section (quick actions row, projects list, conversations)
+          lifts in one after another instead of slamming in together. */}
+      <motion.div
+        className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2"
+        initial="hidden"
+        animate="show"
+        variants={containerVariants}
+      >
 
       {/* Quick actions */}
-      <div className="mb-8">
+      <motion.div variants={sectionVariants} className="mb-8">
         <p className="text-[11px] font-mono uppercase text-text-muted mb-3">
           Quick actions
         </p>
@@ -364,11 +377,12 @@ function ClientOverview({ name }: { name: string }) {
             <p className="text-[11px] text-text-muted mt-0.5">Brief vetted creators — replies in hours.</p>
           </Link>
         </div>
-      </div>
+      </motion.div>
 
       {/* Active projects — capped to 5 with a "View all" footer when
           the user has more so the overview never becomes an
           infinite-scroll project list. */}
+      <motion.div variants={sectionVariants}>
       <ProjectsSection
         loading={loading}
         projects={projects}
@@ -390,10 +404,11 @@ function ClientOverview({ name }: { name: string }) {
           </div>
         }
       />
+      </motion.div>
 
       {/* Recent conversations */}
       {conversations.length > 0 && (
-        <div className="mb-8">
+        <motion.div variants={sectionVariants} className="mb-8">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-mono uppercase text-text-muted">
               Recent conversations
@@ -424,9 +439,9 @@ function ClientOverview({ name }: { name: string }) {
               </Link>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
-      </div>{/* end scrollable content */}
+      </motion.div>{/* end scrollable content */}
     </div>
   );
 }
@@ -514,12 +529,18 @@ function CreatorOverview() {
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
+      {/* Scrollable content — same stagger container pattern as the
+          client overview. */}
+      <motion.div
+        className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2"
+        initial="hidden"
+        animate="show"
+        variants={containerVariants}
+      >
 
       {/* Profile completion card */}
       {isProfileIncomplete && (
-        <div className="border border-border rounded-[10px] p-5 mb-8">
+        <motion.div variants={sectionVariants} className="border border-border rounded-[10px] p-5 mb-8">
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-[13px] font-medium text-text-primary">
@@ -542,11 +563,15 @@ function CreatorOverview() {
               style={{ width: `${completion}%` }}
             />
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Quick stats row -- folder shape cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      {/* Quick stats row -- folder shape cards. Inner staggered grid
+          so each card lifts in one after another, not all at once. */}
+      <motion.div
+        variants={containerVariants}
+        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+      >
         {[
           { label: "Projects", value: String(projects.length), href: "/dashboard/projects" },
           { label: "Portfolio items", value: String(portfolioCount), href: "/dashboard/portfolio" },
@@ -572,18 +597,22 @@ function CreatorOverview() {
             </div>
           );
           return stat.href ? (
-            <Link key={stat.label} href={stat.href} className="group">
-              {folderCard("[&_path]:group-hover:stroke-border-hover")}
-            </Link>
+            <motion.div key={stat.label} variants={itemVariants}>
+              <Link href={stat.href} className="group block">
+                {folderCard("[&_path]:group-hover:stroke-border-hover")}
+              </Link>
+            </motion.div>
           ) : (
-            <div key={stat.label}>{folderCard()}</div>
+            <motion.div key={stat.label} variants={itemVariants}>
+              {folderCard()}
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* Getting started checklist for new/incomplete profiles */}
       {isProfileIncomplete && (
-        <div className="border border-border rounded-[10px] p-5 mb-8">
+        <motion.div variants={sectionVariants} className="border border-border rounded-[10px] p-5 mb-8">
           <h3 className="text-[14px] font-medium text-text-primary mb-3">Get started</h3>
           <div className="space-y-3">
             {[
@@ -629,28 +658,32 @@ function CreatorOverview() {
               </Link>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Active projects — capped + paginated link, same as client view. */}
-      <ProjectsSection
-        loading={false}
-        projects={projects}
-        emptyState={
-          <div className="border border-border rounded-[10px] p-6 text-center">
-            <p className="text-[13px] text-text-muted">No active projects yet</p>
-            <Link href="/browse" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
-              Browse the gallery to get discovered
-            </Link>
-          </div>
-        }
-      />
+      <motion.div variants={sectionVariants}>
+        <ProjectsSection
+          loading={false}
+          projects={projects}
+          emptyState={
+            <div className="border border-border rounded-[10px] p-6 text-center">
+              <p className="text-[13px] text-text-muted">No active projects yet</p>
+              <Link href="/browse" className="text-[12px] text-text-primary underline underline-offset-2 mt-1 inline-block">
+                Browse the gallery to get discovered
+              </Link>
+            </div>
+          }
+        />
+      </motion.div>
 
       {/* New on the job board — pulls the latest open briefs so creators
           see fresh opportunities without leaving the overview. */}
-      <JobBoardHighlight />
+      <motion.div variants={sectionVariants}>
+        <JobBoardHighlight />
+      </motion.div>
 
-      </div>{/* end scrollable content */}
+      </motion.div>{/* end scrollable content */}
     </div>
   );
 }

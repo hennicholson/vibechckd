@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
+import { containerVariants, itemVariants } from "@/lib/motion";
 
 interface JobRow {
   id: string;
@@ -206,9 +208,15 @@ export default function JobsBrowseClient() {
                 </p>
               </div>
             ) : (
-              <ul className="space-y-3">
+              <motion.ul
+                key="open-list"
+                initial="hidden"
+                animate="show"
+                variants={containerVariants}
+                className="space-y-3"
+              >
                 {jobs.map((j) => (
-                  <li key={j.id}>
+                  <motion.li key={j.id} variants={itemVariants}>
                     <Link
                       href={`/jobs/${j.id}`}
                       className="group block border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors"
@@ -244,9 +252,9 @@ export default function JobsBrowseClient() {
                         </span>
                       </div>
                     </Link>
-                  </li>
+                  </motion.li>
                 ))}
-              </ul>
+              </motion.ul>
             )}
           </>
         )}
@@ -271,9 +279,15 @@ export default function JobsBrowseClient() {
                 </button>
               </div>
             ) : (
-              <ul className="space-y-3">
+              <motion.ul
+                key="applied-list"
+                initial="hidden"
+                animate="show"
+                variants={containerVariants}
+                className="space-y-3"
+              >
                 {myApplications.map((a) => (
-                  <li key={a.id}>
+                  <motion.li key={a.id} variants={itemVariants}>
                     <Link
                       href={`/jobs/${a.id}`}
                       className="group block border border-border rounded-[10px] p-5 hover:border-border-hover transition-colors"
@@ -305,9 +319,9 @@ export default function JobsBrowseClient() {
                         </span>
                       </div>
                     </Link>
-                  </li>
+                  </motion.li>
                 ))}
-              </ul>
+              </motion.ul>
             )}
             <p className="text-[11px] text-text-muted mt-6 text-center">
               Conversations with each client appear in your{" "}

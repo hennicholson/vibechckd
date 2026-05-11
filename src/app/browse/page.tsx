@@ -42,8 +42,8 @@ import BrowseSidebar from "@/components/browse/BrowseSidebar";
 import BrowseSearchBar from "@/components/browse/BrowseSearchBar";
 import BrowseCoderCard from "@/components/browse/BrowseCoderCard";
 import BrowseStats from "@/components/browse/BrowseStats";
-import BrowseLoadingLottie from "@/components/browse/BrowseLoadingLottie";
 import BrowseIntroOverlay from "@/components/browse/BrowseIntroOverlay";
+import BrowseSkeletonGrid from "@/components/browse/BrowseSkeletonGrid";
 
 type Filter = "all" | Specialty;
 
@@ -494,12 +494,6 @@ export default function BrowsePage() {
 
   return (
     <div className="h-[100dvh] bg-background flex overflow-hidden">
-      {/* Vetted intro overlay — plays the full check-intro Lottie every
-          time the user enters the gallery. The page underneath renders
-          and starts fetching immediately, so by the time the animation
-          completes the grid usually has data ready to stagger in. */}
-      {!introDone && <BrowseIntroOverlay onDone={() => setIntroDone(true)} />}
-
       <BrowseSidebar
         filter={filter}
         onFilterChange={setFilter}
@@ -577,66 +571,92 @@ export default function BrowsePage() {
             />
           </div>
 
-          {/* Grid */}
-          <div>
-            {fetchError ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]">
-                <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
-                  <svg className="w-5 h-5 text-negative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <p className="text-[13px] font-medium text-text-primary mb-1">Failed to load coders</p>
-                <p className="text-[11px] text-text-muted mb-3">Something went wrong. Please try again.</p>
-                <button
-                  onClick={loadCoders}
-                  className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
+          {/* Grid window — the intro Lottie, skeleton, and real grid
+              all share this slot so one crossfades into the next as a
+              single embedded motion. Sidebar + sticky header stay live
+              behind it the whole time. */}
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              {fetchError ? (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]"
                 >
-                  Retry
-                </button>
-              </div>
-            ) : isLoading ? (
-              // Center-stage Lottie loader instead of the skeleton grid —
-              // the marketplace is the page's protagonist, so the wait
-              // gets one calm focal point, not six placeholder cards.
-              <BrowseLoadingLottie />
-            ) : filteredCoders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]">
-                <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
-                  <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <p className="text-[13px] font-medium text-text-primary mb-1">No matches yet</p>
-                <p className="text-[11px] text-text-muted mb-3">Loosen the filters or check back — we vet new coders weekly.</p>
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setFilter("all");
-                  }}
-                  className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
-                >
-                  Clear filters
-                </button>
-              </div>
-            ) : (
-              <LayoutGroup>
-                <motion.div layout className="grid gap-x-5 gap-y-9 sm:gap-x-6 sm:gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                  <AnimatePresence mode="popLayout">
-                    {filteredCoders.map((coder, i) => (
-                      <BrowseCoderCard
-                        key={coder.id}
-                        coder={coder}
-                        index={i}
-                        onClick={() => setSelectedCoder(coder)}
-                        viewerRole={viewerRole}
-                        onPrimaryAction={handlePrimaryAction}
-                      />
-                    ))}
-                  </AnimatePresence>
+                  <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-negative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <p className="text-[13px] font-medium text-text-primary mb-1">Failed to load coders</p>
+                  <p className="text-[11px] text-text-muted mb-3">Something went wrong. Please try again.</p>
+                  <button
+                    onClick={loadCoders}
+                    className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
                 </motion.div>
-              </LayoutGroup>
-            )}
+              ) : !introDone ? (
+                <BrowseIntroOverlay key="intro" onDone={() => setIntroDone(true)} />
+              ) : isLoading ? (
+                <BrowseSkeletonGrid key="skeleton" />
+              ) : filteredCoders.length === 0 ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col items-center justify-center py-20 text-center border border-border rounded-[10px]"
+                >
+                  <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-[13px] font-medium text-text-primary mb-1">No matches yet</p>
+                  <p className="text-[11px] text-text-muted mb-3">Loosen the filters or check back — we vet new coders weekly.</p>
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilter("all");
+                    }}
+                    className="px-4 h-8 text-[12px] font-medium text-text-primary border border-border rounded-md hover:border-border-hover active:bg-surface-muted transition-colors cursor-pointer"
+                  >
+                    Clear filters
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="grid"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <LayoutGroup>
+                    <motion.div layout className="grid gap-x-5 gap-y-9 sm:gap-x-6 sm:gap-y-10 md:gap-x-8 md:gap-y-12 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                      <AnimatePresence mode="popLayout">
+                        {filteredCoders.map((coder, i) => (
+                          <BrowseCoderCard
+                            key={coder.id}
+                            coder={coder}
+                            index={i}
+                            onClick={() => setSelectedCoder(coder)}
+                            viewerRole={viewerRole}
+                            onPrimaryAction={handlePrimaryAction}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </motion.div>
+                  </LayoutGroup>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Bottom breathing room */}

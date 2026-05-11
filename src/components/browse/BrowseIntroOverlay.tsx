@@ -1,33 +1,19 @@
 "use client";
 
 /**
- * BrowseIntroOverlay — full-viewport "vetted" intro that plays every
- * time the user enters /browse.
+ * BrowseIntroOverlay — vetted-mark intro that plays in the grid window
+ * (not over the whole viewport). Sidebar + sticky header stay live the
+ * whole time, so the entrance feels like content materializing inside
+ * the shell instead of a takeover screen.
  *
- * Why this exists: the verified seal is the entire product proposition
- * for vibechckd. Re-asserting it on every visit is a brand decision —
- * the user explicitly wanted creators + clients reminded of what the
- * checkmark means before they see the gallery.
- *
- * Behaviour:
- *   1. Mounts as a fixed full-screen overlay with bg-background.
- *   2. Plays public/lottie/check-intro.json once (loop: false).
- *   3. When the Lottie's onComplete fires, fades the overlay out
- *      (260ms) and calls onDone() so the parent can mark the
- *      intro complete and render the grid.
- *   4. Hard timeout (3.5s) fires onDone() even if Lottie fails to
- *      load or the JSON fetch errors — never traps the user behind
- *      a blank screen.
- *
- * The browse page renders its content underneath the overlay from
- * the very first paint, so data fetches kick off in parallel with
- * the animation. By the time the overlay fades, the grid usually
- * already has data ready to stagger in.
+ * Sequence: Lottie plays once → "VIBECHCKD" wordmark types in beneath
+ * it → onDone() fires so the parent can crossfade us out into the
+ * skeleton/grid.
  */
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 const Lottie = dynamic(
   () => import("lottie-react").then((m) => m.default),
@@ -35,27 +21,29 @@ const Lottie = dynamic(
 );
 
 interface BrowseIntroOverlayProps {
-  // Called once the intro is fully complete (Lottie finished, fade done,
-  // OR the safety timeout fired). Parent uses this to render the page.
   onDone: () => void;
 }
 
 const HARD_TIMEOUT_MS = 3500;
+const WORDMARK = "VIBECHCKD";
+
+// Wordmark starts mid-Lottie so the brand resolves alongside the mark
+// instead of after it — feels like one continuous motion, not two beats.
+const WORDMARK_DELAY_MS = 550;
+// After the Lottie ends, hold the composed lockup briefly before
+// crossfading into the skeleton/grid.
+const POST_LOTTIE_HOLD_MS = 620;
 
 export default function BrowseIntroOverlay({ onDone }: BrowseIntroOverlayProps) {
   const [data, setData] = useState<unknown | null>(null);
-  const [visible, setVisible] = useState(true);
-  const finishedRef = useRef(false);
+  const [showWordmark, setShowWordmark] = useState(false);
+  const [lottieDone, setLottieDone] = useState(false);
+  const firedRef = useRef(false);
 
-  // Single-shot finish — both the Lottie completion path and the
-  // safety timeout call this; whichever wins wins.
   function finish() {
-    if (finishedRef.current) return;
-    finishedRef.current = true;
-    setVisible(false);
-    // Wait for the fade to settle, then notify the parent. Matches
-    // the AnimatePresence exit duration below.
-    setTimeout(() => onDone(), 280);
+    if (firedRef.current) return;
+    firedRef.current = true;
+    onDone();
   }
 
   useEffect(() => {
@@ -65,51 +53,83 @@ export default function BrowseIntroOverlay({ onDone }: BrowseIntroOverlayProps) 
       .then((json) => {
         if (!cancelled) setData(json);
       })
-      .catch(() => {
-        // If the JSON is unreachable, the timeout below handles us.
-      });
+      .catch(() => {});
 
-    // Safety net: never trap the user. 3.5s is long enough for the
-    // 2.5s animation + a fade, short enough that a failed Lottie
-    // fetch doesn't strand the page.
-    const t = window.setTimeout(finish, HARD_TIMEOUT_MS);
+    const wordmarkTimer = window.setTimeout(
+      () => setShowWordmark(true),
+      WORDMARK_DELAY_MS
+    );
+    const safety = window.setTimeout(finish, HARD_TIMEOUT_MS);
     return () => {
       cancelled = true;
-      window.clearTimeout(t);
+      window.clearTimeout(wordmarkTimer);
+      window.clearTimeout(safety);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!lottieDone) return;
+    const t = window.setTimeout(finish, POST_LOTTIE_HOLD_MS);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lottieDone]);
+
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          key="browse-intro"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-background"
-          role="status"
-          aria-label="Loading vetted creators"
-        >
-          <div className="w-[180px] h-[180px] md:w-[220px] md:h-[220px]">
-            {data ? (
-              <Lottie
-                animationData={data}
-                loop={false}
-                autoplay
-                onComplete={finish}
-              />
-            ) : (
-              <div className="w-full h-full rounded-full bg-surface-muted animate-pulse" />
-            )}
-          </div>
-          <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.18em] text-text-muted">
-            Vetted
-          </p>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+      // min-height fills the visible viewport below the sticky header +
+      // tab row so the Lottie + wordmark land in the user's eye-line
+      // instead of crammed at the top of the grid slot.
+      className="flex flex-col items-center justify-center min-h-[calc(100dvh-220px)] -mt-2"
+      role="status"
+      aria-label="Loading vetted creators"
+    >
+      <div className="w-[180px] h-[180px] md:w-[200px] md:h-[200px]">
+        {data ? (
+          <Lottie
+            animationData={data}
+            loop={false}
+            autoplay
+            onComplete={() => setLottieDone(true)}
+          />
+        ) : (
+          <div className="w-full h-full rounded-full bg-surface-muted animate-pulse" />
+        )}
+      </div>
+
+      {/* Wordmark — letters stagger-fade in part-way through the Lottie
+          so the brand resolves alongside the mark, not after it. */}
+      <div className="-mt-1 h-[18px] flex items-center justify-center overflow-hidden">
+        {showWordmark && (
+          <motion.div
+            className="flex items-center text-[13px] font-semibold tracking-[0.28em] text-text-primary"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.055 } },
+            }}
+            aria-label={WORDMARK}
+          >
+            {WORDMARK.split("").map((char, i) => (
+              <motion.span
+                key={i}
+                variants={{
+                  hidden: { opacity: 0, y: 5 },
+                  show: { opacity: 1, y: 0 },
+                }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="inline-block"
+              >
+                {char}
+              </motion.span>
+            ))}
+          </motion.div>
+        )}
+      </div>
+    </motion.div>
   );
 }
