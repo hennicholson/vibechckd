@@ -386,13 +386,16 @@ export default function CoderProfilePopup({ coder, onClose }: CoderProfilePopupP
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button — floats top right, always reachable */}
+            {/* Close button — floats top right, always reachable. Larger
+                touch target on mobile (44px) since the popup goes
+                full-bleed there; tighter (32px) on sm+ where the modal
+                has visible insets and the chrome can shrink. */}
             <button
               onClick={onClose}
-              className="absolute top-3 right-3 z-20 inline-flex items-center justify-center w-8 h-8 rounded-full bg-background border border-border hover:bg-surface-muted transition-colors cursor-pointer"
+              className="absolute top-3 right-3 z-20 inline-flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-background border border-border hover:bg-surface-muted transition-colors cursor-pointer"
               aria-label="Close"
             >
-              <svg className="w-4 h-4 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <svg className="w-5 h-5 sm:w-4 sm:h-4 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
