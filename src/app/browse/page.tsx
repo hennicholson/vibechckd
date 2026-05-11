@@ -504,23 +504,43 @@ export default function BrowsePage() {
         ref={mainRef}
         className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto"
       >
-        <MobileTopBar
-          filter={filter}
-          onFilterChange={setFilter}
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          totalCount={searchFiltered.length}
-          counts={specialtyCounts}
-        />
+        {/* Chrome (mobile top bar, sticky search/ticker, tab row) is
+            hidden during the intro animation and fades in once the
+            VETTED Lottie + wordmark completes. Keeps the intro
+            uncluttered — one focal mark on stage at a time. */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: introDone ? 1 : 0 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <MobileTopBar
+            filter={filter}
+            onFilterChange={setFilter}
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            totalCount={searchFiltered.length}
+            counts={specialtyCounts}
+          />
+        </motion.div>
 
         {/* Sticky desktop header — solid bg, smooth fade-out beneath.
-            Mirrors the dashboard pattern (DashboardClient.tsx, settings,
-            projects): solid bg-background up top so scrolling content
-            is fully masked, then an absolutely-positioned gradient
-            sliver underneath that fades the bottom edge into transparent
-            so the grid doesn't visually slam into a hard line.
-            No backdrop-blur — keeps the page calm and crisp. */}
-        <div className="hidden md:block sticky top-0 z-20 bg-background">
+            Mirrors the dashboard pattern: solid bg-background up top so
+            scrolling content is fully masked, then an absolutely-
+            positioned gradient sliver underneath that fades the bottom
+            edge into transparent so the grid doesn't visually slam
+            into a hard line. No backdrop-blur — keeps the page calm.
+            Animate opacity only (not y/transform) so position:sticky
+            on the descendant chain isn't broken by a parent transform. */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: introDone ? 1 : 0 }}
+          transition={{
+            duration: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+            delay: introDone ? 0.1 : 0,
+          }}
+          className="hidden md:block sticky top-0 z-20 bg-background"
+        >
           {/* Ticker — full opacity + height when at the top of the page,
               fades + collapses to 0 once the user starts scrolling so
               only the search bar stays locked. The transitions on
@@ -546,13 +566,27 @@ export default function BrowsePage() {
           </div>
           {/* Smooth fade — the strip that hides the abrupt bg edge. */}
           <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
-        </div>
+        </motion.div>
 
         <div className="w-full px-4 md:px-12 lg:px-16 pt-5 md:pt-6 pb-10">
           {/* Lightweight tab row — text-only, underline-on-active.
               "Featured" is the resting state; selecting a discipline
-              filters the grid in place. */}
-          <div className="flex items-center gap-1 mb-10 md:mb-12 -ml-2">
+              filters the grid in place. Fades in after the intro,
+              slightly later than the search bar so the cascade reads
+              top-down: ticker/search → tab row → grid. */}
+          <motion.div
+            initial={false}
+            animate={{
+              opacity: introDone ? 1 : 0,
+              y: introDone ? 0 : -6,
+            }}
+            transition={{
+              duration: 0.45,
+              ease: [0.16, 1, 0.3, 1],
+              delay: introDone ? 0.2 : 0,
+            }}
+            className="flex items-center gap-1 mb-10 md:mb-12 -ml-2"
+          >
             <button
               type="button"
               onClick={() => setFilter("all")}
@@ -569,7 +603,7 @@ export default function BrowsePage() {
               onFilterChange={setFilter}
               counts={specialtyCounts}
             />
-          </div>
+          </motion.div>
 
           {/* Grid window — the intro Lottie, skeleton, and real grid
               all share this slot so one crossfades into the next as a

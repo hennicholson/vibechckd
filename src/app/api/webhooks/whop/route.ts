@@ -138,9 +138,13 @@ async function handlePaymentFailed(payload: Record<string, unknown>): Promise<vo
 
 async function handleInvoiceEvent(
   eventType: string,
-  payload: Record<string, any>
+  payload: Record<string, unknown>
 ) {
-  const whopInvoiceId = payload.data?.id || payload.invoice_id;
+  // The SDK normalizes events under `data`. The legacy `payload.invoice_id`
+  // fallback only fires for ancient payloads that don't reach prod anymore
+  // — dropping it makes the type signature honest and removes a dead path.
+  const data = (payload.data as { id?: string } | undefined) || {};
+  const whopInvoiceId = data.id;
   if (!whopInvoiceId) return;
 
   // Look up the invoice in our table
@@ -406,8 +410,11 @@ async function transferToCreatorLedger(opts: {
   }
 }
 
-async function handlePaymentSucceeded(payload: Record<string, any>) {
-  const data = payload.data || {};
+async function handlePaymentSucceeded(payload: Record<string, unknown>) {
+  // `data` shape varies across event versions — keep the local binding
+  // permissive but the entry-point payload type narrow so signature
+  // expectations at the dispatch boundary stay honest.
+  const data = ((payload.data as Record<string, any>) || {}) as Record<string, any>;
 
   // Try every possible field path for the checkout config ID
   const checkoutId =
@@ -531,8 +538,11 @@ async function handlePaymentSucceeded(payload: Record<string, any>) {
   console.log(`payment.succeeded: transaction ${transaction.id} marked completed`);
 }
 
-async function handleWithdrawalCompleted(payload: Record<string, any>) {
-  const whopWithdrawalId = payload.data?.id || payload.withdrawal_id;
+async function handleWithdrawalCompleted(payload: Record<string, unknown>) {
+  // Drop legacy `|| payload.withdrawal_id` fallback — SDK normalizes
+  // events under `data`. Per audit, the legacy path never fired correctly.
+  const data = (payload.data as { id?: string } | undefined) || {};
+  const whopWithdrawalId = data.id;
   if (!whopWithdrawalId) return;
 
   // Update withdrawal record
@@ -569,10 +579,11 @@ async function handleWithdrawalCompleted(payload: Record<string, any>) {
     );
 }
 
-async function handleWithdrawalFailed(payload: Record<string, any>) {
-  const whopWithdrawalId = payload.data?.id || payload.withdrawal_id;
-  const failureReason =
-    payload.data?.failure_reason || payload.data?.error || "Unknown error";
+async function handleWithdrawalFailed(payload: Record<string, unknown>) {
+  const data =
+    (payload.data as { id?: string; failure_reason?: string; error?: string } | undefined) || {};
+  const whopWithdrawalId = data.id;
+  const failureReason = data.failure_reason || data.error || "Unknown error";
 
   if (!whopWithdrawalId) return;
 
@@ -620,8 +631,8 @@ async function handleWithdrawalFailed(payload: Record<string, any>) {
 //   3. Attempt to claw back the recipient's ledger transfer if we'd already
 //      forwarded their share. If they've already withdrawn from Whop, the
 //      clawback fails — we mark `whop_refund_id` and let ops reconcile.
-async function handleRefund(payload: Record<string, any>): Promise<void> {
-  const data = payload.data || {};
+async function handleRefund(payload: Record<string, unknown>): Promise<void> {
+  const data = ((payload.data as Record<string, any>) || {}) as Record<string, any>;
   const refundId: string | undefined =
     data.id || data.refund_id || payload.refund_id;
   const checkoutId: string | undefined =
@@ -756,10 +767,10 @@ async function handleRefund(payload: Record<string, any>): Promise<void> {
 // transaction so the dashboard can show it, and to attempt a clawback if
 // the dispute resolves as `lost`.
 async function handleDispute(
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   phase: "open" | "update" | "close"
 ): Promise<void> {
-  const data = payload.data || {};
+  const data = ((payload.data as Record<string, any>) || {}) as Record<string, any>;
   const disputeId: string | undefined = data.id || data.dispute_id;
   if (!disputeId) {
     console.warn("dispute webhook: missing dispute id");

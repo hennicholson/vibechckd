@@ -42,4 +42,30 @@
 |----|------|---|-------|------|
 | #10313 | 8:55 PM | 🔵 | Root cause identified for Whop iframe authentication bugs | ~534 |
 | #10202 | 4:47 PM | 🔵 | Production deployment architecture on Netlify with Whop iframe integration | ~607 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10423 | 11:28 PM | 🔄 | Refactored font CSS variables to use Next.js font optimization | ~496 |
+| #10422 | 11:27 PM | 🔄 | Migrated fonts from Google CDN to Next.js self-hosted fonts | ~354 |
+| #10401 | 10:57 PM | 🟣 | Replaced static stats grid with animated live ticker in browse page | ~549 |
+
+### May 3, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10756 | 11:44 PM | 🟣 | Built suite of brand-matched Lottie animations for vibechckd project | ~541 |
+
+### May 4, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10801 | 5:14 PM | 🔵 | Examined framer-motion animation patterns in vibecheck codebase | ~339 |
+
+### May 6, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10970 | 8:37 PM | 🟣 | Restyling task initiated for tighter design system | ~386 |
 </claude-mem-context>

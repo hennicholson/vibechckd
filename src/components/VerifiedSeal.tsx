@@ -1,6 +1,18 @@
+"use client";
+
+import { VerifiedStamp } from "@/components/lottie";
+
 interface VerifiedSealProps {
   className?: string;
-  size?: "xs" | "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  /**
+   * When true, plays the stamp entry animation on mount (drop in + rotate
+   * settle + check stroke-on). Use sparingly — only on prominent moments
+   * (verified-coder profile hero, badge reveal in onboarding). Inline
+   * usage in dense UI (Nav next to wordmark, list cards) should leave
+   * this off and render the static SVG.
+   */
+  animate?: boolean;
 }
 
 const sizeMap = {
@@ -8,9 +20,25 @@ const sizeMap = {
   sm: "w-3.5 h-3.5",
   md: "w-[18px] h-[18px]",
   lg: "w-5 h-5",
+  xl: "w-12 h-12",
 };
 
-export default function VerifiedSeal({ className = "", size = "sm" }: VerifiedSealProps) {
+const lottiePxMap = {
+  xs: 12,
+  sm: 14,
+  md: 18,
+  lg: 20,
+  xl: 48,
+};
+
+export default function VerifiedSeal({
+  className = "",
+  size = "sm",
+  animate = false,
+}: VerifiedSealProps) {
+  if (animate) {
+    return <VerifiedStamp size={lottiePxMap[size]} className={className} />;
+  }
   return (
     <svg
       className={`${sizeMap[size]} ${className}`}

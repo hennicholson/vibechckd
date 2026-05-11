@@ -8,4 +8,17 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #9171 | 5:05 PM | 🔄 | Upload API Route Error Handling and Code Cleanup | ~449 |
+
+### Apr 23, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10018 | 12:37 AM | 🟣 | Comprehensive security hardening across API routes, authentication, and infrastructure | ~1087 |
+| #9971 | 12:05 AM | 🔵 | Security audit identified critical vulnerabilities in vibecheck application | ~721 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11115 | 1:54 AM | 🔴 | IDOR Vulnerability Fixed in Upload Endpoint | ~398 |
 </claude-mem-context>

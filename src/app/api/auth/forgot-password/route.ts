@@ -61,7 +61,11 @@ export async function POST(req: Request) {
         expires,
       });
 
-      const resetUrl = `https://vibechckd.cc/reset-password?token=${rawToken}&email=${encodeURIComponent(normalizedEmail)}`;
+      // Env-aware base URL so reset emails sent from staging/preview
+      // deploys don't redirect users to prod. Matches the fallback used
+      // in register/route.ts and resend-verification/route.ts.
+      const baseUrl = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+      const resetUrl = `${baseUrl}/reset-password?token=${rawToken}&email=${encodeURIComponent(normalizedEmail)}`;
       await emails.passwordReset(normalizedEmail, resetUrl);
     }
 

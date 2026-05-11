@@ -49,12 +49,17 @@ type ProjectData = {
   lastActivity: string;
 };
 
+// Mirrors the unified shape /api/conversations actually returns. The
+// previous type used field names that NEVER match the API response, so
+// the "Recent conversations" panel always rendered empty.
 type ConversationData = {
-  projectId: string;
-  projectName: string;
-  lastMessage: string;
-  lastSenderName: string;
-  lastMessageAt: string;
+  id: string;
+  kind: "dm" | "project" | "job_application";
+  projectId: string | null;
+  title: string | null;
+  lastMessageContent: string | null;
+  lastSenderName: string | null;
+  lastMessageAt: string | null;
 };
 
 type OpenJob = {
@@ -296,11 +301,15 @@ function ClientOverview({ name }: { name: string }) {
   useEffect(() => {
     Promise.all([
       fetch("/api/projects").then((r) => (r.ok ? r.json() : [])),
-      fetch("/api/conversations").then((r) => (r.ok ? r.json() : [])),
+      // /api/conversations returns { conversations: [...] } — NOT a raw
+      // array. Unwrap here so .map() works downstream.
+      fetch("/api/conversations").then((r) =>
+        r.ok ? r.json() : { conversations: [] }
+      ),
     ])
       .then(([p, c]) => {
         setProjects(p);
-        setConversations(c);
+        setConversations(Array.isArray(c) ? c : c?.conversations ?? []);
       })
       .catch((err) => console.error("Failed to load client data:", err))
       .finally(() => setLoading(false));
@@ -421,23 +430,38 @@ function ClientOverview({ name }: { name: string }) {
             </Link>
           </div>
           <div className="border border-border rounded-[10px] divide-y divide-border">
-            {conversations.slice(0, 3).map((convo) => (
-              <Link
-                key={convo.projectId}
-                href={`/dashboard/projects/${convo.projectId}`}
-                className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-text-primary truncate">{convo.projectName}</p>
-                  <p className="text-[11px] text-text-muted mt-0.5 truncate">
-                    {convo.lastSenderName}: {convo.lastMessage}
-                  </p>
-                </div>
-                <span className="text-[11px] font-mono text-text-muted flex-shrink-0 ml-3">
-                  {relativeTime(convo.lastMessageAt)}
-                </span>
-              </Link>
-            ))}
+            {conversations.slice(0, 3).map((convo) => {
+              // Route DMs to /dashboard/inbox?c=<id>, projects to the
+              // project page. Title falls back gracefully when unset.
+              const href =
+                convo.kind === "project" && convo.projectId
+                  ? `/dashboard/projects/${convo.projectId}`
+                  : `/dashboard/inbox?c=${convo.id}`;
+              const title = convo.title || "Conversation";
+              const preview = convo.lastMessageContent || "No messages yet";
+              return (
+                <Link
+                  key={convo.id}
+                  href={href}
+                  className="flex items-center justify-between p-4 hover:bg-background-alt transition-colors first:rounded-t-[10px] last:rounded-b-[10px]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-text-primary truncate">
+                      {title}
+                    </p>
+                    <p className="text-[11px] text-text-muted mt-0.5 truncate">
+                      {convo.lastSenderName ? `${convo.lastSenderName}: ` : ""}
+                      {preview}
+                    </p>
+                  </div>
+                  {convo.lastMessageAt && (
+                    <span className="text-[11px] font-mono text-text-muted flex-shrink-0 ml-3">
+                      {relativeTime(convo.lastMessageAt)}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </motion.div>
       )}
@@ -610,56 +634,142 @@ function CreatorOverview() {
         })}
       </motion.div>
 
-      {/* Getting started checklist for new/incomplete profiles */}
-      {isProfileIncomplete && (
-        <motion.div variants={sectionVariants} className="border border-border rounded-[10px] p-5 mb-8">
-          <h3 className="text-[14px] font-medium text-text-primary mb-3">Get started</h3>
-          <div className="space-y-3">
-            {[
-              {
-                href: "/dashboard/profile",
-                done: !!(profile?.displayName && profile?.bio && profile?.tagline),
-                title: "Complete your profile",
-                desc: "Add bio, specialties, rate, and social links",
-              },
-              {
-                href: "/dashboard/portfolio",
-                done: portfolioCount > 0,
-                title: "Add your first project",
-                desc: "Upload portfolio work with live previews and assets",
-              },
-              {
-                href: "/browse",
-                done: false,
-                title: "Browse the gallery",
-                desc: "See how other verified coders present their work",
-              },
-            ].map((step, i) => (
-              <Link key={i} href={step.href} className="flex items-center gap-3 group">
-                <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
-                  step.done
-                    ? "border-text-primary bg-text-primary"
-                    : "border-border group-hover:border-text-primary"
-                }`}>
-                  {step.done ? (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <span className="text-[10px] font-mono text-text-muted">{i + 1}</span>
-                  )}
+      {/* Profile-completion checklist — granular, ordered: incomplete
+          items first (with a deep link), completed items collapsed
+          underneath. Progress bar up top shows how close to "VETTED-
+          ready" the creator is. */}
+      {isProfileIncomplete && (() => {
+        // Per-field readiness so each checkbox links to the exact tab
+        // that fixes it. Order matters: avatar / displayName are the
+        // strongest signals on the public profile, portfolio is the
+        // proof, social/bio round it out.
+        type Step = { key: string; href: string; done: boolean; title: string; desc: string };
+        const steps: Step[] = [
+          {
+            key: "avatar",
+            href: "/dashboard/profile",
+            done: !!profile?.avatarUrl,
+            title: "Add a profile photo",
+            desc: "A real face nearly triples message-back rates.",
+          },
+          {
+            key: "tagline",
+            href: "/dashboard/profile",
+            done: !!profile?.tagline,
+            title: "Write a one-line tagline",
+            desc: "How clients describe you in a sentence — e.g. \"Vibe coder for fintech founders.\"",
+          },
+          {
+            key: "bio",
+            href: "/dashboard/profile",
+            done: !!profile?.bio,
+            title: "Tell your story",
+            desc: "A short bio — what you build, who you build it for.",
+          },
+          {
+            key: "specialties",
+            href: "/dashboard/profile",
+            done: (profile?.specialties?.length ?? 0) > 0,
+            title: "Pick your specialties",
+            desc: "Helps clients filter and the algorithm match you to briefs.",
+          },
+          {
+            key: "rate",
+            href: "/dashboard/profile",
+            done: !!profile?.hourlyRate,
+            title: "Set an hourly rate",
+            desc: "Clients trust priced creators more than \"DM for rates.\"",
+          },
+          {
+            key: "portfolio",
+            href: "/dashboard/portfolio",
+            done: portfolioCount > 0,
+            title: "Add a portfolio project",
+            desc: "Live previews + assets — the work IS the proof.",
+          },
+        ];
+        const doneCount = steps.filter((s) => s.done).length;
+        const pending = steps.filter((s) => !s.done);
+        const done = steps.filter((s) => s.done);
+        const pct = Math.round((doneCount / steps.length) * 100);
+
+        return (
+          <motion.div variants={sectionVariants} className="border border-border rounded-[12px] p-5 mb-8 overflow-hidden">
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="text-[14px] font-medium text-text-primary">Get vetted-ready</h3>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted tabular-nums">
+                {doneCount} / {steps.length} · {pct}%
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="relative h-1 bg-surface-muted rounded-full overflow-hidden mb-1">
+              <motion.div
+                key={`bar-${doneCount}`}
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                className="absolute inset-y-0 left-0 bg-text-primary rounded-full"
+              />
+            </div>
+            <p className="text-[11px] text-text-muted mb-4 leading-relaxed">
+              {pct < 50
+                ? "A complete profile is the difference between getting messages and being scrolled past."
+                : pct < 100
+                ? "Almost there — a few more pieces and your profile is hire-ready."
+                : "Looking good — double-check, then submit for review."}
+            </p>
+
+            {/* Pending steps — primary surface */}
+            <div className="space-y-1">
+              {pending.map((step) => (
+                <Link
+                  key={step.key}
+                  href={step.href}
+                  className="flex items-start gap-3 p-2 -mx-2 rounded-md hover:bg-surface-muted/60 transition-colors group"
+                >
+                  <div className="w-5 h-5 rounded-full border border-border flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:border-text-primary transition-colors">
+                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted group-hover:bg-text-primary transition-colors" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] text-text-primary leading-tight">
+                      {step.title}
+                    </p>
+                    <p className="text-[11px] text-text-muted leading-relaxed mt-0.5">
+                      {step.desc}
+                    </p>
+                  </div>
+                  <svg className="w-3 h-3 text-text-muted/40 group-hover:text-text-primary transition-colors mt-1.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              ))}
+            </div>
+
+            {/* Completed steps — collapsed strip so the eye doesn't
+                linger on what's done. */}
+            {done.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-border/60">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-text-muted mb-2">
+                  Done
+                </p>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {done.map((step) => (
+                    <span
+                      key={step.key}
+                      className="inline-flex items-center gap-1 text-[11px] text-text-muted bg-surface-muted/70 rounded-full px-2 py-0.5"
+                    >
+                      <svg className="w-2.5 h-2.5 text-positive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {step.title.replace(/^(Add|Write|Tell|Pick|Set) /, "")}
+                    </span>
+                  ))}
                 </div>
-                <div>
-                  <p className={`text-[13px] group-hover:underline ${step.done ? "text-text-muted line-through" : "text-text-primary"}`}>
-                    {step.title}
-                  </p>
-                  <p className="text-[11px] text-text-muted">{step.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </motion.div>
-      )}
+              </div>
+            )}
+          </motion.div>
+        );
+      })()}
 
       {/* Active projects — capped + paginated link, same as client view. */}
       <motion.div variants={sectionVariants}>

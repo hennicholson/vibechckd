@@ -17,12 +17,21 @@ import { notifyWhopUsers } from "@/lib/whop-notifications";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const sendSchema = z.object({
-  content: z.string().min(1).max(8000),
-  messageType: z.enum(["text", "file", "system", "ai", "invoice"]).default("text"),
-  fileUrl: z.string().url().optional().nullable(),
-  invoiceId: z.string().uuid().optional().nullable(),
-});
+// User-writable message types only. `system`, `ai`, and `invoice` are
+// server-emitted — invoices are created by /api/invoices which writes the
+// chat row itself, and system banners are written by webhooks. Accepting
+// these from a user lets them impersonate the system banner ("PAYMENT
+// RECEIVED" etc.) or attach an unrelated invoice card to a thread.
+//
+// `.strict()` rejects any unknown key (including `invoiceId` which used
+// to be accepted-and-silently-ignored). Belt + suspenders.
+const sendSchema = z
+  .object({
+    content: z.string().min(1).max(8000),
+    messageType: z.enum(["text", "file"]).default("text"),
+    fileUrl: z.string().url().optional().nullable(),
+  })
+  .strict();
 
 // GET messages in a conversation. Cursor pagination on (created_at, id) so
 // the inbox can scroll back into history without skipping rows that share
@@ -162,7 +171,10 @@ export async function POST(
       content: parsed.data.content,
       messageType: parsed.data.messageType,
       fileUrl: parsed.data.fileUrl ?? null,
-      invoiceId: parsed.data.invoiceId ?? null,
+      // invoiceId is never set on the user POST path. Invoice cards are
+      // created by /api/invoices which inserts its own message row with
+      // messageType="invoice" + invoiceId set server-side.
+      invoiceId: null,
     })
     .returning({
       id: messages.id,
@@ -217,8 +229,6 @@ export async function POST(
       const preview =
         messageType === "file"
           ? `${senderName} shared a file`
-          : messageType === "invoice"
-          ? `${senderName} sent an invoice`
           : messageBody.slice(0, 140);
       const [convRow] = await db
         .select({ kind: conversations.kind })

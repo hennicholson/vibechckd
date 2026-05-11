@@ -81,9 +81,14 @@ export default function BrowseIntroOverlay({ onDone }: BrowseIntroOverlayProps) 
       exit={{ opacity: 0 }}
       transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
       // min-height fills the visible viewport below the sticky header +
-      // tab row so the Lottie + wordmark land in the user's eye-line
-      // instead of crammed at the top of the grid slot.
-      className="flex flex-col items-center justify-center min-h-[calc(100dvh-220px)] -mt-2"
+      // tab row. Negative margin nudges the lockup up so the Lottie +
+      // wordmark sit slightly above the geometric center — feels more
+      // intentional than dead-center, and accounts for the chrome that
+      // fades in beneath after the intro completes. Mobile uses a
+      // gentler offset (-mt-12) because small viewports already
+      // squeeze the available vertical space — too aggressive a
+      // negative margin on a 375x667 phone clipped the Lottie top.
+      className="flex flex-col items-center justify-center min-h-[calc(100dvh-220px)] -mt-12 md:-mt-28"
       role="status"
       aria-label="Loading vetted creators"
     >

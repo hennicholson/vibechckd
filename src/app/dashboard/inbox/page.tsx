@@ -265,10 +265,13 @@ function InboxMenu({ onOpenContacts }: { onOpenContacts: () => void }) {
     }
   };
 
+  // Creator-marketplace voice — "Available / Selective / Away" reads
+  // like LinkedIn. These map 1:1 to the DB enum values but speak to
+  // what a vibe-coder cares about: taking work, picky, or off-grid.
   const statuses = [
-    { value: "available", label: "Available", color: "#22c55e" },
-    { value: "selective", label: "Selective", color: "#f59e0b" },
-    { value: "unavailable", label: "Away", color: "#a3a3a3" },
+    { value: "available", label: "Taking work", color: "#22c55e" },
+    { value: "selective", label: "Picky right now", color: "#f59e0b" },
+    { value: "unavailable", label: "Off-grid", color: "#a3a3a3" },
   ];
 
   return (
@@ -414,10 +417,10 @@ function NotificationPrompt({ onDismiss }: { onDismiss: () => void }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-medium text-text-primary mb-1">
-            Hear when it happens
+            Don&apos;t miss a beat
           </p>
           <p className="text-[12px] text-text-muted leading-relaxed mb-3">
-            We&apos;ll ping you when a project message or invoice lands. No marketing, ever.
+            Get notified the moment a message, invoice, or payment lands. We&apos;ll never use it for marketing.
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -517,10 +520,33 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
   });
 
   useEffect(() => {
-    // 3s poll — SSE bus is in-process and won't cross Netlify lambdas, so
-    // polling is the reliable path. SSE stays as a same-instance upgrade.
-    const interval = setInterval(fetchMessages, 3_000);
-    return () => clearInterval(interval);
+    // Adaptive polling. Three regimes:
+    //   - tab hidden: pause entirely (no work while the user can't see)
+    //   - tab visible: 3s, reliable across Netlify lambdas (SSE bus is
+    //     in-process and won't cross instances)
+    // The `visibilitychange` listener re-arms the interval on return so
+    // messages catch up immediately when the user comes back.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (interval) return;
+      fetchMessages();
+      interval = setInterval(fetchMessages, 3_000);
+    };
+    const stop = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") stop();
+      else start();
+    };
+    if (document.visibilityState !== "hidden") start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [fetchMessages]);
 
   // Auto-scroll. Two passes:
@@ -702,7 +728,7 @@ function DMChat({ threadId, otherUserName }: { threadId: string; otherUserName: 
             <ChatBubbleIcon />
             <div className="text-center">
               <p className="text-[14px] font-medium text-text-primary">Say hi to {otherUserName}</p>
-              <p className="text-[13px] text-text-muted mt-0.5">Drop a line — they&apos;ll see it the moment you hit send.</p>
+              <p className="text-[13px] text-text-muted mt-0.5 max-w-[260px]">Send a message, share work, or drop an invoice — they&apos;ll see it instantly.</p>
             </div>
           </div>
         )}
@@ -912,18 +938,36 @@ export default function InboxPage() {
     fetchConversations();
   }, [fetchConversations]);
 
-  // Refetch on focus + low-frequency poll. SSE on the SELECTED conversation
-  // updates the chat panel directly; this loop just refreshes the rail.
+  // Refetch on focus + adaptive poll for the rail. Same shape as the
+  // message poll above: pause when hidden, resume on visibility. The
+  // 15s cadence (up from 5s) is still tight enough that "thread you
+  // were just messaged in" floats to the top within one tick.
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (interval) return;
+      interval = setInterval(fetchConversations, 15_000);
+    };
+    const stop = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
     const onFocus = () => fetchConversations();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") stop();
+      else {
+        fetchConversations();
+        start();
+      }
+    };
     window.addEventListener("focus", onFocus);
-    // 5s poll — list-level updates are less time-critical than message
-    // arrivals; tighter than messages would be wasteful with the LATERAL
-    // join doing a full re-scan each time.
-    const interval = setInterval(fetchConversations, 5_000);
+    document.addEventListener("visibilitychange", onVisibility);
+    if (document.visibilityState !== "hidden") start();
     return () => {
       window.removeEventListener("focus", onFocus);
-      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stop();
     };
   }, [fetchConversations]);
 
@@ -1153,12 +1197,12 @@ export default function InboxPage() {
             <div className="px-4 py-10 text-center">
               <ChatBubbleIcon />
               <p className="text-[13px] text-text-primary font-medium mt-3 mb-1">
-                {search.trim() ? "Nothing matches that" : "Your inbox is clear"}
+                {search.trim() ? "Nothing matches" : "All caught up"}
               </p>
               <p className="text-[12px] text-text-muted leading-relaxed max-w-[260px] mx-auto">
                 {search.trim()
-                  ? "Try a looser query."
-                  : "Start a DM with a coder, post a job, or join a project — threads land here."}
+                  ? "Try a different search or clear it to see everything."
+                  : "Threads land here when you message a creator, accept a brief, or join a project."}
               </p>
             </div>
           )}
@@ -1271,7 +1315,14 @@ export default function InboxPage() {
                   </div>
 
                   {unread && (
-                    <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-text-primary flex-shrink-0" />
+                    // Numeric badge — caps at "9+" so a thread with 47
+                    // unread messages doesn't widen the rail. Previously
+                    // this was a 1.5×1.5 dot which couldn't communicate
+                    // urgency between threads ("2 unread" vs "20 unread"
+                    // looked identical).
+                    <span className="ml-1.5 mt-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-text-primary text-background text-[10px] font-mono font-medium tabular-nums flex-shrink-0">
+                      {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+                    </span>
                   )}
                 </div>
               </motion.div>
@@ -1479,8 +1530,11 @@ function EmptyState({
           {recent.length === 0 ? (
             <div className="flex flex-col items-center py-8 text-center">
               <ChatBubbleIcon />
-              <span className="text-[13px] text-text-muted mt-3">
-                No threads yet
+              <p className="text-[13px] font-medium text-text-primary mt-3 mb-1">
+                Pick a chat to get going
+              </p>
+              <span className="text-[12px] text-text-muted max-w-[240px] leading-relaxed">
+                Conversations from clients, project teams, and job briefs will live here.
               </span>
             </div>
           ) : (

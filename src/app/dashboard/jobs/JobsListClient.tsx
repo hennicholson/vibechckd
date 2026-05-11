@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { containerVariants, itemVariants } from "@/lib/motion";
+import { useToast, failed } from "@/components/Toast";
 
 interface JobRow {
   id: string;
@@ -16,10 +19,16 @@ interface JobRow {
   applicantCount: number;
 }
 
-const statusTone: Record<JobRow["status"], string> = {
+const STATUS_TONE: Record<JobRow["status"], string> = {
   open: "text-positive bg-positive/10",
-  closed: "text-negative bg-negative/10",
+  closed: "text-text-muted bg-surface-muted",
   filled: "text-text-primary bg-text-primary/10",
+};
+
+const STATUS_LABEL: Record<JobRow["status"], string> = {
+  open: "Open",
+  closed: "Closed",
+  filled: "Hired",
 };
 
 function relativeTime(iso: string): string {
@@ -35,23 +44,31 @@ function relativeTime(iso: string): string {
   return `${months}mo ago`;
 }
 
-type StatusFilter = "all" | "open" | "closed" | "filled";
+type Tab = "open" | "closed" | "filled" | "all";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "open", label: "Open" },
+  { key: "filled", label: "Hired" },
+  { key: "closed", label: "Closed" },
+  { key: "all", label: "All" },
+];
 
 export default function JobsListClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+  const [tab, setTab] = useState<Tab>(() => {
     const s = searchParams.get("status");
     if (s === "open" || s === "closed" || s === "filled") return s;
-    return "all";
+    return "open";
   });
 
   useEffect(() => {
     const s = searchParams.get("status");
-    setStatusFilter(
-      s === "open" || s === "closed" || s === "filled" ? s : "all"
+    setTab(
+      s === "open" || s === "closed" || s === "filled" ? s : "open"
     );
   }, [searchParams]);
 
@@ -59,139 +76,264 @@ export default function JobsListClient() {
     fetch("/api/jobs")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setJobs(d?.jobs ?? []))
-      .catch(() => setError("Couldn't load jobs"));
-  }, []);
+      .catch(() => {
+        const msg = failed("load your jobs");
+        setError(msg);
+        toast(msg, "error");
+      });
+  }, [toast]);
+
+  // Counts roll up the full job list — the tab badges should reflect
+  // the total, not whatever the current filter is. Memoized so we
+  // don't recompute on every render.
+  const counts = useMemo(() => {
+    const base = { open: 0, closed: 0, filled: 0, all: 0 };
+    if (!jobs) return base;
+    base.all = jobs.length;
+    for (const j of jobs) base[j.status]++;
+    return base;
+  }, [jobs]);
 
   const visibleJobs =
-    jobs && statusFilter !== "all"
-      ? jobs.filter((j) => j.status === statusFilter)
-      : jobs;
+    jobs && tab !== "all" ? jobs.filter((j) => j.status === tab) : jobs;
+
+  // Aggregate applicant counts across visible jobs — surfaces "you have
+  // 7 people waiting on you" in the sticky header so the client knows
+  // there's stuff to decide on.
+  const pendingApplicants = useMemo(() => {
+    if (!jobs) return 0;
+    return jobs
+      .filter((j) => j.status === "open")
+      .reduce((sum, j) => sum + j.applicantCount, 0);
+  }, [jobs]);
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "open") url.searchParams.delete("status");
+    else url.searchParams.set("status", next);
+    router.replace(url.pathname + (url.search || ""));
+  }
 
   return (
     <div className="max-w-3xl h-full flex flex-col">
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Jobs</h1>
-            <p className="text-[12px] text-text-muted mt-0.5">
-              Post a brief and we&apos;ll route vetted creators to your inbox.
-            </p>
+          <div className="min-w-0">
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
+              Your jobs
+            </h1>
+            <div className="mt-0.5 h-[16px] flex items-center">
+              {jobs === null ? (
+                <div className="flex items-center gap-1" aria-label="Loading">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="w-1 h-1 rounded-full bg-text-muted animate-pulse"
+                      style={{ animationDelay: `${i * 120}ms` }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] font-mono text-text-muted tabular-nums">
+                  {counts.open} open
+                  {pendingApplicants > 0 && (
+                    <>
+                      {" · "}
+                      <span className="text-text-primary">
+                        {pendingApplicants} waiting on you
+                      </span>
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
           <Link
             href="/dashboard/jobs/new"
-            className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 min-h-[36px] px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity flex-shrink-0"
           >
-            Post a job
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            Post a brief
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4v16m8-8H4"
+              />
             </svg>
           </Link>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-b from-background to-transparent pointer-events-none translate-y-full" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-6 pt-2">
-        {/* Status filter pills — also driven by sidebar quick actions
-            (?status=open|closed). Reset to All via the same control. */}
-        <div className="flex items-center gap-1.5 mb-4">
-          {(["all", "open", "closed", "filled"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                setStatusFilter(s);
-                const url = new URL(window.location.href);
-                if (s === "all") url.searchParams.delete("status");
-                else url.searchParams.set("status", s);
-                router.replace(url.pathname + (url.search || ""));
-              }}
-              className={`text-[11px] font-medium px-2 py-0.5 rounded-md cursor-pointer transition-colors capitalize ${
-                statusFilter === s
-                  ? "bg-[#171717] text-white"
-                  : "bg-surface-muted text-text-muted hover:text-text-secondary"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-12 pt-3">
+        {/* Lede — sets expectations, mirrors creator side voice. */}
+        <p className="text-[13px] text-text-secondary mb-6 max-w-[560px] leading-relaxed">
+          Post a brief and we&apos;ll route vetted creators straight to your
+          inbox. Decide who&apos;s a fit here — shortlist, pass, or hire.
+        </p>
+
+        {/* Tabs — text-only with underline-on-active, matching the
+            creator-side /jobs treatment. Pulls double duty as status
+            filter and is driven by ?status= for sidebar deep-links. */}
+        <div className="flex items-center gap-1 mb-6 border-b border-border overflow-x-auto -mx-1 px-1 scrollbar-hide">
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => switchTab(t.key)}
+                className={`relative px-3 py-2 min-h-[40px] text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                  active
+                    ? "text-text-primary"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                aria-selected={active}
+              >
+                <span>{t.label}</span>
+                <span className="ml-1.5 text-[11px] font-mono text-text-muted tabular-nums">
+                  {counts[t.key]}
+                </span>
+                {active && (
+                  <span className="absolute left-3 right-3 -bottom-px h-[1.5px] bg-text-primary" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {error && <p className="text-[13px] text-negative">{error}</p>}
+        {error && (
+          <p className="text-[13px] text-negative mb-4 font-mono">{error}</p>
+        )}
 
+        {/* Loading skeleton mirrors real card shape. */}
         {jobs === null && (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="border border-border rounded-[10px] h-[80px] animate-pulse bg-surface-muted" />
+              <div
+                key={i}
+                className="border border-border rounded-[10px] p-4"
+                style={{ opacity: 1 - i * 0.1 }}
+              >
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="h-[14px] w-[55%] rounded bg-surface-muted animate-pulse" />
+                  <div className="h-[16px] w-[52px] rounded bg-surface-muted animate-pulse" />
+                </div>
+                <div className="h-[10px] w-[90%] rounded bg-surface-muted animate-pulse mb-1.5" />
+                <div className="h-[10px] w-[70%] rounded bg-surface-muted animate-pulse mb-3" />
+                <div className="flex items-center gap-3">
+                  <div className="h-[10px] w-[64px] rounded bg-surface-muted animate-pulse" />
+                  <div className="h-[10px] w-[80px] rounded bg-surface-muted animate-pulse" />
+                  <div className="h-[10px] w-[72px] rounded bg-surface-muted animate-pulse ml-auto" />
+                </div>
+              </div>
             ))}
           </div>
         )}
 
-        {jobs && jobs.length === 0 && (
-          <div className="border border-border rounded-[10px] p-8 text-center">
-            <p className="text-[13px] font-medium text-text-primary mb-1">No jobs posted yet</p>
-            <p className="text-[12px] text-text-muted mb-4">
-              Post a brief to get matched with vetted creators.
-            </p>
-            <Link
-              href="/dashboard/jobs/new"
-              className="inline-flex items-center h-9 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium"
+        <AnimatePresence mode="wait" initial={false}>
+          {jobs !== null && (
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             >
-              Post your first job
-            </Link>
-          </div>
-        )}
-
-        {visibleJobs && jobs && jobs.length > 0 && visibleJobs.length === 0 && (
-          <p className="text-[12px] text-text-muted">
-            No {statusFilter} jobs.{" "}
-            <button
-              onClick={() => {
-                setStatusFilter("all");
-                const url = new URL(window.location.href);
-                url.searchParams.delete("status");
-                router.replace(url.pathname);
-              }}
-              className="underline cursor-pointer hover:text-text-primary"
-            >
-              Show all
-            </button>
-          </p>
-        )}
-
-        {visibleJobs && visibleJobs.length > 0 && (
-          <ul className="space-y-3">
-            {visibleJobs.map((j) => (
-              <li key={j.id}>
-                <Link
-                  href={`/dashboard/jobs/${j.id}`}
-                  className="block border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <p className="text-[14px] font-medium text-text-primary truncate">{j.title}</p>
-                    <span
-                      className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded ${statusTone[j.status]}`}
-                    >
-                      {j.status}
-                    </span>
-                  </div>
-                  {j.description && (
-                    <p className="text-[12px] text-text-muted line-clamp-2 mb-2">{j.description}</p>
-                  )}
-                  <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted">
-                    {j.projectType && <span>{j.projectType}</span>}
-                    {j.budgetRange && <span>· {j.budgetRange}</span>}
-                    {j.timeline && <span>· {j.timeline}</span>}
-                    <span className="ml-auto tabular-nums">
-                      {j.applicantCount} applicant{j.applicantCount === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-mono text-text-muted mt-1.5">
-                    Posted {relativeTime(j.createdAt)}
+              {jobs.length === 0 ? (
+                <div className="border border-border rounded-[10px] p-8 text-center">
+                  <p className="text-[13px] font-medium text-text-primary mb-1">
+                    Nothing posted yet
                   </p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <p className="text-[12px] text-text-muted mb-4 max-w-[360px] mx-auto leading-relaxed">
+                    Drop a brief — we&apos;ll route vetted creators to your
+                    inbox, usually within hours.
+                  </p>
+                  <Link
+                    href="/dashboard/jobs/new"
+                    className="inline-flex items-center min-h-[40px] px-4 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                  >
+                    Post your first brief
+                  </Link>
+                </div>
+              ) : visibleJobs && visibleJobs.length === 0 ? (
+                <div className="border border-border rounded-[10px] p-6 text-center">
+                  <p className="text-[12px] text-text-muted mb-2">
+                    No {tab} jobs in your stack.
+                  </p>
+                  <button
+                    onClick={() => switchTab("all")}
+                    className="inline-flex items-center min-h-[32px] px-3 rounded-md border border-border text-[12px] font-medium text-text-primary hover:bg-surface-muted transition-colors cursor-pointer"
+                  >
+                    Show all
+                  </button>
+                </div>
+              ) : (
+                <motion.ul
+                  initial="hidden"
+                  animate="show"
+                  variants={containerVariants}
+                  className="space-y-3"
+                >
+                  {visibleJobs!.map((j) => {
+                    // Decision priority: open jobs with applicants need
+                    // action; surface the count in a stronger color.
+                    const needsReview = j.status === "open" && j.applicantCount > 0;
+                    return (
+                      <motion.li key={j.id} variants={itemVariants}>
+                        <Link
+                          href={`/dashboard/jobs/${j.id}`}
+                          className="group block border border-border rounded-[10px] p-4 hover:border-border-hover transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-1.5">
+                            <p className="text-[14px] md:text-[15px] font-medium text-text-primary truncate group-hover:underline underline-offset-4 decoration-from-font">
+                              {j.title}
+                            </p>
+                            <span
+                              className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded flex-shrink-0 ${STATUS_TONE[j.status]}`}
+                            >
+                              {STATUS_LABEL[j.status]}
+                            </span>
+                          </div>
+                          {j.description && (
+                            <p className="text-[12px] text-text-muted line-clamp-2 mb-2.5">
+                              {j.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted flex-wrap">
+                            {j.projectType && <span>{j.projectType}</span>}
+                            {j.budgetRange && <span>· {j.budgetRange}</span>}
+                            {j.timeline && <span>· {j.timeline}</span>}
+                            <span
+                              className={`ml-auto tabular-nums ${
+                                needsReview
+                                  ? "text-text-primary font-medium"
+                                  : ""
+                              }`}
+                            >
+                              {j.applicantCount} applicant
+                              {j.applicantCount === 1 ? "" : "s"}
+                              {needsReview && " · review"}
+                            </span>
+                          </div>
+                          <p className="text-[10px] font-mono text-text-muted mt-1.5">
+                            Posted {relativeTime(j.createdAt)}
+                          </p>
+                        </Link>
+                      </motion.li>
+                    );
+                  })}
+                </motion.ul>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

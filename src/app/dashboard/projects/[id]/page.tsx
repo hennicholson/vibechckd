@@ -7,6 +7,14 @@ import { motion } from "framer-motion";
 import ProjectChat from "@/components/projects/ProjectChat";
 import TaskList from "@/components/projects/TaskList";
 import DeliverablesList from "@/components/projects/DeliverablesList";
+import Modal from "@/components/Modal";
+import Button from "@/components/Button";
+import { useToast, failed } from "@/components/Toast";
+
+// Roles that can edit / archive / delete a project. Mirrors the
+// PRIVILEGED_ROLES check inside /api/projects/[id]/route.ts:34-38 so the
+// UI doesn't dangle Save/Archive/Delete buttons that just silently 403.
+const PRIVILEGED_ROLES = new Set(["client", "lead", "owner"]);
 
 type Tab = "chat" | "tasks" | "deliverables" | "details";
 
@@ -78,6 +86,13 @@ export default function ProjectDashboardPage() {
   const [newTag, setNewTag] = useState("");
   const [saving, setSaving] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  // Two-step confirm guards: typing the project title for delete; a
+  // single confirm tap for archive. Without these, the buttons fire
+  // PATCH/DELETE immediately on first click.
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteTypedTitle, setDeleteTypedTitle] = useState("");
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}`)
@@ -114,24 +129,52 @@ export default function ProjectDashboardPage() {
     }
   }, [showSettings]);
 
+  // Viewer's role on this project. Drives whether destructive UI is
+  // even rendered. Undefined while loading.
+  const viewerRoleLabel = project?.members?.find(
+    (m) => m.userId === currentUserId
+  )?.role;
+  const canManageProject = viewerRoleLabel
+    ? PRIVILEGED_ROLES.has(viewerRoleLabel.toLowerCase())
+    : false;
+
   const handleArchive = async () => {
     setShowSettings(false);
-    await fetch(`/api/projects/${projectId}`, {
+    setConfirmArchive(false);
+    const res = await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
     });
+    if (!res.ok) {
+      toast(
+        res.status === 403
+          ? "Only project leads can archive."
+          : failed("archive the project"),
+        "error"
+      );
+      return;
+    }
     router.push("/dashboard/projects");
   };
 
   const handleDelete = async () => {
     setShowSettings(false);
+    setConfirmDelete(false);
+    setDeleteTypedTitle("");
     const res = await fetch(`/api/projects/${projectId}`, {
       method: "DELETE",
     });
-    if (res.ok) {
-      router.push("/dashboard/projects");
+    if (!res.ok) {
+      toast(
+        res.status === 403
+          ? "Only project leads can delete."
+          : failed("delete the project"),
+        "error"
+      );
+      return;
     }
+    router.push("/dashboard/projects");
   };
 
   const handleEditTitle = () => {
@@ -167,6 +210,13 @@ export default function ProjectDashboardPage() {
     if (res.ok) {
       const data = await res.json();
       setProject((prev) => prev ? { ...prev, ...data, tags: data.tags || [] } : prev);
+    } else {
+      toast(
+        res.status === 403
+          ? "Only project leads can edit."
+          : failed("save changes"),
+        "error"
+      );
     }
     setSaving(false);
     setShowSettings(false);
@@ -271,7 +321,7 @@ export default function ProjectDashboardPage() {
                 </svg>
               </button>
             </div>
-          ) : (
+          ) : canManageProject ? (
             <h1
               onClick={() => { setEditTitle(title); setIsEditing(true); }}
               className="text-[18px] font-semibold text-text-primary leading-tight cursor-text hover:text-text-secondary transition-colors"
@@ -279,18 +329,29 @@ export default function ProjectDashboardPage() {
             >
               {title}
             </h1>
+          ) : (
+            // Non-privileged viewers can't rename — render as plain h1 so
+            // there's no false affordance (cursor-text, hover-darken).
+            <h1 className="text-[18px] font-semibold text-text-primary leading-tight">
+              {title}
+            </h1>
           )}
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-surface-muted text-text-muted flex-shrink-0">
             {status}
           </span>
 
-          {/* Settings button */}
-          <button
-            onClick={handleOpenSettings}
-            className="ml-auto p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors cursor-pointer flex-shrink-0"
-          >
-            <SettingsIcon />
-          </button>
+          {/* Settings button — privileged roles only. API enforces the
+              same check (returns 403); hiding the button removes the
+              "looks broken" feeling of a no-op click. */}
+          {canManageProject && (
+            <button
+              onClick={handleOpenSettings}
+              className="ml-auto p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors cursor-pointer flex-shrink-0"
+              aria-label="Project settings"
+            >
+              <SettingsIcon />
+            </button>
+          )}
         </div>
         {description && (
           <p className="text-[12px] text-neutral-500 mt-1 leading-relaxed hidden md:block line-clamp-1">
@@ -455,7 +516,7 @@ export default function ProjectDashboardPage() {
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full text-[13px] text-text-primary bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
+                  className="w-full text-[16px] md:text-[13px] text-text-primary bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
                 />
               </div>
 
@@ -467,7 +528,7 @@ export default function ProjectDashboardPage() {
                   onChange={(e) => setEditDesc(e.target.value)}
                   rows={3}
                   placeholder="Describe the project"
-                  className="w-full text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none focus:border-border-hover transition-colors"
+                  className="w-full text-[16px] md:text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none resize-none focus:border-border-hover transition-colors"
                 />
               </div>
 
@@ -491,7 +552,7 @@ export default function ProjectDashboardPage() {
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
                     placeholder="Tag…"
-                    className="flex-1 text-[12px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-2.5 py-1.5 outline-none focus:border-border-hover transition-colors"
+                    className="flex-1 text-[16px] md:text-[12px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-2.5 py-1.5 outline-none focus:border-border-hover transition-colors"
                   />
                   <button onClick={addTag} disabled={!newTag.trim()} className="text-[11px] font-medium text-text-secondary border border-border rounded-md px-2.5 py-1.5 hover:border-border-hover transition-colors cursor-pointer disabled:opacity-40">
                     Add
@@ -530,17 +591,23 @@ export default function ProjectDashboardPage() {
                 {saving ? "Saving..." : "Save changes"}
               </button>
 
-              {/* Danger zone */}
+              {/* Danger zone — both actions route through confirm
+                  modals below so a stray click doesn't archive or
+                  destroy work. */}
               <div className="pt-4 border-t border-border space-y-2">
                 <button
-                  onClick={() => { handleArchive(); setShowSettings(false); }}
+                  onClick={() => { setShowSettings(false); setConfirmArchive(true); }}
                   className="w-full text-left px-3 py-2 text-[12px] text-text-secondary hover:bg-surface-muted rounded-md transition-colors cursor-pointer"
                 >
                   Archive project
                 </button>
                 {status === "draft" && (
                   <button
-                    onClick={() => { handleDelete(); setShowSettings(false); }}
+                    onClick={() => {
+                      setShowSettings(false);
+                      setDeleteTypedTitle("");
+                      setConfirmDelete(true);
+                    }}
                     className="w-full text-left px-3 py-2 text-[12px] text-negative hover:bg-negative/5 rounded-md transition-colors cursor-pointer"
                   >
                     Delete project
@@ -551,6 +618,70 @@ export default function ProjectDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Archive confirm — single-step. */}
+      <Modal
+        open={confirmArchive}
+        onClose={() => setConfirmArchive(false)}
+        title="Archive project"
+        size="sm"
+      >
+        <p className="text-[13px] text-text-secondary mb-5 leading-relaxed">
+          This moves <span className="font-medium text-text-primary">{title}</span> to
+          Completed. The team can still view it, but no more invoices or
+          tasks can be added.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setConfirmArchive(false)}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleArchive}>
+            Archive
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Delete confirm — type-to-confirm (project title) so a wrong
+          click can't nuke a draft. */}
+      <Modal
+        open={confirmDelete}
+        onClose={() => { setConfirmDelete(false); setDeleteTypedTitle(""); }}
+        title="Delete project"
+        size="sm"
+      >
+        <p className="text-[13px] text-text-secondary mb-3 leading-relaxed">
+          This permanently removes <span className="font-medium text-text-primary">{title}</span>,
+          its chat history, tasks, and any draft invoices. This can&apos;t be undone.
+        </p>
+        <label className="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+          Type the project title to confirm
+        </label>
+        <input
+          type="text"
+          value={deleteTypedTitle}
+          onChange={(e) => setDeleteTypedTitle(e.target.value)}
+          placeholder={title}
+          className="w-full mt-1.5 mb-4 text-[16px] md:text-[13px] text-text-primary placeholder:text-text-muted bg-surface-muted border border-border rounded-md px-3 py-2 outline-none focus:border-border-hover transition-colors"
+          autoFocus
+        />
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setConfirmDelete(false); setDeleteTypedTitle(""); }}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleDelete}
+            disabled={deleteTypedTitle !== title}
+            className="bg-negative hover:bg-negative/90 text-white disabled:opacity-40"
+          >
+            Delete
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

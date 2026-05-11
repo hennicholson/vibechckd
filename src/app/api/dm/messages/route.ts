@@ -19,11 +19,13 @@ import { notifyWhopUsers } from "@/lib/whop-notifications";
 // don't need to change ID semantics. Will be retired once the frontend
 // migrates to /api/conversations/[id]/messages.
 
+// User-writable message types only. `system` and `ai` are server-emitted
+// — accepting them from a user lets them impersonate platform banners.
 const dmPostSchema = z
   .object({
     threadId: z.string().uuid(),
     content: z.string().min(1).max(5000),
-    messageType: z.enum(["text", "file", "system", "ai"]).optional(),
+    messageType: z.enum(["text", "file"]).optional(),
     fileUrl: z.string().url().max(2048).nullable().optional(),
   })
   .strict();

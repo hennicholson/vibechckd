@@ -33,11 +33,21 @@ interface MyApplication {
   appliedAt: string | null;
 }
 
+// Status pill copy. Stays short on the card (one word) and adopts a
+// second-line "what's next" subtitle inside the applied feed so the
+// creator doesn't have to click in to know what's happening.
 const APP_STATUS_LABEL: Record<MyApplication["applicationStatus"], string> = {
-  applied: "Applied",
+  applied: "Sent",
   shortlisted: "Shortlisted",
   hired: "Hired",
-  rejected: "Not selected",
+  rejected: "Passed",
+};
+
+const APP_STATUS_SUBTITLE: Record<MyApplication["applicationStatus"], string> = {
+  applied: "Profile's in their hands",
+  shortlisted: "They want a call — check your inbox",
+  hired: "You got it — head to your project",
+  rejected: "Went a different direction",
 };
 
 const APP_STATUS_TONE: Record<MyApplication["applicationStatus"], string> = {
@@ -135,7 +145,7 @@ export default function JobsBrowseClient() {
           left-edge + baseline match when navigating between them. */}
       <div className="sticky top-0 z-10 bg-background px-4 md:px-8 pt-4 md:pt-6 pb-3">
         <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
-          Job board
+          Briefs
         </h1>
         <div className="mt-0.5 h-[16px] flex items-center">
           {jobs === null ? (
@@ -163,23 +173,23 @@ export default function JobsBrowseClient() {
         {/* Lede sentence — gives the page a voice without bloating the
             sticky header. Sits inline with the body so it scrolls away. */}
         <p className="text-[13px] text-text-secondary mb-6 max-w-[560px] leading-relaxed">
-          Briefs from vetted clients. Apply with one tap — your profile is sent
-          automatically. Track every application + its status here.
+          Live briefs from vetted clients. Pull one and your profile goes with
+          it — no cover letter, no forms. Track every send and its status below.
         </p>
 
         {/* Vetting prompt */}
         {!applyEligible && (
           <div className="border border-warning/30 bg-warning/5 rounded-[10px] p-4 mb-6">
             <p className="text-[13px] font-medium text-text-primary mb-1">
-              Finish your vetting application to start applying
+              Finish vetting to start pulling briefs
             </p>
             <p className="text-[12px] text-text-muted leading-relaxed mb-3">
-              Only verified creators can apply to jobs. Once you're approved, your
-              profile is sent automatically with each application.
+              Only verified creators can apply. Once you&apos;re in, your full
+              profile gets sent with every brief — one tap, no forms.
             </p>
             <Link
               href="/apply"
-              className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center min-h-[36px] px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
             >
               Continue your application
             </Link>
@@ -263,17 +273,18 @@ export default function JobsBrowseClient() {
             {jobs.length === 0 ? (
               <div className="border border-border rounded-[10px] p-8 text-center">
                 <p className="text-[13px] font-medium text-text-primary mb-1">
-                  No open briefs
+                  Quiet on the wire
                 </p>
                 <p className="text-[12px] text-text-muted mb-4">
-                  New ones drop weekly — we&apos;ll ping you when one lands.
+                  No open briefs right now. New ones drop weekly — we&apos;ll
+                  ping your inbox when the next one lands.
                 </p>
                 {counts.applied > 0 && (
                   <button
                     onClick={() => switchTab("applied")}
-                    className="inline-flex items-center h-8 px-3 rounded-md border border-border text-[12px] font-medium text-text-primary hover:bg-surface-muted transition-colors cursor-pointer"
+                    className="inline-flex items-center min-h-[36px] px-3 rounded-md border border-border text-[12px] font-medium text-text-primary hover:bg-surface-muted transition-colors cursor-pointer"
                   >
-                    View your {counts.applied} application
+                    View your {counts.applied} send
                     {counts.applied === 1 ? "" : "s"}
                   </button>
                 )}
@@ -299,7 +310,7 @@ export default function JobsBrowseClient() {
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {j.applied && (
                             <span className="text-[10px] font-mono uppercase tracking-wider text-positive bg-positive/10 px-2 py-0.5 rounded">
-                              Applied
+                              Sent
                             </span>
                           )}
                           <span
@@ -342,17 +353,17 @@ export default function JobsBrowseClient() {
             {myApplications.length === 0 ? (
               <div className="border border-border rounded-[10px] p-8 text-center">
                 <p className="text-[13px] font-medium text-text-primary mb-1">
-                  No applications out yet
+                  Nothing sent yet
                 </p>
                 <p className="text-[12px] text-text-muted mb-4">
-                  Browse open briefs and apply — every one shows up here so you
-                  can track its status at a glance.
+                  Pull an open brief and your profile goes with it — each send
+                  lands here so you can track status without digging.
                 </p>
                 <button
                   onClick={() => switchTab("open")}
-                  className="inline-flex items-center h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                  className="inline-flex items-center min-h-[36px] px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
                 >
-                  Browse open jobs
+                  Browse open briefs
                 </button>
               </div>
             ) : (
@@ -379,11 +390,19 @@ export default function JobsBrowseClient() {
                           {APP_STATUS_LABEL[a.applicationStatus]}
                         </span>
                       </div>
-                      {a.description && (
-                        <p className="text-[12px] text-text-muted line-clamp-2 mb-2.5">
-                          {a.description}
-                        </p>
-                      )}
+                      {/* Status subtitle — replaces the generic description
+                          line on applied cards so what's-next is the first
+                          thing the creator reads. */}
+                      <p
+                        className={`text-[12px] mb-2.5 leading-relaxed ${
+                          a.applicationStatus === "hired" ||
+                          a.applicationStatus === "shortlisted"
+                            ? "text-text-primary font-medium"
+                            : "text-text-muted"
+                        }`}
+                      >
+                        {APP_STATUS_SUBTITLE[a.applicationStatus]}
+                      </p>
                       <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted flex-wrap">
                         {a.projectType && <span>{a.projectType}</span>}
                         {a.budgetRange && <span>· {a.budgetRange}</span>}
@@ -392,7 +411,7 @@ export default function JobsBrowseClient() {
                           <span className="capitalize">· Job {a.status}</span>
                         )}
                         <span className="ml-auto tabular-nums">
-                          Applied {relativeTime(a.appliedAt)}
+                          Sent {relativeTime(a.appliedAt)}
                         </span>
                       </div>
                     </Link>

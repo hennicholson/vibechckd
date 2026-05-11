@@ -25,4 +25,19 @@
 | #10294 | 7:41 PM | 🔄 | Removed duplicate navigation array from DashboardSidebar component | ~430 |
 | #10276 | 6:52 PM | 🟣 | Added Application navigation item to creator dashboard | ~258 |
 | #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10443 | 11:34 PM | 🔴 | Fixed excessive API refetches in sidebar components | ~507 |
+| #10431 | 11:29 PM | 🔴 | Fixed DashboardSidebar profile fetch infinite re-render | ~293 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11107 | 1:39 AM | 🟣 | Mobile avatar now navigates to profile | ~299 |
+| #11080 | 1:09 AM | 🟣 | Portfolio Page Intro Animation Implemented | ~359 |
+| #11078 | 1:07 AM | 🟣 | Portfolio Page Intro Animation Implementation | ~349 |
 </claude-mem-context>

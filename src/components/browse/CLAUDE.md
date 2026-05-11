@@ -12,4 +12,29 @@
 | #10302 | 7:44 PM | 🔴 | Unified navigation and fixed layout issues across Whop, Browse, and Dashboard | ~521 |
 | #10281 | 6:53 PM | 🟣 | Added password-setting detection logic for Whop SSO users in BrowseSidebar | ~524 |
 | #10263 | 6:44 PM | 🔵 | Critical role-based access control vulnerabilities across dashboard routes | ~541 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10449 | 11:53 PM | 🔴 | Fixed BrowseSidebar sign-out button responsive alignment | ~265 |
+| #10443 | 11:34 PM | 🔴 | Fixed excessive API refetches in sidebar components | ~507 |
+| #10401 | 10:57 PM | 🟣 | Replaced static stats grid with animated live ticker in browse page | ~549 |
+
+### May 10, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11039 | 11:55 PM | 🔄 | Intro overlay animation timing refined for overlapping wordmark reveal | ~542 |
+| #11027 | 11:51 PM | 🟣 | Browse intro refactored to in-content animation with wordmark reveal | ~506 |
+| #11024 | " | 🟣 | Browse page skeleton grid component created | ~433 |
+| #11022 | " | 🔵 | Browse coder card component design and animation reviewed | ~480 |
+| #11019 | 11:50 PM | 🔵 | BrowseLoadingLottie component architecture reviewed | ~169 |
+| #11016 | " | 🔵 | Browse intro overlay Lottie animation implementation reviewed | ~455 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11074 | 12:56 AM | ✅ | Improved Intro Overlay Vertical Positioning | ~305 |
 </claude-mem-context>

@@ -14,4 +14,17 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #9707 | 1:55 AM | 🟣 | Mobile responsiveness implemented across entire application | ~430 |
+
+### Apr 29, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10463 | 6:07 PM | ✅ | Removed max-width constraints from dashboard pages for full-width layouts | ~507 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11128 | 2:12 AM | 🟣 | Confirmation Modals Added for Project Archive and Delete Actions | ~410 |
+| #11042 | 12:08 AM | 🔵 | Dashboard loading state patterns surveyed | ~505 |
 </claude-mem-context>

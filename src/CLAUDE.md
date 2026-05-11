@@ -19,4 +19,10 @@
 | #10202 | 4:47 PM | 🔵 | Production deployment architecture on Netlify with Whop iframe integration | ~607 |
 | #10178 | 3:46 PM | 🔄 | Removed Whop token rewrite logic from middleware | ~349 |
 | #10154 | 1:45 AM | 🔴 | Whop iframe middleware changed from redirect to rewrite | ~340 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10408 | 11:04 PM | 🔵 | Iframe-Compatible Authentication Architecture for Whop Embedding | ~580 |
 </claude-mem-context>

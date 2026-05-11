@@ -21,4 +21,27 @@
 |----|------|---|-------|------|
 | #9707 | 1:55 AM | 🟣 | Mobile responsiveness implemented across entire application | ~430 |
 | #9609 | 1:26 AM | 🟣 | Role-aware chat interface with perspective-specific quick actions and messaging | ~528 |
+
+### Apr 29, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10532 | 11:26 PM | 🟣 | Added slash command pre-filling support to InvoiceForm | ~489 |
+| #10526 | 11:24 PM | 🟣 | Added typing indicator import to ProjectChat | ~165 |
+| #10518 | 11:17 PM | 🟣 | Structured invoice message rendering with database-backed invoice records | ~504 |
+| #10515 | 11:16 PM | ✅ | Invoice message type added to project chat system | ~295 |
+
+### Apr 30, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10578 | 1:20 AM | ✅ | Removed direct balance-to-balance transfer for Whop policy compliance | ~407 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11104 | 1:29 AM | 🔵 | Payment Architecture Audited via Explore Agent | ~401 |
+| #11099 | 1:24 AM | ✅ | Improved Payment Error Messaging in Project Chat | ~371 |
+| #11098 | " | ✅ | Improved Invoice Status Check Error Messaging | ~445 |
 </claude-mem-context>

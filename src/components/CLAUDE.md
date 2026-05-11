@@ -8,4 +8,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #8850 | 2:03 AM | 🟣 | CoderProfilePopup modal component with portfolio preview | ~621 |
+
+### May 4, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10817 | 5:34 PM | 🔵 | FavoriteButton uses CSS scale transitions with 150ms duration | ~325 |
 </claude-mem-context>

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { coderProfiles, portfolioAssets } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { coderProfiles, portfolioAssets, portfolioItems } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 const MAX_SIZE: Record<string, number> = {
@@ -101,6 +101,38 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: `File too large. Max ${Math.round(maxSize / 1024 / 1024)}MB` }, { status: 400 });
     }
 
+    // Ownership check for portfolio asset writes. Without this, a logged-in
+    // user can pass any other coder's itemId/assetId and overwrite their
+    // assets — a classic IDOR. Verify the portfolio item belongs to the
+    // session user's coder profile before the CDN write is even attempted.
+    const incomingAssetId = formData.get("assetId") as string | null;
+    if (type === "asset" && session?.user?.id) {
+      if (!itemId) {
+        return Response.json({ error: "Missing itemId" }, { status: 400 });
+      }
+      const ownerRow = await db
+        .select({ ownerUserId: coderProfiles.userId })
+        .from(portfolioItems)
+        .innerJoin(coderProfiles, eq(portfolioItems.coderProfileId, coderProfiles.id))
+        .where(eq(portfolioItems.id, itemId))
+        .limit(1);
+      const ownerUserId = ownerRow[0]?.ownerUserId;
+      if (!ownerUserId || ownerUserId !== session.user.id) {
+        return Response.json({ error: "Forbidden" }, { status: 403 });
+      }
+      // If updating a specific asset, confirm it belongs to the same item.
+      if (incomingAssetId) {
+        const assetRow = await db
+          .select({ parentItemId: portfolioAssets.portfolioItemId })
+          .from(portfolioAssets)
+          .where(eq(portfolioAssets.id, incomingAssetId))
+          .limit(1);
+        if (!assetRow[0] || assetRow[0].parentItemId !== itemId) {
+          return Response.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+    }
+
     // Build storage path
     const ext = file.name.split(".").pop() || "bin";
     const id = crypto.randomUUID();
@@ -109,6 +141,9 @@ export async function POST(request: NextRequest) {
     if (type === "application") {
       path = `applications/${id}.${ext}`;
     } else if (type === "pfp") {
+      // Normalize pfp path to use the original extension so we can derive
+      // the storage path from the persisted URL at DELETE time without
+      // guessing — see DELETE handler below.
       path = `pfp/${session!.user!.id}.${ext}`;
     } else if (type === "preview") {
       path = `previews/${session!.user!.id}.gif`;
@@ -202,6 +237,21 @@ export async function DELETE(request: NextRequest) {
       return Response.json({ error: "Invalid type parameter" }, { status: 400 });
     }
 
+    // Look up the stored URL BEFORE clearing it so we can derive the
+    // actual storage path (extension can be any of jpg/png/webp/...).
+    // Previously this hard-coded `.webp`, which orphaned the original
+    // file on Bunny whenever a user had uploaded jpg/png.
+    const profileRow = await db
+      .select({
+        pfpUrl: coderProfiles.pfpUrl,
+        gifPreviewUrl: coderProfiles.gifPreviewUrl,
+      })
+      .from(coderProfiles)
+      .where(eq(coderProfiles.userId, session.user.id))
+      .limit(1);
+    const storedUrl =
+      type === "pfp" ? profileRow[0]?.pfpUrl : profileRow[0]?.gifPreviewUrl;
+
     // Clear the URL in the database
     if (type === "pfp") {
       await db
@@ -219,18 +269,25 @@ export async function DELETE(request: NextRequest) {
     const storageKey = process.env.BUNNY_STORAGE_KEY;
     const storageZone = process.env.BUNNY_STORAGE_ZONE || "vibechckd";
     const storageHost = process.env.BUNNY_STORAGE_HOST || "ny.storage.bunnycdn.com";
+    const cdnUrl = process.env.BUNNY_CDN_URL || "https://vibechckd-cdn.b-cdn.net";
 
-    if (storageKey) {
-      const ext = type === "preview" ? "gif" : "webp";
-      const folder = type === "preview" ? "previews" : "pfp";
-      const path = `${folder}/${session.user.id}.${ext}`;
-      const deleteUrl = `https://${storageHost}/${storageZone}/${path}`;
+    if (storageKey && storedUrl) {
+      // Strip query string (cache-bust) and the CDN host to recover the
+      // storage-relative path (e.g. "pfp/<userId>.png").
+      const noQuery = storedUrl.split("?")[0];
+      const cdnPrefix = cdnUrl.endsWith("/") ? cdnUrl : `${cdnUrl}/`;
+      const path = noQuery.startsWith(cdnPrefix)
+        ? noQuery.slice(cdnPrefix.length)
+        : null;
 
-      // Best-effort CDN deletion -- do not block response on failure
-      fetch(deleteUrl, {
-        method: "DELETE",
-        headers: { AccessKey: storageKey },
-      }).catch(() => {});
+      if (path) {
+        const deleteUrl = `https://${storageHost}/${storageZone}/${path}`;
+        // Best-effort CDN deletion — do not block response on failure
+        fetch(deleteUrl, {
+          method: "DELETE",
+          headers: { AccessKey: storageKey },
+        }).catch(() => {});
+      }
     }
 
     return Response.json({ success: true });

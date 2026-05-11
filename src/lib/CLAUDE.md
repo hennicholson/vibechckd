@@ -54,4 +54,25 @@
 | #10156 | 1:46 AM | 🔵 | Whop SDK client implemented as singleton pattern | ~315 |
 | #10151 | 1:39 AM | 🟣 | Whop authentication library with JWT verification and account linking | ~686 |
 | #10125 | 1:05 AM | 🟣 | Whop authentication handoff integration | ~228 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10410 | 11:05 PM | 🔵 | VibeCheck Project Structure and Recent Development Focus | ~756 |
+| #10408 | 11:04 PM | 🔵 | Iframe-Compatible Authentication Architecture for Whop Embedding | ~580 |
+
+### Apr 29, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10503 | 11:07 PM | 🟣 | Whop iframe detection hook for context-aware component behavior | ~443 |
+| #10476 | 7:11 PM | 🔄 | Centralized conversation membership authorization utility | ~361 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11104 | 1:29 AM | 🔵 | Payment Architecture Audited via Explore Agent | ~401 |
+| #11053 | 12:13 AM | 🟣 | Session-gated intro hook created for per-page Lottie animations | ~570 |
 </claude-mem-context>

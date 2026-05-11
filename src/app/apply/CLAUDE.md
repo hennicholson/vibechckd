@@ -21,4 +21,17 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #10312 | 8:34 PM | 🔴 | Platform signup and application flow bug fixes | ~508 |
+
+### May 4, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10802 | 5:15 PM | 🔵 | Vibecheck animation standard: 8px Y-offset with 0.5s fade-in | ~338 |
+| #10801 | 5:14 PM | 🔵 | Examined framer-motion animation patterns in vibecheck codebase | ~339 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11045 | 12:09 AM | 🔵 | Comprehensive Lottie animation opportunities audit completed | ~659 |
 </claude-mem-context>

@@ -290,7 +290,7 @@ export const messages = pgTable(
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
     senderId: uuid("sender_id").references(() => users.id),
     content: text("content").notNull(),
-    messageType: messageTypeEnum("message_type").default("text"),
+    messageType: messageTypeEnum("message_type").default("text").notNull(),
     fileUrl: text("file_url"),
     // FK declared at the constraint level in migration to break the circular
     // dependency with `invoices.messageId` (drizzle can't express it inline).

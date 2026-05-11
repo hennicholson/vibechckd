@@ -14,6 +14,17 @@ import {
   generatePayoutPortalLink,
 } from "@/lib/whop";
 import { emails } from "@/lib/email";
+import { parseBody, z } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+// Hard cap matches Whop's per-transfer ceiling and the audit's $100k
+// recommendation. Lets us reject obviously-bogus loop inputs before
+// the atomic balance check fires.
+const withdrawalSchema = z
+  .object({
+    amountCents: z.number().int().positive().max(10_000_000),
+  })
+  .strict();
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -23,19 +34,33 @@ export async function POST(request: NextRequest) {
 
   const userId = session.user.id;
 
+  // 5 withdrawal attempts per minute per user. The atomic balance function
+  // is already safe under concurrency, but rate-limiting stops a malicious
+  // loop from hammering Whop's API (and our logs) with rejected requests.
+  const rl = checkRateLimit(`withdrawals:${userId}`, 5, 60_000);
+  if (!rl.allowed) {
+    return Response.json(
+      { error: "Too many withdrawal attempts. Try again in a minute." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+      }
+    );
+  }
+
   let withdrawalId: string | null = null;
   let transactionId: string | null = null;
 
   try {
-    const body = await request.json();
-    const { amountCents } = body;
-
-    if (!amountCents || typeof amountCents !== "number" || amountCents <= 0) {
+    const rawBody = await request.json().catch(() => null);
+    const validated = parseBody(withdrawalSchema, rawBody);
+    if (!validated.ok) {
       return Response.json(
-        { error: "amountCents must be a positive integer" },
+        { error: "Invalid input", details: validated.error },
         { status: 400 }
       );
     }
+    const { amountCents } = validated.data;
 
     // Get user info (need email and name for connected account creation)
     const [user] = await db

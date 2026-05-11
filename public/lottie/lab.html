@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>vibechckd · lottie lab</title>
+<style>
+  :root {
+    --ink: #171717;
+    --muted: #8a8a8a;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --line: #e6e6e6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 32px;
+    min-height: 100vh;
+  }
+  header {
+    max-width: 1200px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  .meta { color: var(--muted); font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
+  .controls {
+    max-width: 1200px;
+    margin: 0 auto 24px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+  }
+  button {
+    appearance: none;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--ink); }
+  button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  label { font-size: 12px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+  input[type="range"] { vertical-align: middle; width: 200px; }
+  .grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .tile {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .tile header {
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .tile-name {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+  .tile-meta {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .stage {
+    aspect-ratio: 1 / 1;
+    background: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .stage > * { width: 100%; height: 100%; }
+  .row {
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .row button { padding: 4px 10px; font-size: 11px; }
+  .frame { tabular-nums: tabular-nums; min-width: 70px; }
+  details {
+    max-width: 1200px;
+    margin: 24px auto 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  details summary {
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  details pre {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 12px 0 0;
+    white-space: pre-wrap;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>vibechckd · lottie lab</h1>
+      <div class="meta">tab intro animations · 720×720 · 60fps · 150f (2.5s)</div>
+    </div>
+    <div class="meta" id="versionStamp">—</div>
+  </header>
+
+  <div class="controls">
+    <button class="primary" id="playAll">Play all</button>
+    <button id="pauseAll">Pause all</button>
+    <button id="restartAll">Restart all</button>
+    <label>
+      Speed
+      <input id="speedSlider" type="range" min="0.25" max="2" step="0.05" value="1" />
+      <span id="speedValue">1.00×</span>
+    </label>
+    <label>
+      <input id="loopToggle" type="checkbox" checked />
+      Loop
+    </label>
+    <label>
+      <input id="gridBg" type="checkbox" />
+      Show grid
+    </label>
+    <button id="reloadAll" style="margin-left: auto;">Reload JSON</button>
+  </div>
+
+  <div class="grid" id="grid">
+    <!-- tiles injected -->
+  </div>
+
+  <details>
+    <summary>How to use</summary>
+    <pre>
+• Each tile plays one Lottie. Scrub the per-tile slider to inspect any frame.
+• Play / Pause / Restart at the top affects all 4 at once for side-by-side review.
+• Speed slider re-applies on next play.
+• "Reload JSON" re-fetches each Lottie from disk — useful after re-running
+  scripts/gen-tab-lotties.mjs to iterate on the JSON without a page reload.
+• Drop notes in the corresponding section of vibechckd.md when you've nailed
+  the animation you want to keep.
+    </pre>
+  </details>
+
+<script>
+  const TILES = [
+    { key: "projects", path: "/lottie/projects-intro.json", wordmark: "PROJECTS" },
+    { key: "inbox",    path: "/lottie/inbox-intro.json",    wordmark: "INBOX" },
+    { key: "earnings", path: "/lottie/earnings-intro.json", wordmark: "EARNINGS" },
+    { key: "jobs",     path: "/lottie/jobs-intro.json",     wordmark: "JOBS" },
+    { key: "portfolio", path: "/lottie/portfolio-intro.json", wordmark: "PORTFOLIO" },
+    { key: "check",    path: "/lottie/check-intro.json",    wordmark: "VIBECHCKD" },
+  ];
+
+  const grid = document.getElementById("grid");
+  const stamp = document.getElementById("versionStamp");
+  const players = new Map();
+
+  function tileTemplate(t) {
+    return `
+      <section class="tile" data-key="${t.key}">
+        <header>
+          <span class="tile-name">${t.wordmark}</span>
+          <span class="tile-meta">${t.key}-intro.json</span>
+        </header>
+        <div class="stage" id="stage-${t.key}"></div>
+        <div class="row">
+          <button data-act="play">Play</button>
+          <button data-act="pause">Pause</button>
+          <button data-act="restart">Restart</button>
+          <input type="range" min="0" max="150" value="0" step="1" data-act="scrub" style="flex:1;" />
+          <span class="frame" data-act="frame">0 / 150</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function mountTile(t) {
+    const stage = document.getElementById(`stage-${t.key}`);
+    return fetch(`${t.path}?v=${Date.now()}`)
+      .then(r => r.json())
+      .then(data => {
+        const anim = lottie.loadAnimation({
+          container: stage,
+          renderer: "svg",
+          loop: document.getElementById("loopToggle").checked,
+          autoplay: false,
+          animationData: data,
+        });
+        const total = data.op - data.ip;
+        const section = document.querySelector(`.tile[data-key="${t.key}"]`);
+        const scrub = section.querySelector('[data-act="scrub"]');
+        const frame = section.querySelector('[data-act="frame"]');
+        scrub.max = total;
+        section.querySelector('[data-act="play"]').onclick = () => anim.play();
+        section.querySelector('[data-act="pause"]').onclick = () => anim.pause();
+        section.querySelector('[data-act="restart"]').onclick = () => { anim.goToAndPlay(0, true); };
+        scrub.oninput = () => { anim.goToAndStop(parseInt(scrub.value, 10), true); };
+        anim.addEventListener("enterFrame", () => {
+          scrub.value = Math.floor(anim.currentFrame);
+          frame.textContent = `${Math.floor(anim.currentFrame)} / ${total}`;
+        });
+        players.set(t.key, anim);
+        anim.play();
+      });
+  }
+
+  function applyLoopAll() {
+    const loop = document.getElementById("loopToggle").checked;
+    players.forEach(a => { a.loop = loop; });
+  }
+  function applySpeedAll() {
+    const v = parseFloat(document.getElementById("speedSlider").value);
+    document.getElementById("speedValue").textContent = v.toFixed(2) + "×";
+    players.forEach(a => a.setSpeed(v));
+  }
+  function applyGridBg() {
+    const on = document.getElementById("gridBg").checked;
+    document.querySelectorAll(".stage").forEach(el => {
+      el.style.backgroundImage = on
+        ? "linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)"
+        : "";
+      el.style.backgroundSize = on ? "40px 40px" : "";
+    });
+  }
+
+  document.getElementById("playAll").onclick = () => players.forEach(a => a.play());
+  document.getElementById("pauseAll").onclick = () => players.forEach(a => a.pause());
+  document.getElementById("restartAll").onclick = () => players.forEach(a => a.goToAndPlay(0, true));
+  document.getElementById("speedSlider").oninput = applySpeedAll;
+  document.getElementById("loopToggle").onchange = applyLoopAll;
+  document.getElementById("gridBg").onchange = applyGridBg;
+  document.getElementById("reloadAll").onclick = () => {
+    players.forEach(a => a.destroy());
+    players.clear();
+    mountAll();
+  };
+
+  function mountAll() {
+    grid.innerHTML = TILES.map(tileTemplate).join("");
+    stamp.textContent = "loaded " + new Date().toLocaleTimeString();
+    Promise.all(TILES.map(mountTile)).then(() => {
+      applySpeedAll();
+      applyLoopAll();
+    });
+  }
+  mountAll();
+</script>
+</body>
+</html>

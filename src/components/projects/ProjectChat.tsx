@@ -518,21 +518,29 @@ function EmptyState() {
     <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
       <IconChat />
       <div className="text-center">
-        <p className="text-[14px] font-medium text-text-primary">Start the conversation</p>
-        <p className="text-[13px] text-text-muted mt-0.5">Send a message or use the quick actions below</p>
+        <p className="text-[14px] font-medium text-text-primary">Nothing here yet</p>
+        <p className="text-[13px] text-text-muted mt-0.5 max-w-[260px]">
+          Send a message — or use{" "}
+          <span className="font-mono text-text-secondary">+</span> below to drop in
+          an invoice, proposal, or file.
+        </p>
       </div>
     </div>
   );
 }
 
+// System message — short pill instead of italic-between-hairlines. Reads as
+// an event (vs. dialog) and is much easier to spot in dense threads.
 function SystemMessage({ content }: { content: string }) {
-  // Strip emojis from system messages for clean display
-  const clean = content.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}]/gu, "").trim();
+  const clean = content
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}]/gu, "")
+    .trim();
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="flex-1 h-px bg-border" />
-      <span className="text-[12px] text-text-muted italic font-body whitespace-nowrap px-1">{clean}</span>
-      <div className="flex-1 h-px bg-border" />
+    <div className="flex justify-center py-2 animate-[fadeInUp_0.18s_ease-out]">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-muted/70 rounded-full text-[11px] font-medium text-text-secondary">
+        <span className="w-1 h-1 rounded-full bg-text-muted/70" />
+        {clean}
+      </span>
     </div>
   );
 }
@@ -618,8 +626,18 @@ function InvoiceCard({
     ? `You sent this to ${toName}`
     : `${fromName} sent this to you`;
 
+  // Left-accent color codes the card type at a glance: green=paid,
+  // warning=pending invoice. Voided gets muted so it doesn't shout.
+  const accent = isPaid
+    ? "border-l-positive"
+    : isVoided
+      ? "border-l-text-muted/40"
+      : "border-l-warning";
+
   return (
-    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+    <div
+      className={`bg-surface-muted rounded-lg overflow-hidden border-l-[3px] max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${accent} ${isPaid ? "ring-1 ring-positive/20" : ""}`}
+    >
       {/* Header */}
       <div className={`px-3 py-2 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
         <div className="flex items-center gap-2">
@@ -644,7 +662,7 @@ function InvoiceCard({
         )}
 
         {invoice.amount && (
-          <p className="text-[20px] font-semibold text-text-primary tabular-nums tracking-tight mb-2">{invoice.amount}</p>
+          <p className="text-[18px] md:text-[20px] font-semibold text-text-primary tabular-nums tracking-tight mb-2">{invoice.amount}</p>
         )}
 
         <div className="flex items-center gap-3">
@@ -662,38 +680,51 @@ function InvoiceCard({
 
       {/* Actions footer */}
       {(!isPaid && !isVoided) && (
-        <div className="px-3 py-2 border-t border-border flex items-center gap-2 flex-wrap">
-          {/* Show Pay button only to the recipient. When running inside the
-              Whop iframe the click is forwarded through `openExternalUrl` so
-              Whop can route the user to its hosted checkout in-app. Outside
-              the iframe (direct vibechckd.cc) we open in a new tab. */}
+        <>
+          <div className="px-3 py-2 border-t border-border flex items-center gap-2 flex-wrap">
+            {/* Show Pay button only to the recipient. When running inside the
+                Whop iframe the click is forwarded through `openExternalUrl` so
+                Whop can route the user to its hosted checkout in-app. Outside
+                the iframe (direct vibechckd.cc) we open in a new tab. */}
+            {!isSender && invoice.payUrl && (
+              <PayInvoiceButton
+                url={invoice.payUrl}
+                checkoutConfigId={invoice.checkoutConfigId ?? null}
+              />
+            )}
+            {invoice.invoiceId && onCheckStatus && (
+              <button
+                onClick={() => onCheckStatus(invoice.invoiceId!)}
+                disabled={checking}
+                className="flex items-center gap-1 px-3 py-2.5 md:py-1.5 md:px-2.5 text-[12px] md:text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40 min-h-[44px] md:min-h-0"
+              >
+                <IconRefresh size={11} />
+                {checking ? "Checking…" : "Verify payment"}
+              </button>
+            )}
+            {/* Show Email button only to the sender */}
+            {isSender && invoice.invoiceId && onSendEmail && (
+              <button
+                onClick={() => onSendEmail(invoice.invoiceId!)}
+                className="flex items-center gap-1 px-3 py-2.5 md:py-1.5 md:px-2.5 text-[12px] md:text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer min-h-[44px] md:min-h-0"
+              >
+                <IconMail size={11} />
+                Resend email
+              </button>
+            )}
+          </div>
+          {/* Payment-method hint — only shown to the payer so they know
+              their Whop balance is a valid funding source (Whop's hosted
+              checkout lists it alongside card / ACH). Without this hint
+              users assume "Pay now" = credit card only. */}
           {!isSender && invoice.payUrl && (
-            <PayInvoiceButton
-              url={invoice.payUrl}
-              checkoutConfigId={invoice.checkoutConfigId ?? null}
-            />
+            <div className="px-3 pb-2 -mt-1">
+              <p className="text-[10px] text-text-muted leading-snug">
+                Card, ACH, or your Whop balance — pick at checkout.
+              </p>
+            </div>
           )}
-          {invoice.invoiceId && onCheckStatus && (
-            <button
-              onClick={() => onCheckStatus(invoice.invoiceId!)}
-              disabled={checking}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40"
-            >
-              <IconRefresh size={11} />
-              {checking ? "Checking..." : "Verify payment"}
-            </button>
-          )}
-          {/* Show Email button only to the sender */}
-          {isSender && invoice.invoiceId && onSendEmail && (
-            <button
-              onClick={() => onSendEmail(invoice.invoiceId!)}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
-            >
-              <IconMail size={11} />
-              Resend
-            </button>
-          )}
-        </div>
+        </>
       )}
 
       {isPaid && (
@@ -701,7 +732,7 @@ function InvoiceCard({
           <div className="flex items-center gap-1.5">
             <span className="text-positive"><IconCheck size={12} /></span>
             <span className="text-[11px] font-medium text-positive">
-              {isSender ? "Payment received -- credited to your balance" : "Payment complete"}
+              {isSender ? "Paid — funds in your balance" : "Payment complete"}
             </span>
           </div>
         </div>
@@ -714,23 +745,25 @@ function InvoiceCard({
 
 function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: ParsedProposal; onAccept?: () => void; isOwn: boolean; senderName?: string | null }) {
   return (
-    <div className="bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[320px] w-full">
+    <div className="bg-surface-muted rounded-lg overflow-hidden border-l-[3px] border-l-text-primary max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full">
       <div className="px-3 py-2 flex items-center gap-2">
         <span className="text-text-secondary"><IconProposal size={14} /></span>
-        <span className="text-[13px] font-medium text-text-primary">Project Proposal</span>
+        <span className="text-[13px] font-medium text-text-primary">Proposal</span>
       </div>
 
       {/* Context line */}
       <div className="px-4 py-2 border-t border-border/50">
         <p className="text-[11px] text-text-muted">
-          {isOwn ? "You sent this proposal" : `from ${senderName || "Creator"}`}
+          {isOwn
+            ? "You sent this — they can accept it here"
+            : `${senderName || "A creator"} sent this — review and accept to kick off`}
         </p>
       </div>
 
       <div className="px-3 py-2 border-t border-border">
         {proposal.scope && (
           <div className="mb-3">
-            <span className="text-[10px] uppercase tracking-widest text-text-muted font-medium">Scope of Work</span>
+            <span className="text-[10px] uppercase tracking-widest text-text-muted font-medium">Scope</span>
             <p className="text-[13px] text-text-primary leading-relaxed mt-1">{proposal.scope}</p>
           </div>
         )}
@@ -754,10 +787,10 @@ function ProposalCard({ proposal, onAccept, isOwn, senderName }: { proposal: Par
         <div className="px-3 py-2 border-t border-border">
           <button
             onClick={onAccept}
-            className="w-full py-2 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className="w-full py-3 md:py-2 text-[13px] md:text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px] md:min-h-0"
           >
             <IconCheck size={12} />
-            Accept proposal
+            Accept and start
           </button>
         </div>
       )}
@@ -1611,13 +1644,13 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed to create invoice" }));
-        toast(err.error || "Failed to send invoice");
+        const err = await res.json().catch(() => ({ error: "Couldn't send the invoice" }));
+        toast(err.error || "Couldn't send the invoice — try again or check your connection.", "error");
         setIsSending(false);
         return;
       }
 
-      toast("Invoice created");
+      toast("Invoice sent");
       userScrolledRef.current = false;
       await fetchMessages();
       await fetchBalance();
@@ -1640,15 +1673,17 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
       if (res.ok) {
         const data = await res.json();
         if (data.statusChanged) {
-          toast(`Invoice status updated to ${data.status}`);
+          toast(`Invoice marked ${data.status}`);
           await fetchMessages();
           await fetchBalance();
         } else {
-          toast(`Status: ${data.status}`);
+          toast(`Still ${data.status} — try again shortly.`);
         }
+      } else {
+        toast("Couldn't reach the invoice provider. Try again.", "error");
       }
     } catch {
-      toast("Could not check invoice status");
+      toast("Network hiccup — couldn't check status.", "error");
     }
     setCheckingInvoice(null);
   }
@@ -1813,17 +1848,17 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast(err.error || "Payment failed");
+        toast(err.error || "Couldn't process the payment — try again or refresh.", "error");
         setIsSending(false);
         return;
       }
 
-      toast("Payment link sent to chat");
+      toast("Payment request sent");
       userScrolledRef.current = false;
       await fetchMessages();
       await fetchBalance();
     } catch {
-      toast("Payment failed");
+      toast("Couldn't reach the payment provider. Try again.", "error");
     }
 
     setIsSending(false);
@@ -2139,12 +2174,16 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                   paySentByMe = msg.senderId === currentUserId;
                 }
                 const payContextLine = paySentByMe
-                  ? `You sent this${payTo ? ` to ${payTo}` : ""}`
+                  ? payTo
+                    ? `You sent this to ${payTo}`
+                    : "You sent this payment"
                   : `${payFrom || "Someone"} sent you a payment`;
+
+                const payAccent = isPaid ? "border-l-positive" : "border-l-warning";
 
                 return withDivider((
                   <div key={msg.id} className={`flex py-2 animate-[fadeInUp_0.25s_ease-out] ${paySentByMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`bg-surface-muted rounded-lg overflow-hidden max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
+                    <div className={`bg-surface-muted rounded-lg overflow-hidden border-l-[3px] ${payAccent} max-w-[calc(100vw-48px)] sm:max-w-[340px] w-full ${isPaid ? "ring-1 ring-positive/20" : ""}`}>
                       <div className={`px-3 py-2 flex items-center justify-between ${isPaid ? "bg-positive/5" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-text-secondary"><IconDollar size={14} /></span>
@@ -2162,50 +2201,64 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                       </div>
                       <div className="px-3 py-2 border-t border-border/50">
                         {payDesc && <p className="text-[13px] text-text-secondary leading-snug mb-2">{payDesc}</p>}
-                        {payAmount && <p className="text-[20px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
+                        {payAmount && <p className="text-[18px] md:text-[20px] font-semibold text-text-primary tabular-nums tracking-tight">{payAmount}</p>}
                       </div>
                       {!isPaid && (
-                        <div className="px-3 py-2 border-t border-border flex items-center gap-2">
-                          {!paySentByMe && payUrl && (
-                            <a href={payUrl} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline">
-                              <IconWallet size={12} />
-                              Pay now
-                            </a>
-                          )}
-                          {payTxId && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch(`/api/payments/${payTxId}/check-status`, { method: "POST" });
-                                  if (res.ok) {
-                                    const data = await res.json();
-                                    if (data.changed) {
-                                      toast("Payment confirmed");
-                                      await fetchMessages();
-                                      await fetchBalance();
+                        <>
+                          <div className="px-3 py-2 border-t border-border flex items-center gap-2 flex-wrap">
+                            {!paySentByMe && payUrl && (
+                              <a href={payUrl} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 px-4 py-2.5 md:py-1.5 md:px-3 text-[13px] md:text-[12px] font-medium bg-[#171717] text-white rounded-md hover:bg-[#0a0a0a] transition-colors no-underline min-h-[44px] md:min-h-0">
+                                <IconWallet size={12} />
+                                Pay now
+                              </a>
+                            )}
+                            {payTxId && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/payments/${payTxId}/check-status`, { method: "POST" });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      if (data.changed) {
+                                        toast("Payment confirmed");
+                                        await fetchMessages();
+                                        await fetchBalance();
+                                      } else {
+                                        toast(`Still ${data.status}. Try again in a moment.`);
+                                      }
                                     } else {
-                                      toast(`Status: ${data.status}`);
+                                      toast("Couldn't reach the payment provider. Try again.", "error");
                                     }
+                                  } catch {
+                                    toast("Network hiccup — check status didn't go through.", "error");
                                   }
-                                } catch {
-                                  toast("Could not check status");
-                                }
-                              }}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer"
-                            >
-                              <IconRefresh size={11} />
-                              Verify payment
-                            </button>
+                                }}
+                                className="flex items-center gap-1 px-3 py-2.5 md:py-1.5 md:px-2.5 text-[12px] md:text-[11px] font-medium text-text-secondary border border-border rounded-md hover:border-border-hover hover:text-text-primary transition-colors cursor-pointer min-h-[44px] md:min-h-0"
+                              >
+                                <IconRefresh size={11} />
+                                Verify payment
+                              </button>
+                            )}
+                          </div>
+                          {/* Same hint as the InvoiceCard — surface that
+                              Whop balance is a valid funding source so
+                              users with credit don't assume card-only. */}
+                          {!paySentByMe && payUrl && (
+                            <div className="px-3 pb-2 -mt-1">
+                              <p className="text-[10px] text-text-muted leading-snug">
+                                Card, ACH, or your Whop balance — pick at checkout.
+                              </p>
+                            </div>
                           )}
-                        </div>
+                        </>
                       )}
                       {isPaid && (
                         <div className="px-3 py-2 border-t border-positive/10 bg-positive/5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-positive"><IconCheck size={12} /></span>
                             <span className="text-[11px] font-medium text-positive">
-                              {paySentByMe ? "Payment complete" : "Payment received -- credited to your balance"}
+                              {paySentByMe ? "Payment sent — receipt in your transactions" : "Received — funds in your balance"}
                             </span>
                           </div>
                         </div>
@@ -2228,17 +2281,15 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
                 ));
               }
 
-              // Task created message
+              // Task created message — pill chip (matches SystemMessage)
               if (msg.content?.includes("TASK CREATED") && msg.messageType === "system") {
-                const taskContent = msg.content.replace("TASK CREATED\n", "").replace("TASK CREATED", "");
+                const taskContent = msg.content.replace("TASK CREATED\n", "").replace("TASK CREATED", "").trim();
                 return withDivider((
-                  <div key={msg.id} className="flex items-center gap-3 py-3 animate-[fadeInUp_0.2s_ease-out]">
-                    <div className="flex-1 h-px bg-border" />
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-text-muted"><IconTask size={12} /></span>
-                      <span className="text-[12px] text-text-muted font-body">{taskContent}</span>
-                    </div>
-                    <div className="flex-1 h-px bg-border" />
+                  <div key={msg.id} className="flex justify-center py-2 animate-[fadeInUp_0.2s_ease-out]">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-muted/70 rounded-full text-[11px] font-medium text-text-secondary">
+                      <span className="text-text-muted"><IconTask size={11} /></span>
+                      New task · {taskContent}
+                    </span>
                   </div>
                 ));
               }
@@ -2395,6 +2446,50 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
           ))}
         </div>
 
+        {/* Slash-command hint — appears the moment the user types "/" so
+            commands are discoverable without docs. Currently /invoice is
+            the only slash-parseable command (others live in the +menu),
+            but the panel doubles as a directory of what's available. */}
+        <AnimatePresence>
+          {inputValue.startsWith("/") && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="mx-3 mb-1 rounded-lg border border-border bg-background shadow-[0_6px_24px_-8px_rgba(0,0,0,0.08)] overflow-hidden"
+            >
+              <div className="px-3 py-2 border-b border-border bg-surface-muted/40">
+                <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-text-muted">
+                  Quick command
+                </p>
+              </div>
+              <div className="px-3 py-2.5 flex items-start gap-2.5">
+                <span className="text-text-secondary mt-0.5 flex-shrink-0">
+                  <IconInvoice size={14} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-text-primary mb-0.5">
+                    <span className="font-mono">/invoice</span> [amount] for [description]
+                  </p>
+                  <p className="text-[11px] text-text-muted leading-snug">
+                    Example: <span className="font-mono text-text-secondary">/invoice 250 for landing page rev</span>
+                  </p>
+                </div>
+              </div>
+              <div className="px-3 py-2 border-t border-border bg-surface-muted/30 flex items-center gap-1.5">
+                <span className="text-[10px] text-text-muted">
+                  Need a proposal or direct payment? Hit the
+                </span>
+                <span className="text-[10px] font-mono text-text-secondary">+</span>
+                <span className="text-[10px] text-text-muted">
+                  button.
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input row */}
         <div className="flex items-end gap-2 px-3 pb-2 pt-1 md:pt-0.5">
           {/* Mobile-only `+` trigger — opens the actions bottom sheet
@@ -2418,7 +2513,7 @@ export default function ProjectChat({ projectId, members = [] }: ProjectChatProp
               }
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message…  ·  /invoice 250 for site copy"
+            placeholder="Message — type / for invoice, proposal, payment…"
             rows={1}
             className="flex-1 text-[16px] md:text-[13px] font-body text-text-primary placeholder:text-text-muted bg-transparent outline-none resize-none leading-relaxed max-h-[100px]"
             style={{ minHeight: "22px" }}

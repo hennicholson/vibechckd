@@ -367,12 +367,15 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
 
                     {/* Actions row — text-style buttons matching the
                         rest of the dashboard. Reorder controls tuck
-                        into the right side so they don't dominate. */}
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/60">
-                      <div className="flex items-center gap-2">
+                        into the right side so they don't dominate.
+                        Reorder chevrons stay visible on mobile (no
+                        hover state) so phone users can actually
+                        reorder; on md+ they fade in on hover. */}
+                    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-border/60">
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
                         <button
                           onClick={() => openEditor(item)}
-                          className="text-[12px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                          className="text-[12px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer py-1"
                         >
                           Edit
                         </button>
@@ -384,16 +387,16 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
                         <span className="text-text-muted/40 text-[10px]">·</span>
                         <button
                           onClick={() => setDeleteConfirmId(item.id)}
-                          className="text-[12px] text-text-muted hover:text-negative transition-colors cursor-pointer"
+                          className="text-[12px] text-text-muted hover:text-negative transition-colors cursor-pointer py-1"
                         >
                           Delete
                         </button>
                       </div>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0.5 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => moveUp(idx)}
                           disabled={idx === 0}
-                          className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer p-1 rounded hover:bg-surface-muted"
+                          className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer p-1.5 md:p-1 rounded hover:bg-surface-muted"
                           aria-label="Move up"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -403,7 +406,7 @@ export default function PortfolioManager({ initialItems }: PortfolioManagerProps
                         <button
                           onClick={() => moveDown(idx)}
                           disabled={idx === items.length - 1}
-                          className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer p-1 rounded hover:bg-surface-muted"
+                          className="text-text-muted hover:text-text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer p-1.5 md:p-1 rounded hover:bg-surface-muted"
                           aria-label="Move down"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

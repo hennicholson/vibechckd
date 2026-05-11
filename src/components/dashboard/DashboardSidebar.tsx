@@ -143,9 +143,18 @@ export default function DashboardSidebar() {
           <VerifiedSeal size="sm" />
         </Link>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
-            {session?.user?.name?.charAt(0) || "?"}
-          </div>
+          {/* Avatar → profile route. Touch target padded to 44pt with a
+              rounded hit area while the visible avatar stays 24px. Same
+              role-based routing as the desktop footer profile link. */}
+          <Link
+            href={role === "client" ? "/dashboard/company" : "/dashboard/profile"}
+            aria-label="Open profile"
+            className="inline-flex items-center justify-center w-11 h-11 -mr-1 active:bg-surface-muted/60 rounded-md transition-colors"
+          >
+            <div className="w-6 h-6 rounded-md bg-surface-muted flex items-center justify-center text-[10px] font-medium text-text-muted">
+              {session?.user?.name?.charAt(0) || "?"}
+            </div>
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"

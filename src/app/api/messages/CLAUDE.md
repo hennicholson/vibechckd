@@ -8,4 +8,11 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #9118 | 3:27 PM | 🟣 | Production deployment with CDN uploads, chat system, and schema updates | ~595 |
+
+### Apr 23, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10018 | 12:37 AM | 🟣 | Comprehensive security hardening across API routes, authentication, and infrastructure | ~1087 |
+| #9971 | 12:05 AM | 🔵 | Security audit identified critical vulnerabilities in vibecheck application | ~721 |
 </claude-mem-context>

@@ -9,6 +9,7 @@ import Textarea from "./Textarea";
 import Button from "./Button";
 import FileUpload, { type UploadedFile } from "./FileUpload";
 import ProgressIndicator from "./ProgressIndicator";
+import { CheckSuccess, ErrorX } from "./lottie";
 import { SPECIALTIES, SPECIALTY_LABELS, type Specialty } from "@/lib/mock-data";
 
 const STEPS = ["Basics", "Specialties", "Portfolio", "About You", "Review"];
@@ -227,15 +228,22 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
 
   if (submitted) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
-        <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mx-auto mb-4">
-          <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="text-center py-16"
+      >
+        <div className="flex items-center justify-center mx-auto mb-4">
+          <CheckSuccess size={64} />
         </div>
-        <h2 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Application Submitted</h2>
-        <p className="text-[14px] text-text-secondary mt-2 max-w-md mx-auto">
-          Thanks, {form.name}. We&apos;ll review your application and get back to you within 3-5 business days.
+        <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-text-muted mb-2">
+          Application in
+        </p>
+        <h2 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">Nice work, {form.name.split(" ")[0] || "creator"}</h2>
+        <p className="text-[14px] text-text-secondary mt-2 max-w-md mx-auto leading-relaxed">
+          A human is reading this — not a bot. Decisions land in 3–5 business days.
+          {session?.user?.id ? " Sending you to your application page now…" : " Watch your inbox."}
         </p>
       </motion.div>
     );
@@ -265,8 +273,10 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
             {step === 1 && (
               <div className="space-y-4">
                 <h3 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-1">Basics</h3>
+                <p className="text-[13px] text-text-muted">Who we&apos;re talking to and where to find you.</p>
                 <Input
-                  label="Full Name"
+                  label="Full name"
+                  autoComplete="name"
                   placeholder="Your name"
                   value={form.name}
                   onChange={(e) => update("name", e.target.value)}
@@ -275,19 +285,22 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
                 <Input
                   label="Email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="off"
                   placeholder="you@example.com"
                   value={form.email}
                   onChange={(e) => update("email", e.target.value)}
                   error={fieldErrors.email}
                 />
-                <Input label="Location" placeholder="City, Country" value={form.location} onChange={(e) => update("location", e.target.value)} />
+                <Input label="Location" autoComplete="address-level2" placeholder="City, country" value={form.location} onChange={(e) => update("location", e.target.value)} />
               </div>
             )}
 
             {step === 2 && (
               <div>
-                <h3 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-1">Specialties</h3>
-                <p className="text-[13px] text-text-muted mb-5">Select all that apply.</p>
+                <h3 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-1">What you do</h3>
+                <p className="text-[13px] text-text-muted mb-5">Pick everything that fits — we&apos;ll match against the right briefs.</p>
                 <div className="flex flex-wrap gap-2">
                   {SPECIALTIES.map((s) => (
                     <button
@@ -359,17 +372,18 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
 
             {step === 4 && (
               <div className="space-y-4">
-                <h3 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-1">About You</h3>
+                <h3 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] mb-1">About you</h3>
+                <p className="text-[13px] text-text-muted">Rate sets expectations. Pitch sets the tone.</p>
                 <Input
-                  label="Rate Expectations *"
-                  placeholder="e.g. $150-250/hr"
+                  label="Rate range"
+                  placeholder="e.g. $150–250/hr"
                   value={form.rateExpectation}
                   onChange={(e) => update("rateExpectation", e.target.value)}
                   error={fieldErrors.rateExpectation}
                 />
                 <Textarea
                   label="Why should you be vibechckd?"
-                  placeholder="What makes you different?"
+                  placeholder="What makes the work feel like yours? Don't sell — show."
                   value={form.pitch}
                   onChange={(e) => update("pitch", e.target.value)}
                   maxChars={1000}
@@ -428,16 +442,19 @@ export default function ApplicationForm({ initialName, initialEmail }: { initial
       </div>
 
       {submitError && (
-        <p className="text-[12px] text-negative text-center mt-4">{submitError}</p>
+        <div className="flex flex-col items-center gap-2 mt-4">
+          <ErrorX size={32} replay={submitError} />
+          <p className="text-[12px] text-negative text-center">{submitError}</p>
+        </div>
       )}
 
-      <div className="flex justify-between mt-8">
-        <Button variant="ghost" onClick={goBack} disabled={step === 1}>Back</Button>
+      <div className="flex justify-between items-center gap-3 mt-8">
+        <Button variant="ghost" onClick={goBack} disabled={step === 1} className="min-h-[44px] md:min-h-0">Back</Button>
         {step < 5 ? (
-          <Button onClick={goNext}>Continue</Button>
+          <Button onClick={goNext} size="lg" className="min-h-[44px] md:min-h-0 min-w-[120px]">Continue</Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Application"}
+          <Button onClick={handleSubmit} disabled={submitting} size="lg" className="min-h-[44px] md:min-h-0 min-w-[160px]">
+            {submitting ? "Submitting…" : "Submit application"}
           </Button>
         )}
       </div>

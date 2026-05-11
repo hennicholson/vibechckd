@@ -118,7 +118,7 @@ function ProfilePreview({ data, portfolio = [] }: { data: ProfileData; portfolio
                 <h2 className="text-[18px] font-semibold text-text-primary tracking-[-0.02em]">
                   {data.displayName || "Your Name"}
                 </h2>
-                {data.verified && <VerifiedSeal size="md" />}
+                {data.verified && <VerifiedSeal size="md" animate />}
               </div>
 
               {/* Specialty + rate */}

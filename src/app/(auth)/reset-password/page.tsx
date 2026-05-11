@@ -3,14 +3,17 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
+import { useToast, failed } from "@/components/Toast";
 
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
   const email = searchParams.get("email") || "";
+  const { toast } = useToast();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,17 +29,17 @@ function ResetPasswordContent() {
     setError("");
 
     if (!passwordLongEnough) {
-      setError("Password must be at least 8 characters");
+      setError("Passwords need at least 8 characters.");
       return;
     }
 
     if (!passwordsMatch) {
-      setError("Passwords do not match");
+      setError("Those two don't match yet.");
       return;
     }
 
     if (!token || !email) {
-      setError("Invalid reset link. Please request a new one.");
+      setError("This reset link is invalid. Request a new one.");
       return;
     }
 
@@ -52,13 +55,15 @@ function ResetPasswordContent() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong");
+        setError(data.error || "We hit a snag resetting that.");
+        toast(failed("reset your password"), "error");
         return;
       }
 
       router.push("/login?reset=success");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Connection hiccup. Try again.");
+      toast(failed("reset your password"), "error");
     } finally {
       setLoading(false);
     }
@@ -66,60 +71,82 @@ function ResetPasswordContent() {
 
   if (!token || !email) {
     return (
-      <div>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      >
         <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] text-center">
-          Invalid reset link
+          This link is stale
         </h1>
         <p className="text-[13px] text-text-muted text-center mt-1 mb-6">
-          This reset link is invalid or has expired.
+          Reset links expire fast for safety. Grab a fresh one.
         </p>
         <div className="space-y-3">
-          <Button href="/forgot-password" className="w-full">Request a new link</Button>
+          <Button href="/forgot-password" className="w-full min-h-[44px] md:min-h-0" size="lg">Request a new link</Button>
           <p className="text-[13px] text-text-muted text-center">
             <Link href="/login" className="text-text-primary font-medium hover:underline">
               Back to sign in
             </Link>
           </p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
+  const showMismatch = newPassword.length > 0 && confirmPassword.length > 0 && !passwordsMatch;
+
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
       <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] text-center">
-        Set new password
+        Set a new password
       </h1>
       <p className="text-[13px] text-text-muted text-center mt-1 mb-6">
-        Enter your new password below
+        Make it a good one — at least 8 characters.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="New password"
-          type="password"
-          placeholder="Min 8 characters"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-        />
+        <div>
+          <Input
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          {newPassword.length > 0 && !passwordLongEnough && (
+            <p className="text-[11px] text-text-muted mt-1.5">{8 - newPassword.length} more character{8 - newPassword.length === 1 ? "" : "s"} to go.</p>
+          )}
+          {passwordLongEnough && (
+            <p className="text-[11px] text-positive mt-1.5 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Long enough
+            </p>
+          )}
+        </div>
         <Input
           label="Confirm password"
           type="password"
-          placeholder="Repeat your password"
+          autoComplete="new-password"
+          placeholder="Type it again"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
+          error={showMismatch ? "Doesn't match yet" : undefined}
         />
 
         {error && (
-          <p className="text-[12px] text-negative">{error}</p>
+          <p className="text-[12px] text-negative" role="alert" aria-live="polite">{error}</p>
         )}
 
-        {newPassword && confirmPassword && !passwordsMatch && (
-          <p className="text-[12px] text-negative">Passwords do not match</p>
-        )}
-
-        <Button type="submit" className="w-full" disabled={!canSubmit}>
-          {loading ? "Resetting..." : "Reset password"}
+        <Button type="submit" className="w-full min-h-[44px] md:min-h-0" size="lg" disabled={!canSubmit}>
+          {loading ? "Resetting…" : "Reset password"}
         </Button>
       </form>
 
@@ -128,7 +155,7 @@ function ResetPasswordContent() {
           Back to sign in
         </Link>
       </p>
-    </div>
+    </motion.div>
   );
 }
 

@@ -9,7 +9,7 @@ import {
   users,
   conversations,
 } from "@/db/schema";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { eq, and, ne, desc, inArray } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { createInvoice } from "@/lib/whop";
 import { emails } from "@/lib/email";
@@ -113,6 +113,41 @@ export async function POST(request: NextRequest) {
 
     if (!senderMembership) {
       return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // SECURITY: Validate splits before any external API calls. Without
+    // these checks (a) a project member could route funds to userIds
+    // OUTSIDE the project, and (b) splits don't have to sum to the
+    // total amount — both are credited verbatim by the webhook on
+    // payment success.
+    if (splits && splits.length > 0) {
+      const splitSum = splits.reduce((acc, s) => acc + s.amountCents, 0);
+      if (splitSum !== amount) {
+        return Response.json(
+          {
+            error: `Splits must sum to invoice total. Got ${splitSum}, expected ${amount}.`,
+          },
+          { status: 400 }
+        );
+      }
+      const splitUserIds = Array.from(new Set(splits.map((s) => s.userId)));
+      const memberRows = await db
+        .select({ userId: projectMembers.userId })
+        .from(projectMembers)
+        .where(
+          and(
+            eq(projectMembers.projectId, projectId),
+            inArray(projectMembers.userId, splitUserIds)
+          )
+        );
+      const memberSet = new Set(memberRows.map((r) => r.userId));
+      const outside = splitUserIds.filter((id) => !memberSet.has(id));
+      if (outside.length > 0) {
+        return Response.json(
+          { error: "Splits must only credit project members." },
+          { status: 400 }
+        );
+      }
     }
 
     // Look up the other project member's email and ID if not provided

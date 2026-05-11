@@ -9,4 +9,16 @@
 |----|------|---|-------|------|
 | #8914 | 1:11 PM | 🟣 | Database data layer and seed script implementation completed | ~504 |
 | #8912 | 1:10 PM | 🔄 | Simplified database query in seed script | ~286 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10409 | 11:04 PM | 🔵 | Marketplace Platform Data Model with Whop Payment Integration | ~649 |
+
+### May 11, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #11104 | 1:29 AM | 🔵 | Payment Architecture Audited via Explore Agent | ~401 |
 </claude-mem-context>

@@ -14,13 +14,14 @@ import { parseBody, z } from "@/lib/validation";
 import { publishConversationEvent } from "@/lib/conversation-bus";
 import { notifyWhopUsers } from "@/lib/whop-notifications";
 
+// User-writable message types only. `system` and `ai` are server-emitted
+// (webhook system banners, AI assistants) — accepting them from a user
+// lets them impersonate platform messages.
 const messagePostSchema = z
   .object({
     projectId: z.string().uuid(),
     content: z.string().min(1).max(10_000),
-    messageType: z
-      .enum(["text", "file", "system", "ai"])
-      .optional(),
+    messageType: z.enum(["text", "file"]).optional(),
     fileUrl: z.string().url().max(2048).nullable().optional(),
   })
   .strict();

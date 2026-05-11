@@ -20,4 +20,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #10371 | 11:49 PM | 🔄 | Improved job application UX by keeping users on job page after applying | ~359 |
+
+### Apr 29, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #10462 | 6:07 PM | 🔄 | Removed PageShell wrapper from JobApplyClient component | ~311 |
 </claude-mem-context>

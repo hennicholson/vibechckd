@@ -187,3 +187,36 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   return NextResponse.json({ success: true, applicationId: created.id, updated: false });
 }
+
+// DELETE /api/jobs/[id]/apply — creator withdraws their own application.
+// Only allowed while the application is in the `applied` state (i.e. the
+// client hasn't shortlisted, rejected, or hired them yet). After that the
+// decision belongs to the client, not the creator.
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { id: jobId } = await ctx.params;
+  const [existing] = await db
+    .select({ id: jobApplications.id, status: jobApplications.status })
+    .from(jobApplications)
+    .where(
+      and(
+        eq(jobApplications.jobId, jobId),
+        eq(jobApplications.creatorId, session.user.id)
+      )
+    )
+    .limit(1);
+  if (!existing) {
+    return NextResponse.json({ error: "No application to withdraw" }, { status: 404 });
+  }
+  if (existing.status !== "applied") {
+    return NextResponse.json(
+      { error: "Can't pull this — the client has already reviewed it." },
+      { status: 409 }
+    );
+  }
+  await db.delete(jobApplications).where(eq(jobApplications.id, existing.id));
+  return NextResponse.json({ success: true });
+}

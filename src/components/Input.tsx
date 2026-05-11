@@ -21,7 +21,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
-          className={`w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-[14px] text-text-primary placeholder:text-text-muted/60 transition-colors duration-150 focus:outline-none focus:border-text-secondary ${
+          className={`w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-[16px] md:text-[13px] text-text-primary placeholder:text-text-muted/60 transition-colors duration-150 focus:outline-none focus:border-text-secondary ${
             error ? "border-negative" : ""
           } ${className}`}
           {...props}
