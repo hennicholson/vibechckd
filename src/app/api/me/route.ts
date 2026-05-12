@@ -38,14 +38,23 @@ export async function GET() {
       image: users.image,
       role: users.role,
       whopUserId: users.whopUserId,
+      // Surface verification timestamp so settings can show "Verified ✓"
+      // or the unverified state with a resend CTA. null = never verified.
+      emailVerified: users.emailVerified,
+      passwordHash: users.passwordHash,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
   if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Don't leak the actual hash — just whether one exists (drives the
+  // "Set password" CTA for Whop SSO users who haven't linked yet).
+  const { passwordHash, ...rest } = u;
   return NextResponse.json({
-    ...u,
+    ...rest,
     whopLinked: !!u.whopUserId,
+    emailVerified: u.emailVerified ? u.emailVerified.toISOString() : null,
+    hasPassword: !!passwordHash,
   });
 }
 

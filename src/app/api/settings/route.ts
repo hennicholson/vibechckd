@@ -59,6 +59,9 @@ export async function GET() {
       email: users.email,
       passwordHash: users.passwordHash,
       whopUserId: users.whopUserId,
+      // Surface verification timestamp so the settings page can render
+      // "Verified ✓" or the resend CTA. null = unverified.
+      emailVerified: users.emailVerified,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
@@ -79,6 +82,9 @@ export async function GET() {
     profileStatus: profile?.status ?? null,
     hasPassword: !!user?.passwordHash,
     whopLinked: !!user?.whopUserId,
+    emailVerified: user?.emailVerified
+      ? user.emailVerified.toISOString()
+      : null,
   });
 }
 

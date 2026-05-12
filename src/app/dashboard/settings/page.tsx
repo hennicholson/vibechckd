@@ -73,6 +73,13 @@ export default function SettingsPage() {
   // of "Change password" and skip the current-password input.
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [whopLinked, setWhopLinked] = useState(false);
+  // Email verification state. null while loading; ISO timestamp string once
+  // verified; "" (empty) while unverified. The settings page polls /api/settings
+  // when the tab regains focus so a click-through verification from another
+  // tab updates the badge here without a refresh.
+  const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null | undefined>(undefined);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
 
   // ── Email change section ──
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -173,6 +180,11 @@ export default function SettingsPage() {
         if (cancelled) return;
         if (typeof data?.hasPassword === "boolean") setHasPassword(data.hasPassword);
         if (typeof data?.whopLinked === "boolean") setWhopLinked(data.whopLinked);
+        // emailVerified is an ISO string or null. Storing the string lets us
+        // do a "Verified MMM d" subtitle if we ever want a verification date.
+        if (data?.emailVerified !== undefined) {
+          setEmailVerifiedAt(data.emailVerified ?? null);
+        }
         if (!isCreator) {
           setProfileVisibleLoaded(true);
           return;
@@ -201,6 +213,61 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, [isCreator]);
+
+  // Refetch verification status on focus + visibility change. Lets users
+  // verify in another tab and see the "Verified" badge flip here without
+  // a hard refresh.
+  useEffect(() => {
+    let inFlight = false;
+    const refetch = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const r = await fetch("/api/settings");
+        if (!r.ok) return;
+        const data = await r.json();
+        if (data?.emailVerified !== undefined) {
+          setEmailVerifiedAt(data.emailVerified ?? null);
+        }
+      } catch {
+        // ignore — next focus event tries again
+      } finally {
+        inFlight = false;
+      }
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    window.addEventListener("focus", refetch);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", refetch);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+
+  // ── Resend verification email ──
+  // Endpoint is enumeration-safe + rate-limited (3/10min IP, 3/hour email),
+  // so we always show "sent" even if dispatch was suppressed. The user
+  // can keep clicking; the cooldown copy below softens the UX.
+  async function handleResendVerification() {
+    if (!email || resending || resent) return;
+    setResending(true);
+    try {
+      await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResent(true);
+      toast("Verification link sent — check your inbox.", "success");
+      setTimeout(() => setResent(false), 30_000);
+    } catch {
+      toast(failed("send the verification link"), "error");
+    } finally {
+      setResending(false);
+    }
+  }
 
   // ── Password submission ──
   async function submitPasswordChange(e: React.FormEvent) {
@@ -420,20 +487,66 @@ export default function SettingsPage() {
         <div id="account" className="border border-border rounded-[10px] p-5 mb-4 scroll-mt-24">
           <h2 className="text-[14px] font-medium text-text-primary mb-4">Account</h2>
 
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-[13px] text-text-muted truncate">{email || "your@email.com"}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setEmailModalOpen(true);
-                setEmailError(null);
-                setEmailCurrentPassword("");
-                setNewEmail("");
-              }}
-              className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150 cursor-pointer shrink-0"
-            >
-              Change email
-            </button>
+          {/* Email + verification status. Three render states:
+              • loading: skeleton-ish (status undefined)
+              • verified: subtle green dot + "Verified" pill, no resend CTA
+              • unverified: warning-toned chip + Resend button. The resend
+                endpoint is enumeration-safe so we always toast "sent" — the
+                button locks for 30s to prevent inbox-bombing your own email. */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] text-text-primary truncate">{email || "your@email.com"}</p>
+                <div className="mt-1 h-[18px] flex items-center">
+                  {emailVerifiedAt === undefined ? (
+                    <span className="inline-block w-20 h-3 rounded bg-surface-muted animate-pulse" />
+                  ) : emailVerifiedAt ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-positive">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Verified
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-warning">
+                      <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                      Unverified
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailModalOpen(true);
+                  setEmailError(null);
+                  setEmailCurrentPassword("");
+                  setNewEmail("");
+                }}
+                className="text-[12px] text-text-secondary hover:text-text-primary transition-colors duration-150 cursor-pointer shrink-0"
+              >
+                Change email
+              </button>
+            </div>
+
+            {/* Unverified-state nudge — only renders once we know the
+                status. Sits inside a soft warning-toned panel so it reads
+                as "to-do" not "broken." */}
+            {emailVerifiedAt === null && (
+              <div className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 flex items-center justify-between gap-3">
+                <p className="text-[12px] text-text-secondary leading-snug min-w-0">
+                  Verify this email to unlock sign-in outside Whop and confirm we can reach you.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resending || resent}
+                  className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-md bg-text-primary text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resending ? "Sending…" : resent ? "Sent" : "Send link"}
+                </button>
+              </div>
+            )}
           </div>
 
           {!showPasswordForm ? (
