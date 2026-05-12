@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
+import { createHash, randomBytes } from "crypto";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, emailVerificationTokens } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { parseBody, z } from "@/lib/validation";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
+import { emails } from "@/lib/email";
 
 // Change the currently-authenticated user's email address. Requires proof of
-// possession via currentPassword. On success the email is updated and
-// emailVerified is cleared — a sibling flow (owned by another agent) handles
-// re-verification dispatch. We return `needsReverification: true` so the
-// client can surface that and sign the user out.
+// possession via currentPassword. On success the email is updated, emailVerified
+// is cleared, and a fresh verification token + email is dispatched against the
+// NEW address so the user can re-verify. We return `needsReverification: true`
+// so the client can surface that and sign the user out.
+
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+function baseUrl(): string {
+  return process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+}
 const emailChangeSchema = z
   .object({
     currentPassword: z.string().min(1).max(200),
@@ -117,5 +127,31 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ success: true, needsReverification: true });
+  // Issue a fresh verification token against the NEW address. Old tokens
+  // (pointing at the previous email) are wiped so they can't be reused.
+  await db
+    .delete(emailVerificationTokens)
+    .where(eq(emailVerificationTokens.userId, session.user.id));
+
+  const rawToken = randomBytes(32).toString("hex");
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
+
+  await db.insert(emailVerificationTokens).values({
+    userId: session.user.id,
+    tokenHash,
+    email: newEmail,
+    expiresAt,
+  });
+
+  const verifyUrl = `${baseUrl()}/verify-email?token=${rawToken}&email=${encodeURIComponent(newEmail)}`;
+
+  // Fire-and-forget — the response shouldn't block on delivery.
+  emails.emailVerification(newEmail, verifyUrl).catch(() => {});
+
+  return NextResponse.json({
+    success: true,
+    needsReverification: true,
+    email: newEmail,
+  });
 }

@@ -24,6 +24,11 @@ export default function WelcomeForm({ defaultEmail, defaultName, next, cameFromW
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // After /api/welcome succeeds we hold on a "check your inbox" screen so the
+  // user knows the link is required to enable external (non-Whop) login.
+  // They can still proceed to the dashboard / vetting flow — Whop SSO works
+  // unverified — but external login is gated until they click the link.
+  const [verificationSent, setVerificationSent] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,11 +59,10 @@ export default function WelcomeForm({ defaultEmail, defaultName, next, cameFromW
         toast(failed("finish setup"), "error");
         return;
       }
-      // Creators go straight into the existing vetting form. Clients land on
-      // wherever they were trying to go (defaults to /dashboard).
-      const dest = role === "coder" ? "/apply" : next;
-      router.push(dest);
-      router.refresh();
+      // Show the "check inbox" interstitial. The user can proceed via the
+      // CTA at the bottom of that screen — they're already authenticated via
+      // Whop SSO so the dashboard isn't blocked.
+      setVerificationSent(true);
     } catch {
       setSubmitting(false);
       setError("Connection hiccup. Try again.");
@@ -66,7 +70,108 @@ export default function WelcomeForm({ defaultEmail, defaultName, next, cameFromW
     }
   }
 
+  async function resendVerification() {
+    try {
+      await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      toast("Fresh link sent — check your inbox.", "success");
+    } catch {
+      // resend-verification is enumeration-safe and always returns success.
+    }
+  }
+
+  function continueToDestination() {
+    const dest = role === "coder" ? "/apply" : next;
+    router.push(dest);
+    router.refresh();
+  }
+
   const firstName = defaultName?.split(" ")[0];
+
+  // ── "Check your inbox" interstitial — visible after /api/welcome accepts.
+  // Same shell + brand lockup as the form so the transition feels like one
+  // page, not a different screen. Two CTAs: resend (in case the email
+  // doesn't land) + continue (Whop SSO already authenticated, so we don't
+  // gate the dashboard on verification).
+  if (verificationSent) {
+    return (
+      <main className="min-h-full flex items-start md:items-center justify-center bg-background px-4 py-10">
+        <div className="w-full max-w-[420px]">
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center mb-7"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-[16px] font-semibold text-text-primary">vibechckd</span>
+              <VerifiedSeal size="sm" animate />
+            </div>
+            <span className="text-[11px] text-text-muted mt-1">The vetted coder marketplace</span>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+            className="border border-border rounded-[10px] p-6 text-center"
+          >
+            {/* Envelope mark with breathing pulse — mirrors /verify-email
+                so users who saw that screen recognize the pattern. */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="relative inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-muted border border-border mb-4"
+            >
+              <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <motion.span
+                aria-hidden
+                className="absolute inset-0 rounded-full border border-text-primary/15"
+                initial={{ scale: 1, opacity: 0.8 }}
+                animate={{ scale: 1.6, opacity: 0 }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+              />
+            </motion.div>
+
+            <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em]">
+              Check your inbox
+            </h1>
+            <p className="text-[13px] text-text-muted mt-1 mb-5 leading-relaxed">
+              We sent a verification link to{" "}
+              <span className="text-text-primary font-medium break-all">{email}</span>.
+              Click it to enable sign-in outside Whop.
+            </p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={continueToDestination}
+                className="w-full py-3 md:py-2 text-[14px] md:text-[13px] font-medium bg-text-primary text-background rounded-lg hover:opacity-90 transition-opacity min-h-[44px] md:min-h-0"
+              >
+                {role === "coder" ? "Continue to vetting" : "Continue to dashboard"}
+              </button>
+              <button
+                type="button"
+                onClick={resendVerification}
+                className="w-full py-2 text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Didn&apos;t arrive? Resend
+              </button>
+              <p className="text-[11px] text-text-muted leading-relaxed pt-2">
+                You&apos;re signed in via Whop already — verification just unlocks signing in at vibechckd.cc directly.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-full flex items-start md:items-center justify-center bg-background px-4 py-10">
