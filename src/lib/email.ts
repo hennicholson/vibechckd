@@ -1,8 +1,26 @@
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// SendGrid swap (May 2026). Resend's domain verifier got stuck in `pending`
+// for 5+ hours on vibechckd.cc — couldn't unblock real-user signup. SendGrid
+// supports single-sender verification (click a link, no DNS) so we can send
+// from `noreply@vibechckd.cc` immediately. Same `emails.*` export surface as
+// before so callers are untouched.
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+// FROM_EMAIL must match the verified sender identity in SendGrid. Default
+// matches what we expect users to verify; can be overridden via env.
 const FROM_EMAIL = process.env.EMAIL_FROM || "vibechckd <noreply@vibechckd.cc>";
 const APP_URL = process.env.NEXT_PUBLIC_URL || "https://vibechckd.cc";
+
+// Parse "Display Name <email@host>" into { name, email } for SendGrid which
+// prefers the structured object form over the joined string.
+function parseFrom(s: string): { email: string; name?: string } {
+  const m = s.match(/^\s*(.+?)\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1], email: m[2] };
+  return { email: s.trim() };
+}
 
 // Escape user-controlled strings before embedding in HTML.
 // Apply to any value that originates from user input or DB fields that
@@ -150,21 +168,27 @@ export async function sendEmail(params: {
   ctaPlain?: boolean;
   footer?: string;
 }) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log("Email skipped (no RESEND_API_KEY):", params.subject, "->", params.to);
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log("Email skipped (no SENDGRID_API_KEY):", params.subject, "->", params.to);
     return;
   }
 
   try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
+    await sgMail.send({
+      from: parseFrom(FROM_EMAIL),
       to: params.to,
       subject: params.subject,
       html: brandedEmail(params),
     });
     console.log("Email sent:", params.subject, "->", params.to);
   } catch (error) {
-    console.error("Email send failed:", error);
+    // SendGrid throws { response: { body: { errors: [...] } } } — surface
+    // the actual reason so silent failures get caught in function logs.
+    const sgErr = error as { response?: { body?: unknown }; message?: string };
+    console.error(
+      "Email send failed:",
+      sgErr?.response?.body || sgErr?.message || error
+    );
     // Non-blocking — don't fail the API request if email fails
   }
 }

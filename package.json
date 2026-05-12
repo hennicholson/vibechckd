@@ -16,6 +16,7 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
     "@neondatabase/serverless": "^1.0.2",
+    "@sendgrid/mail": "^8.1.6",
     "@whop/embedded-components-react-js": "^0.0.12",
     "@whop/embedded-components-vanilla-js": "^0.0.12",
     "@whop/react": "^0.3.2",
